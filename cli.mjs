@@ -342,13 +342,27 @@ async function preflightChecks(cwd, category, slug) {
     });
   }
 
-  // 7. Tamanho da pasta
+  // 7. Tamanho da pasta + arquivos individuais grandes
   let totalBytes = 0;
-  walkSource(cwd, (full) => { totalBytes += statSync(full).size; });
+  const bigFiles = [];
+  walkSource(cwd, (full, rel) => {
+    const sz = statSync(full).size;
+    totalBytes += sz;
+    if (sz > 10 * 1024 * 1024) bigFiles.push({ rel, sz });
+  });
   if (totalBytes > 100 * 1024 * 1024) {
     issues.push({
       level: "warn",
-      msg: `Pasta grande: ${(totalBytes / 1024 / 1024).toFixed(1)} MB. Considere otimizar imagens (TinyPNG, squoosh.app).`,
+      msg: `Pasta grande: ${(totalBytes / 1024 / 1024).toFixed(1)} MB. Otimize imagens (squoosh.app, tinypng.com).`,
+    });
+  }
+  if (bigFiles.length) {
+    const sample = bigFiles.slice(0, 3)
+      .map(f => `  ${c.dim}${(f.sz / 1024 / 1024).toFixed(1)} MB:${c.reset} ${f.rel}`).join("\n");
+    issues.push({
+      level: "warn",
+      msg: `${bigFiles.length} arquivo(s) acima de 10 MB — push via HTTPS pode falhar:\n${sample}`,
+      fix: "Comprima imagens em squoosh.app ou tinypng.com antes de publicar.",
     });
   }
 
@@ -459,7 +473,7 @@ async function cmdDeploy(argv) {
   const sp2 = new Spinner("Conectando ao repositório do sistema...").start();
   try {
     execSync(
-      `git clone --depth 1 https://${config.token}@github.com/${REPO}.git "${tmp}"`,
+      `git clone --depth 1 -c http.postBuffer=524288000 https://${config.token}@github.com/${REPO}.git "${tmp}"`,
       { stdio: "pipe" },
     );
   } catch (e) {
@@ -509,12 +523,43 @@ async function cmdDeploy(argv) {
   try {
     execSync(`git config user.email "${config.email}"`, gitOpts);
     execSync(`git config user.name "${config.name}"`, gitOpts);
+    // Buffer maior pra pushes com imagens pesadas via HTTPS
+    execSync(`git config http.postBuffer 524288000`, gitOpts);
+    execSync(`git config http.maxRequestBuffer 100M`, gitOpts);
+    execSync(`git config core.compression 0`, gitOpts);
     execSync(`git add sites/${category}/${slug}`, gitOpts);
     execSync(`git commit -m "feat(sites): ${verb} ${fullSlug}"`, gitOpts);
-    execSync(`git push`, gitOpts);
+    // Tenta push; se falhar com erro de buffer, tenta de novo com --no-thin
+    try {
+      execSync(`git push`, gitOpts);
+    } catch (pushErr) {
+      const msg = (pushErr.stderr?.toString() || "") + (pushErr.stdout?.toString() || "");
+      if (/HTTP 400|sideband|RPC failed|hung up/.test(msg)) {
+        sp3.update("Push grande — tentando com configuração otimizada...");
+        execSync(`git push --no-thin`, gitOpts);
+      } else {
+        throw pushErr;
+      }
+    }
   } catch (e) {
     sp3.fail("Falha ao subir");
-    err(e.stderr?.toString() || e.message);
+    const errMsg = e.stderr?.toString() || e.message;
+    err(errMsg);
+    if (/HTTP 400|sideband|RPC failed/i.test(errMsg)) {
+      console.log();
+      info("Geralmente isso acontece quando tem arquivo muito grande na pasta.");
+      info("Dica: comprima imagens pesadas com https://squoosh.app ou https://tinypng.com");
+      info("Arquivos grandes detectados:");
+      const big = [];
+      walkSource(cwd, (full, rel) => {
+        const sz = statSync(full).size;
+        if (sz > 5 * 1024 * 1024) big.push({ rel, sz });
+      });
+      big.sort((a, b) => b.sz - a.sz).slice(0, 5).forEach(f => {
+        console.log(`   ${c.yellow}${(f.sz / 1024 / 1024).toFixed(1)} MB${c.reset}  ${f.rel}`);
+      });
+      if (!big.length) info("   (nenhum arquivo > 5MB encontrado — pode ser problema de rede)");
+    }
     rmSync(tmp, { recursive: true, force: true });
     process.exit(1);
   }

@@ -9,8 +9,9 @@ import {
   rmSync, cpSync, readdirSync, statSync,
 } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, basename, relative } from "node:path";
+import { join, basename, relative, extname } from "node:path";
 import readline from "node:readline";
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { BANNER } from "./banner.mjs";
 
 // ============================================================================
@@ -21,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "1.4.0";
+const VERSION = "2.0.0";
 
 // ============================================================================
 // UI helpers
@@ -549,6 +550,25 @@ async function cmdDeploy(argv) {
   });
   console.log(`${c.green}✓${c.reset} ${done} arquivo(s) copiado(s)`);
 
+  // ====== Upload de assets pesados pro R2 (se configurado) ======
+  if (config.r2) {
+    try {
+      const r2Result = await uploadAssetsToR2(targetPath, category, slug, config.r2);
+      if (r2Result.uploaded > 0 || r2Result.skipped > 0) {
+        const touched = rewriteSourceForR2(targetPath, config.r2, r2Result.remoteMap, category, slug);
+        const totalMb = (r2Result.totalBytes / 1024 / 1024).toFixed(1);
+        console.log();
+        ok(`R2: ${r2Result.uploaded} novo(s), ${r2Result.skipped} já existia(m) — ${totalMb}MB enviados`);
+        ok(`Source reescrito em ${touched} arquivo(s) — referências agora apontam pro R2`);
+      }
+    } catch (e) {
+      err(`Falha no upload R2: ${e.message}`);
+      info("Pulando R2 — os assets vão pro git mesmo (zip pode estourar 100MB).");
+    }
+  } else {
+    info(`${c.dim}R2 não configurado — assets vão pro git. Rode ${c.cyan}criarte-deploy r2-setup${c.reset}${c.dim} pra ativar.${c.reset}`);
+  }
+
   // ====== Commit + push ======
   const sp3 = new Spinner("Commitando e subindo pro GitHub...").start();
   const gitOpts = { cwd: tmp, stdio: "pipe" };
@@ -818,6 +838,13 @@ ${c.bold}Comandos:${c.reset}
     Analisa a estrutura do site da pasta atual e mostra problemas,
     SEM enviar pro GitHub. Ótimo pra checar antes de publicar.
 
+  ${c.cyan}criarte-deploy r2-setup${c.reset}
+    Configura upload automático de assets pesados pro Cloudflare R2.
+    Reduz drasticamente o tamanho do zip da Discloud. Recomendado!
+
+  ${c.cyan}criarte-deploy r2-disable${c.reset}
+    Desativa R2 — assets voltam pro git.
+
   ${c.cyan}criarte-deploy list${c.reset}
     Mostra todos os sites publicados.
 
@@ -833,6 +860,258 @@ ${c.bold}Fluxo do dia-a-dia (depois do login):${c.reset}
 }
 
 // ============================================================================
+// R2 — Cloudflare Object Storage (S3-compatible)
+// ============================================================================
+async function cmdR2Setup() {
+  miniHeader("☁️  Configurar Cloudflare R2");
+  const config = requireLogin();
+
+  console.log("Vamos configurar o upload de assets pesados pro R2.");
+  console.log("Antes de continuar, você precisa de 4 valores do dashboard do Cloudflare:\n");
+  console.log(`  ${c.dim}1.${c.reset} Endpoint S3            ${c.dim}(https://<conta>.r2.cloudflarestorage.com)${c.reset}`);
+  console.log(`  ${c.dim}2.${c.reset} Nome do bucket          ${c.dim}(ex: criarte)${c.reset}`);
+  console.log(`  ${c.dim}3.${c.reset} Public Development URL  ${c.dim}(https://pub-xxx.r2.dev)${c.reset}`);
+  console.log(`  ${c.dim}4.${c.reset} Access Key ID + Secret Key  ${c.dim}(do API Token)${c.reset}\n`);
+
+  const endpoint = await ask("Endpoint S3 → ");
+  // Endpoint pode vir com o bucket no path (ex: .../criarte) — separa
+  let cleanEndpoint = endpoint.trim().replace(/\/$/, "");
+  let bucketFromEndpoint = "";
+  const m = cleanEndpoint.match(/^(https:\/\/[^/]+)\/([^/]+)$/);
+  if (m) { cleanEndpoint = m[1]; bucketFromEndpoint = m[2]; }
+
+  const bucket = await ask("Nome do bucket → ", { default: bucketFromEndpoint });
+  const publicUrl = (await ask("Public Development URL → ")).replace(/\/$/, "");
+  const accessKeyId = await ask("Access Key ID → ");
+  const secretAccessKey = await ask("Secret Access Key → ", { hidden: true });
+
+  if (!cleanEndpoint || !bucket || !publicUrl || !accessKeyId || !secretAccessKey) {
+    err("Todos os campos são obrigatórios.");
+    process.exit(1);
+  }
+  if (!/^https:\/\//.test(cleanEndpoint))    { err("Endpoint inválido (precisa começar com https://)"); process.exit(1); }
+  if (!/^https:\/\/pub-/.test(publicUrl))     { err("Public URL inválida (precisa ser https://pub-xxx.r2.dev)"); process.exit(1); }
+
+  // Testa criando um cliente e fazendo um HEAD
+  const sp = new Spinner("Testando credenciais...").start();
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: cleanEndpoint,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  try {
+    // Sobe um arquivo de teste e remove via PutObjectCommand
+    await s3.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: ".criarte-deploy-test",
+      Body: "ok",
+      ContentType: "text/plain",
+    }));
+    sp.succeed("Credenciais válidas — consegui escrever no bucket");
+  } catch (e) {
+    sp.fail("Credenciais inválidas ou sem permissão");
+    err(e.message);
+    info("Confirma se o token tem permissão 'Object Read & Write' e cobre esse bucket.");
+    process.exit(1);
+  }
+
+  saveConfig({
+    ...config,
+    r2: { endpoint: cleanEndpoint, bucket, publicUrl, accessKeyId, secretAccessKey },
+  });
+
+  ok("R2 configurado!");
+  info(`Daqui pra frente, ${c.cyan}criarte-deploy${c.reset} vai subir assets pesados (>${SMALL_LIMIT_KB}KB) automaticamente pro R2.`);
+  info(`Pra desativar: ${c.cyan}criarte-deploy r2-disable${c.reset}`);
+}
+
+async function cmdR2Disable() {
+  const config = requireLogin();
+  if (!config.r2) { warn("R2 já está desativado."); return; }
+  delete config.r2;
+  saveConfig(config);
+  ok("R2 desativado. Próximos deploys vão incluir tudo no git.");
+}
+
+// Tamanho mínimo pra enviar pro R2. Arquivos menores que isso ficam no Git
+// (não vale a pena pagar request fee + latência pra 50KB).
+const SMALL_LIMIT_KB = 100;
+
+const MIME_TYPES = {
+  ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+  ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+  ".avif": "image/avif", ".ico": "image/x-icon",
+  ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".ogg": "audio/ogg", ".wav": "audio/wav",
+  ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+  ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf",
+  ".pdf": "application/pdf",
+};
+
+function getMimeType(file) {
+  return MIME_TYPES[extname(file).toLowerCase()] || "application/octet-stream";
+}
+
+/**
+ * Faz upload dos assets pesados pro R2 e reescreve o source pra apontar pras
+ * URLs públicas. Trabalha sobre a CÓPIA do site no temp dir, não toca os
+ * arquivos originais do usuário.
+ *
+ * Retorna { uploaded: number, totalBytes: number, skipped: number }
+ */
+async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: r2Config.endpoint,
+    credentials: { accessKeyId: r2Config.accessKeyId, secretAccessKey: r2Config.secretAccessKey },
+  });
+
+  // Lista todos os arquivos em public/ — eles são os candidatos
+  const publicDir = join(siteCopyPath, "public");
+  if (!existsSync(publicDir)) {
+    return { uploaded: 0, totalBytes: 0, skipped: 0, remoteMap: new Map() };
+  }
+
+  // Coleta arquivos elegíveis (> SMALL_LIMIT_KB)
+  const candidates = []; // { localPath, publicRelPath, sz }
+  function walkPublic(dir) {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) walkPublic(full);
+      else if (st.size >= SMALL_LIMIT_KB * 1024) {
+        const publicRel = relative(publicDir, full).replace(/\\/g, "/");
+        candidates.push({ localPath: full, publicRelPath: publicRel, sz: st.size });
+      }
+    }
+  }
+  walkPublic(publicDir);
+
+  if (candidates.length === 0) {
+    return { uploaded: 0, totalBytes: 0, skipped: 0, remoteMap: new Map() };
+  }
+
+  console.log(`\n${c.bold}📤 Upload de ${candidates.length} asset(s) pro R2:${c.reset}`);
+
+  const remoteMap = new Map(); // publicRelPath -> URL pública
+  let uploaded = 0;
+  let totalBytes = 0;
+  let skipped = 0;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const { localPath, publicRelPath, sz } = candidates[i];
+    const key = `${category}/${slug}/${publicRelPath}`;
+    const publicAssetUrl = `${r2Config.publicUrl}/${key}`;
+    const mb = (sz / 1024 / 1024).toFixed(2);
+
+    // Verifica se já está lá (skip pra ser idempotente)
+    let exists = false;
+    try {
+      await s3.send(new HeadObjectCommand({ Bucket: r2Config.bucket, Key: key }));
+      exists = true;
+    } catch {}
+
+    if (exists) {
+      process.stdout.write(`  ${c.dim}↻${c.reset} ${publicRelPath} ${c.dim}(${mb}MB — já existe)${c.reset}\n`);
+      remoteMap.set(publicRelPath, publicAssetUrl);
+      skipped++;
+      continue;
+    }
+
+    const sp = new Spinner(`Subindo ${publicRelPath} (${mb}MB) ${c.dim}[${i + 1}/${candidates.length}]${c.reset}`).start();
+    try {
+      await s3.send(new PutObjectCommand({
+        Bucket: r2Config.bucket,
+        Key: key,
+        Body: readFileSync(localPath),
+        ContentType: getMimeType(localPath),
+        CacheControl: "public, max-age=31536000, immutable",
+      }));
+      sp.succeed(`${publicRelPath} ${c.dim}(${mb}MB)${c.reset}`);
+      remoteMap.set(publicRelPath, publicAssetUrl);
+      uploaded++;
+      totalBytes += sz;
+    } catch (e) {
+      sp.fail(`Falha em ${publicRelPath}: ${e.message}`);
+      throw e;
+    }
+  }
+
+  return { uploaded, totalBytes, skipped, remoteMap };
+}
+
+/**
+ * Reescreve referências no source: /assets/foo.png → https://pub-xxx.r2.dev/<cat>/<slug>/assets/foo.png
+ * Também remove os arquivos do public/ que já estão no R2 (pra não ir no git).
+ */
+function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
+  if (remoteMap.size === 0) return 0;
+
+  let touched = 0;
+  // Mapa de prefixos a substituir: /assets/, /fonts/, /videos/, etc
+  // Pega os primeiros segmentos únicos dos publicRelPath
+  const prefixes = new Set();
+  for (const key of remoteMap.keys()) {
+    const first = key.split("/")[0];
+    if (first) prefixes.add(first);
+  }
+
+  // Walk no source (excluindo public/ — ele será removido depois)
+  const EXTS = /\.(tsx?|jsx?|css|scss|html|mjs|cjs|json|md)$/;
+  function walkSrc(dir) {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "public" || entry === "node_modules" || entry === ".next" || entry === "out") continue;
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) { walkSrc(full); continue; }
+      if (!EXTS.test(entry)) continue;
+
+      let content = readFileSync(full, "utf8");
+      let changed = false;
+
+      for (const prefix of prefixes) {
+        // Match `/assets/<algo-sem-aspas>` precedido por aspas, parêntese, vírgula, espaço ou início
+        // Captura: precedente + caminho relativo dentro do prefixo
+        const re = new RegExp(`(["'(\`,\\s=])/${prefix}/([^"'\`)\\s]+)`, "g");
+        content = content.replace(re, (m, pre, rest) => {
+          const publicRel = `${prefix}/${rest}`;
+          if (remoteMap.has(publicRel)) {
+            changed = true;
+            return `${pre}${remoteMap.get(publicRel)}`;
+          }
+          return m;
+        });
+      }
+      if (changed) {
+        writeFileSync(full, content);
+        touched++;
+      }
+    }
+  }
+  walkSrc(siteCopyPath);
+
+  // Remove os arquivos do public/ que foram pro R2 — eles não precisam mais
+  // estar no git. Mas mantém os pequenos (<100KB) que ficaram no git.
+  const publicDir = join(siteCopyPath, "public");
+  for (const publicRel of remoteMap.keys()) {
+    const localPath = join(publicDir, publicRel);
+    if (existsSync(localPath)) rmSync(localPath);
+  }
+  // Remove pastas vazias que sobraram (assets/, fonts/, etc)
+  function pruneEmpty(dir) {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) pruneEmpty(full);
+    }
+    if (readdirSync(dir).length === 0 && dir !== publicDir) rmSync(dir, { recursive: true, force: true });
+  }
+  pruneEmpty(publicDir);
+
+  return touched;
+}
+
+// ============================================================================
 // Router
 // ============================================================================
 const [, , cmd, ...rest] = process.argv;
@@ -845,10 +1124,12 @@ const COMMANDS = new Set(["login", "list", "ls", "check", "help", "--help", "-h"
       return;
     }
     switch (cmd) {
-      case "login":  await cmdLogin();  break;
+      case "login":      await cmdLogin();     break;
+      case "r2-setup":   await cmdR2Setup();   break;
+      case "r2-disable": await cmdR2Disable(); break;
       case "list":
-      case "ls":     await cmdList();   break;
-      case "check":  await cmdCheck();  break;
+      case "ls":         await cmdList();      break;
+      case "check":      await cmdCheck();     break;
       case "help":
       case "--help":
       case "-h":     cmdHelp();          break;

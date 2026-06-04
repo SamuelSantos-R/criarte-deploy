@@ -1,0 +1,16 @@
+{
+  "name": "criarte-deploy",
+  "version": "1.0.0",
+  "description": "CLI pra publicar sites no sistema multi-site da Criarte sem precisar baixar o monorepo",
+  "type": "module",
+  "bin": {
+    "criarte-deploy": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

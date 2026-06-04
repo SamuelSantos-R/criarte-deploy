@@ -21,7 +21,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "1.3.0";
+const VERSION = "1.3.1";
 
 // ============================================================================
 // UI helpers
@@ -213,6 +213,8 @@ const IGNORE_FILES = new Set([
   ".DS_Store", ".env", ".env.local", ".env.production.local",
   "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
   "tsconfig.tsbuildinfo",
+  // Arquivos do shell raiz que não fazem sentido dentro de um site individual
+  "discloud.config", "server.js", ".discloudignore",
 ]);
 
 function walkSource(dir, cb, base = dir) {

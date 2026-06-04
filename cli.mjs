@@ -21,7 +21,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "1.3.2";
+const VERSION = "1.4.0";
 
 // ============================================================================
 // UI helpers
@@ -616,23 +616,136 @@ async function cmdDeploy(argv) {
   sp3.succeed("Código enviado pro GitHub");
   rmSync(tmp, { recursive: true, force: true });
 
-  // ====== Sucesso ======
+  // ====== Monitora o CI até o fim ======
+  console.log();
+  hr();
+  heading("👀 Acompanhando o deploy");
+  const monitorResult = await monitorDeploy(config.token, fullSlug);
+
+  // ====== Resultado final ======
   console.log();
   hr();
   console.log();
-  console.log(`${c.green}${c.bold}🎉 Pronto! Site enviado com sucesso.${c.reset}`);
-  console.log();
-  console.log(`${c.dim}O CI vai agora:${c.reset}`);
-  console.log(`  ${c.dim}1.${c.reset} Reescrever package.json e next.config (basePath /${fullSlug})`);
-  console.log(`  ${c.dim}2.${c.reset} Buildar o site (next build → static export)`);
-  console.log(`  ${c.dim}3.${c.reset} Deployar na Discloud`);
-  console.log();
-  console.log(`🚀 ${c.bold}Acompanhe:${c.reset}`);
-  console.log(`   ${c.cyan}${ACTIONS_URL}${c.reset}`);
-  console.log();
-  console.log(`🌐 ${c.bold}Em ~5 minutos o site estará em:${c.reset}`);
-  console.log(`   ${c.cyan}${targetUrl}${c.reset}`);
-  console.log();
+  if (monitorResult.ok) {
+    console.log(`${c.green}${c.bold}🎉 Site no ar!${c.reset}`);
+    console.log();
+    console.log(`🌐 ${c.bold}${targetUrl}${c.reset}`);
+    console.log();
+  } else {
+    console.log(`${c.red}${c.bold}❌ Deploy falhou.${c.reset}`);
+    console.log();
+    if (monitorResult.reason) console.log(`${c.red}${monitorResult.reason}${c.reset}`);
+    if (monitorResult.url) {
+      console.log();
+      console.log(`📋 Ver log completo: ${c.cyan}${monitorResult.url}${c.reset}`);
+    }
+    console.log();
+    process.exit(1);
+  }
+}
+
+// ============================================================================
+// MONITOR DO CI — espera o workflow_run desse push terminar
+// ============================================================================
+async function monitorDeploy(token, fullSlug) {
+  const start = Date.now();
+  const TIMEOUT_MS = 15 * 60 * 1000; // 15min teto
+  const POLL_MS = 6000;
+
+  // 1) Acha o workflow run criado pelo nosso push (espera até 60s pra ele aparecer)
+  let run = null;
+  const findSp = new Spinner("Aguardando o GitHub registrar o build...").start();
+  const lookStart = Date.now();
+  while (Date.now() - lookStart < 60000) {
+    const res = await ghFetch(
+      `/repos/${REPO}/actions/workflows/deploy-discloud.yml/runs?per_page=3`,
+      token,
+    );
+    if (res && res.workflow_runs?.length) {
+      // Pega o mais recente que tá in_progress, queued OU completed nos últimos 90s
+      const fresh = res.workflow_runs.find((r) => {
+        const age = Date.now() - new Date(r.created_at).getTime();
+        return age < 90_000;
+      });
+      if (fresh) { run = fresh; break; }
+    }
+    await sleep(3000);
+  }
+  if (!run) {
+    findSp.fail("Não detectei o workflow no GitHub Actions");
+    return { ok: false, reason: "Talvez o push não tenha disparado o CI. Verifica em " + ACTIONS_URL };
+  }
+  findSp.succeed(`Build #${run.run_number} registrado (commit "${(run.display_title || "").slice(0, 50)}…")`);
+  console.log(`   ${c.dim}→ ${run.html_url}${c.reset}`);
+
+  // 2) Polla até completar
+  let lastStatus = null;
+  let lastJob = null;
+  const runSp = new Spinner("Build em fila...").start();
+
+  while (Date.now() - start < TIMEOUT_MS) {
+    const cur = await ghFetch(`/repos/${REPO}/actions/runs/${run.id}`, token);
+    if (!cur) {
+      await sleep(POLL_MS);
+      continue;
+    }
+
+    // Mostra status do job atual (validate / deploy)
+    if (cur.status === "in_progress") {
+      const jobsRes = await ghFetch(`/repos/${REPO}/actions/runs/${run.id}/jobs`, token);
+      const inProgressJob = jobsRes?.jobs?.find((j) => j.status === "in_progress");
+      const currentJob = inProgressJob?.name || lastJob || "build";
+      if (currentJob !== lastJob || cur.status !== lastStatus) {
+        runSp.update(`Rodando: ${c.bold}${currentJob}${c.reset}`);
+        lastJob = currentJob;
+      }
+    } else if (cur.status === "queued" && lastStatus !== "queued") {
+      runSp.update("Aguardando runner disponível...");
+    }
+    lastStatus = cur.status;
+
+    if (cur.status === "completed") {
+      if (cur.conclusion === "success") {
+        runSp.succeed(`Deploy concluído (${cur.conclusion})`);
+        return { ok: true, url: cur.html_url };
+      } else {
+        runSp.fail(`Deploy falhou (${cur.conclusion})`);
+        // Tenta pegar o motivo real: último step que falhou
+        const jobsRes = await ghFetch(`/repos/${REPO}/actions/runs/${run.id}/jobs`, token);
+        const failedJob = jobsRes?.jobs?.find((j) => j.conclusion === "failure");
+        const failedStep = failedJob?.steps?.find((s) => s.conclusion === "failure");
+        const reason = failedStep
+          ? `Falhou em "${failedStep.name}" do job "${failedJob.name}"`
+          : `Conclusão: ${cur.conclusion}`;
+        return { ok: false, reason, url: cur.html_url };
+      }
+    }
+
+    await sleep(POLL_MS);
+  }
+
+  runSp.warn("Tempo esgotado (15min) — ainda rodando");
+  return { ok: false, reason: "Build demorou mais que 15min. Acompanhe manualmente.", url: run.html_url };
+}
+
+async function ghFetch(path, token) {
+  try {
+    const r = await fetch(`https://api.github.com${path}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 // ============================================================================

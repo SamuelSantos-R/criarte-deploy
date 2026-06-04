@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "2.0.0";
+const VERSION = "2.0.1";
 
 // ============================================================================
 // UI helpers
@@ -958,6 +958,39 @@ function getMimeType(file) {
  *
  * Retorna { uploaded: number, totalBytes: number, skipped: number }
  */
+/**
+ * Procura no source (src/, app/, etc — não public/) por arquivos referenciados
+ * via `import` ou `require`. Esses arquivos precisam ficar locais — next/font/local,
+ * webpack asset imports, etc, exigem o arquivo no disco no momento do build.
+ *
+ * Retorna Set com nomes-base de arquivos a NÃO subir pro R2.
+ */
+function detectImportedAssets(siteCopyPath) {
+  const imported = new Set();
+  const EXTS = /\.(tsx?|jsx?|css|scss|mjs|cjs|html)$/;
+  // Pega qualquer string que termine em extensão de asset, dentro de import/require/from
+  const IMPORT_RE = /(?:import|require|from)\s*\(?\s*["'`]([^"'`]+\.(?:ttf|otf|woff2?|eot|png|jpe?g|gif|webp|svg|avif|ico|mp3|mp4|webm|m4a|ogg|wav|mov|pdf))["'`]/gi;
+
+  function walk(dir) {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "public" || entry === "node_modules" || entry === ".next" || entry === "out") continue;
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) { walk(full); continue; }
+      if (!EXTS.test(entry)) continue;
+      const content = readFileSync(full, "utf8");
+      let m;
+      while ((m = IMPORT_RE.exec(content)) !== null) {
+        const importPath = m[1];
+        const filename = basename(importPath);
+        imported.add(filename);
+      }
+    }
+  }
+  walk(siteCopyPath);
+  return imported;
+}
+
 async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
   const s3 = new S3Client({
     region: "auto",
@@ -971,20 +1004,32 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
     return { uploaded: 0, totalBytes: 0, skipped: 0, remoteMap: new Map() };
   }
 
-  // Coleta arquivos elegíveis (> SMALL_LIMIT_KB)
+  // Detecta arquivos importados via `import`/`require` no source — esses
+  // PRECISAM ficar locais (next/font/local, webpack asset modules, etc).
+  const importedAssets = detectImportedAssets(siteCopyPath);
+  if (importedAssets.size > 0) {
+    info(`${importedAssets.size} asset(s) detectado(s) como import — mantidos locais: ${c.dim}${[...importedAssets].slice(0, 5).join(", ")}${importedAssets.size > 5 ? "…" : ""}${c.reset}`);
+  }
+
+  // Coleta arquivos elegíveis (> SMALL_LIMIT_KB e NÃO importados via código)
   const candidates = []; // { localPath, publicRelPath, sz }
+  let protectedCount = 0;
   function walkPublic(dir) {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
       const st = statSync(full);
-      if (st.isDirectory()) walkPublic(full);
-      else if (st.size >= SMALL_LIMIT_KB * 1024) {
-        const publicRel = relative(publicDir, full).replace(/\\/g, "/");
-        candidates.push({ localPath: full, publicRelPath: publicRel, sz: st.size });
-      }
+      if (st.isDirectory()) { walkPublic(full); continue; }
+      if (st.size < SMALL_LIMIT_KB * 1024) continue;
+      // Pula se o arquivo é importado em código (basename match)
+      if (importedAssets.has(entry)) { protectedCount++; continue; }
+      const publicRel = relative(publicDir, full).replace(/\\/g, "/");
+      candidates.push({ localPath: full, publicRelPath: publicRel, sz: st.size });
     }
   }
   walkPublic(publicDir);
+  if (protectedCount > 0) {
+    info(`${protectedCount} arquivo(s) pesado(s) mantido(s) local pq são importados via código`);
+  }
 
   if (candidates.length === 0) {
     return { uploaded: 0, totalBytes: 0, skipped: 0, remoteMap: new Map() };

@@ -1,6 +1,6 @@
 {
   "name": "criarte-deploy",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "CLI pra publicar sites no sistema multi-site da Criarte sem precisar baixar o monorepo",
   "type": "module",
   "bin": {

@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "2.0.2";
+const VERSION = "2.1.0";
 
 // ============================================================================
 // UI helpers
@@ -349,7 +349,23 @@ async function preflightChecks(cwd, category, slug) {
     });
   }
 
-  // 7. Tamanho da pasta + arquivos individuais grandes
+  // 7. Assets órfãos (nunca referenciados no source)
+  try {
+    const { orphans } = detectOrphanAssets(cwd);
+    if (orphans.length > 0) {
+      const totalBytes = orphans.reduce((a, o) => a + o.sz, 0);
+      const totalMb = (totalBytes / 1024 / 1024).toFixed(1);
+      const sample = orphans.slice(0, 3)
+        .map(o => `${c.dim}·${c.reset} ${o.publicRel} ${c.dim}(${(o.sz / 1024).toFixed(0)} KB)${c.reset}`)
+        .join("\n  ");
+      issues.push({
+        level: "info",
+        msg: `${orphans.length} arquivo(s) órfão(s) em public/ (${totalMb} MB) — vou oferecer remover durante o deploy:\n  ${sample}${orphans.length > 3 ? `\n  ${c.dim}… e mais ${orphans.length - 3}${c.reset}` : ""}`,
+      });
+    }
+  } catch {}
+
+  // 8. Tamanho da pasta + arquivos individuais grandes
   let totalBytes = 0;
   const bigFiles = [];
   walkSource(cwd, (full, rel) => {
@@ -549,6 +565,9 @@ async function cmdDeploy(argv) {
     progressBar(done, total, c.dim + rel.slice(0, 40) + c.reset);
   });
   console.log(`${c.green}✓${c.reset} ${done} arquivo(s) copiado(s)`);
+
+  // ====== Limpeza de assets órfãos (não referenciados pelo source) ======
+  await maybeCleanOrphans(targetPath);
 
   // ====== Upload de assets pesados pro R2 (se configurado) ======
   if (config.r2) {
@@ -995,6 +1014,143 @@ function detectImportedAssets(siteCopyPath) {
   }
   walk(siteCopyPath);
   return imported;
+}
+
+// Arquivos especiais que o browser/crawlers acessam direto sem aparecer no
+// source — nunca devem ser marcados como órfãos.
+const ALWAYS_USED = new Set([
+  "favicon.ico", "favicon.png", "favicon-16x16.png", "favicon-32x32.png",
+  "robots.txt", "sitemap.xml", "site.webmanifest", "manifest.json",
+  "apple-touch-icon.png", "apple-touch-icon-precomposed.png",
+  "android-chrome-192x192.png", "android-chrome-512x512.png",
+  "browserconfig.xml", "mstile-150x150.png",
+  ".gitkeep", ".keep",
+]);
+
+/**
+ * Detecta arquivos em public/ que NUNCA são referenciados pelo source.
+ * Filename match (basename) — pega tanto `/assets/X` quanto `../../public/X`
+ * e variantes em CSS url(). É conservador: se o nome aparece em qualquer
+ * lugar do source, considera usado.
+ *
+ * Retorna { used: Set<basename>, orphans: Array<{publicRel, sz, fullPath}> }
+ */
+function detectOrphanAssets(siteCopyPath) {
+  const publicDir = join(siteCopyPath, "public");
+  if (!existsSync(publicDir)) return { used: new Set(), orphans: [] };
+
+  // 1) Coleta TODOS os arquivos de public/ com seu nome-base
+  const publicFiles = []; // { basename, publicRel, fullPath, sz }
+  function walkPub(dir) {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) walkPub(full);
+      else publicFiles.push({
+        basename: entry,
+        publicRel: relative(publicDir, full).replace(/\\/g, "/"),
+        fullPath: full,
+        sz: st.size,
+      });
+    }
+  }
+  walkPub(publicDir);
+
+  if (publicFiles.length === 0) return { used: new Set(), orphans: [] };
+
+  // 2) Concatena todo o source em uma string gigante e procura cada basename
+  const SOURCE_EXTS = /\.(tsx?|jsx?|css|scss|sass|html|mjs|cjs|json|md|svg)$/i;
+  let sourceBlob = "";
+  function walkSrc(dir) {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "public" || entry === "node_modules" || entry === ".next" || entry === "out" || entry === "dist") continue;
+      const full = join(dir, entry);
+      const st = statSync(full);
+      if (st.isDirectory()) { walkSrc(full); continue; }
+      if (!SOURCE_EXTS.test(entry)) continue;
+      try { sourceBlob += "\n" + readFileSync(full, "utf8"); } catch {}
+    }
+  }
+  walkSrc(siteCopyPath);
+
+  // 3) Pra cada arquivo de public/, checa se o nome aparece no source
+  const used = new Set();
+  const orphans = [];
+  for (const f of publicFiles) {
+    if (ALWAYS_USED.has(f.basename)) {
+      used.add(f.basename);
+      continue;
+    }
+    // Match por basename — mais permissivo (evita falsos positivos)
+    // Aceita: foo.png, /foo.png, "foo.png", "/path/foo.png", etc.
+    if (sourceBlob.includes(f.basename)) {
+      used.add(f.basename);
+    } else {
+      orphans.push(f);
+    }
+  }
+  return { used, orphans };
+}
+
+async function maybeCleanOrphans(siteCopyPath) {
+  const { orphans } = detectOrphanAssets(siteCopyPath);
+  if (orphans.length === 0) return { removed: 0, savedBytes: 0 };
+
+  const totalBytes = orphans.reduce((a, o) => a + o.sz, 0);
+  const totalMb = (totalBytes / 1024 / 1024).toFixed(2);
+
+  console.log();
+  console.log(`${c.yellow}🗑${c.reset}  ${c.bold}${orphans.length} arquivo(s) órfão(s)${c.reset} ${c.dim}(${totalMb} MB total)${c.reset}`);
+  console.log(`${c.dim}   Não são referenciados em nenhum lugar do source:${c.reset}`);
+  for (const o of orphans.slice(0, 10)) {
+    const mb = o.sz >= 1024 * 1024
+      ? `${(o.sz / 1024 / 1024).toFixed(2)} MB`
+      : `${(o.sz / 1024).toFixed(0)} KB`;
+    console.log(`   ${c.dim}·${c.reset} ${o.publicRel} ${c.dim}(${mb})${c.reset}`);
+  }
+  if (orphans.length > 10) console.log(`   ${c.dim}… e mais ${orphans.length - 10}${c.reset}`);
+
+  console.log();
+  const yn = await ask(`Remover esses arquivos do deploy? ${c.dim}(S/n)${c.reset} → `, { default: "s" });
+  if (yn.toLowerCase() === "n" || yn.toLowerCase() === "nao" || yn.toLowerCase() === "não") {
+    info("Mantendo órfãos no deploy.");
+    return { removed: 0, savedBytes: 0 };
+  }
+
+  for (const o of orphans) {
+    rmSync(o.fullPath, { force: true });
+  }
+  // Remove pastas vazias
+  const publicDir = join(siteCopyPath, "public");
+  function pruneEmpty(dir) {
+    if (!existsSync(dir) || dir === publicDir) return;
+    if (!statSync(dir).isDirectory()) return;
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) pruneEmpty(full);
+    }
+    if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true });
+  }
+  function pruneAll(dir) {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) pruneAll(full);
+    }
+    if (dir !== publicDir && existsSync(dir) && readdirSync(dir).length === 0) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  pruneAll(publicDir);
+
+  ok(`${orphans.length} arquivo(s) órfão(s) removido(s) — ${totalMb} MB economizado(s)`);
+  info(`${c.dim}Arquivos originais em ${cwdNote(siteCopyPath)} permanecem intactos.${c.reset}`);
+  return { removed: orphans.length, savedBytes: totalBytes };
+}
+
+function cwdNote(siteCopyPath) {
+  // Mostra hint útil pro user — diz que a remoção foi só na cópia
+  return "~/Downloads/<seu site>";
 }
 
 async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {

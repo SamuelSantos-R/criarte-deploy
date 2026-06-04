@@ -21,7 +21,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "1.2.0";
+const VERSION = "1.3.0";
 
 // ============================================================================
 // UI helpers
@@ -318,32 +318,31 @@ async function preflightChecks(cwd, category, slug) {
     fix: "Considere usar fontes locais ou <link rel='stylesheet'> direto no <head>.",
   });
   if (absoluteImagePaths.length) {
-    const sample = absoluteImagePaths.slice(0, 3).map(p => `  ${c.dim}${p.file}:${c.reset} ${p.src}`).join("\n");
     issues.push({
-      level: "warn",
-      msg: `${absoluteImagePaths.length} imagem(ns) com caminho absoluto detectada(s). Com basePath '/${category}/${slug}' elas vão quebrar.\n${sample}${absoluteImagePaths.length > 3 ? `\n  ${c.dim}... e mais ${absoluteImagePaths.length - 3}${c.reset}` : ""}`,
-      fix: "Use caminho relativo ou prefixe com basePath. O sync.mjs do CI tenta corrigir automaticamente.",
+      level: "info",
+      msg: `${absoluteImagePaths.length} imagem(ns) com caminho absoluto — o CI vai prefixar automaticamente com /${category}/${slug}/ no build (prefix-assets.mjs).`,
     });
   }
 
-  // 5. next.config.* tem output: "export"? (sync.mjs faz isso mas avisa)
+  // 5. next.config.* — sync.mjs do CI reescreve, então só info
   const cfgFile = ["next.config.ts","next.config.mjs","next.config.js"]
     .map(f => join(cwd, f)).find(existsSync);
   if (cfgFile) {
     const cfg = readFileSync(cfgFile, "utf8");
     if (!/output\s*:\s*['"]export['"]/.test(cfg)) {
       issues.push({
-        level: "warn",
-        msg: "next.config sem output:'export'. O sync.mjs do CI tenta corrigir, mas se a config for muito custom pode falhar.",
+        level: "info",
+        msg: "next.config será reescrito pelo CI com output:'export' + basePath.",
       });
     }
   }
 
-  // 6. site.json (opcional mas recomendado)
+  // 6. site.json — pode ser auto-criado
   if (!existsSync(join(cwd, "site.json"))) {
     issues.push({
-      level: "info",
-      msg: "Sem site.json — vai ser criado automaticamente com nome capitalizado e descrição vazia.",
+      level: "fixable",
+      kind: "site-json",
+      msg: "Sem site.json (nome + descrição que aparecem no painel).",
     });
   }
 
@@ -374,7 +373,7 @@ async function preflightChecks(cwd, category, slug) {
   return issues;
 }
 
-function renderIssues(issues) {
+async function renderIssues(issues, cwd, category, slug) {
   if (!issues.length) {
     ok("Nenhum problema detectado na estrutura do site.\n");
     return { canDeploy: true };
@@ -382,6 +381,7 @@ function renderIssues(issues) {
   const errors   = issues.filter(i => i.level === "error");
   const warnings = issues.filter(i => i.level === "warn");
   const infos    = issues.filter(i => i.level === "info");
+  const fixables = issues.filter(i => i.level === "fixable");
 
   console.log();
   for (const i of errors) {
@@ -393,9 +393,36 @@ function renderIssues(issues) {
     if (i.fix) console.log(`   ${c.dim}↳ sugestão:${c.reset} ${i.fix}`);
   }
   for (const i of infos) info(i.msg);
-  console.log();
 
+  // Auto-fix interativo
+  for (const i of fixables) {
+    console.log();
+    console.log(`${c.yellow}⚠${c.reset}  ${i.msg}`);
+    const yn = await ask(`   ${c.cyan}?${c.reset} Quer que eu corrija agora? ${c.dim}(S/n)${c.reset} → `);
+    if (yn.toLowerCase() === "n" || yn.toLowerCase() === "nao" || yn.toLowerCase() === "não") {
+      info("   Pulando — vai ser criado automaticamente com nome capitalizado.");
+      continue;
+    }
+    await applyFix(i.kind, cwd, category, slug);
+  }
+  console.log();
   return { canDeploy: errors.length === 0, hasWarnings: warnings.length > 0 };
+}
+
+async function applyFix(kind, cwd, category, slug) {
+  if (kind === "site-json") {
+    const defaultName = slug
+      .split("-")
+      .map(w => w[0].toUpperCase() + w.slice(1))
+      .join(" ");
+    console.log(`   ${c.bold}Nome${c.reset} (que aparece no painel)`);
+    const name = await ask(`   → `, { default: defaultName });
+    console.log(`   ${c.bold}Descrição${c.reset} ${c.dim}(opcional — Enter pra pular)${c.reset}`);
+    const description = await ask(`   → `);
+    const siteJson = { name, description, category };
+    writeFileSync(join(cwd, "site.json"), JSON.stringify(siteJson, null, 2) + "\n");
+    ok(`   site.json criado com nome "${name}"`);
+  }
 }
 
 // ============================================================================
@@ -438,7 +465,7 @@ async function cmdDeploy(argv) {
   const issues = await preflightChecks(cwd, category, slug);
   sp1.succeed("Análise concluída");
 
-  const result = renderIssues(issues);
+  const result = await renderIssues(issues, cwd, category, slug);
 
   if (!result.canDeploy) {
     err("Não dá pra publicar por causa dos erros acima.");
@@ -627,7 +654,7 @@ async function cmdCheck() {
   const sp = new Spinner("Analisando...").start();
   const issues = await preflightChecks(cwd, "categoria", "slug");
   sp.succeed("Análise concluída");
-  const result = renderIssues(issues);
+  const result = await renderIssues(issues, cwd, "categoria", "slug");
   if (result.canDeploy) {
     ok("Site tá pronto pra publicar.");
     info(`Rode ${c.cyan}criarte-deploy${c.reset} pra subir.`);

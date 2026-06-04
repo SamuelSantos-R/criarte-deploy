@@ -21,7 +21,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "1.3.1";
+const VERSION = "1.3.2";
 
 // ============================================================================
 // UI helpers
@@ -561,6 +561,20 @@ async function cmdDeploy(argv) {
     execSync(`git config http.maxRequestBuffer 100M`, gitOpts);
     execSync(`git config core.compression 0`, gitOpts);
     execSync(`git add sites/${category}/${slug}`, gitOpts);
+
+    // Detecta se tem mudanças staged antes de tentar commitar
+    const staged = execSync(`git diff --cached --name-only`, gitOpts).toString().trim();
+    if (!staged) {
+      sp3.warn("Nada mudou — site já tá sincronizado");
+      console.log();
+      info("Os arquivos enviados são idênticos aos que já estão publicados.");
+      info("Não tem o que commitar. O site já está no ar.");
+      rmSync(tmp, { recursive: true, force: true });
+      console.log();
+      console.log(`🌐 ${c.cyan}${targetUrl}${c.reset}\n`);
+      return;
+    }
+
     execSync(`git commit -m "feat(sites): ${verb} ${fullSlug}"`, gitOpts);
     // Tenta push; se falhar com erro de buffer, tenta de novo com --no-thin
     try {
@@ -576,7 +590,10 @@ async function cmdDeploy(argv) {
     }
   } catch (e) {
     sp3.fail("Falha ao subir");
-    const errMsg = e.stderr?.toString() || e.message;
+    // Captura stderr + stdout pra dar contexto real do erro do git
+    const stderr = e.stderr?.toString().trim();
+    const stdout = e.stdout?.toString().trim();
+    const errMsg = stderr || stdout || e.message;
     err(errMsg);
     if (/HTTP 400|sideband|RPC failed/i.test(errMsg)) {
       console.log();

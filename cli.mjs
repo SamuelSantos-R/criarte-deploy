@@ -21,7 +21,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 
 // ============================================================================
 // UI helpers
@@ -43,6 +43,11 @@ function showBanner() {
   console.log(BANNER);
   console.log(`${c.bold}${c.magenta}        Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}`);
   console.log(`${c.dim}        publique sites em segundos${c.reset}\n`);
+}
+
+// Header compacto pra comandos do dia-a-dia — sem poluir o terminal
+function miniHeader(label) {
+  console.log(`\n${c.magenta}${c.bold}❀ Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}  ${c.dim}·${c.reset}  ${c.bold}${label}${c.reset}\n`);
 }
 
 // ============================================================================
@@ -146,7 +151,7 @@ function requireLogin() {
 // ============================================================================
 async function cmdLogin() {
   showBanner();
-  heading("🔐 Configuração inicial");
+  console.log(`${c.bold}${c.magenta}🔐 Configuração inicial${c.reset}\n`);
 
   console.log(`Pra publicar sites o CLI precisa de um ${c.bold}token do GitHub${c.reset}.`);
   console.log("É uma chave que dá permissão pro CLI subir os arquivos.\n");
@@ -397,8 +402,7 @@ function renderIssues(issues) {
 // DEPLOY
 // ============================================================================
 async function cmdDeploy(argv) {
-  showBanner();
-  heading("📦 Publicar site");
+  miniHeader("📦 Publicar site");
 
   const config = requireLogin();
   const cwd = process.cwd();
@@ -589,8 +593,7 @@ async function cmdDeploy(argv) {
 // LIST
 // ============================================================================
 async function cmdList() {
-  showBanner();
-  heading("📂 Sites publicados");
+  miniHeader("📂 Sites publicados");
   const config = requireLogin();
 
   const sp = new Spinner("Buscando lista de sites...").start();
@@ -619,8 +622,7 @@ async function cmdList() {
 // CHECK (preflight standalone, sem fazer deploy)
 // ============================================================================
 async function cmdCheck() {
-  showBanner();
-  heading("🔍 Verificar estrutura do site");
+  miniHeader("🔍 Verificar estrutura do site");
   const cwd = process.cwd();
   const sp = new Spinner("Analisando...").start();
   const issues = await preflightChecks(cwd, "categoria", "slug");

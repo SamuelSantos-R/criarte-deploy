@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "2.0.1";
+const VERSION = "2.0.2";
 
 // ============================================================================
 // UI helpers
@@ -968,8 +968,15 @@ function getMimeType(file) {
 function detectImportedAssets(siteCopyPath) {
   const imported = new Set();
   const EXTS = /\.(tsx?|jsx?|css|scss|mjs|cjs|html)$/;
-  // Pega qualquer string que termine em extensão de asset, dentro de import/require/from
-  const IMPORT_RE = /(?:import|require|from)\s*\(?\s*["'`]([^"'`]+\.(?:ttf|otf|woff2?|eot|png|jpe?g|gif|webp|svg|avif|ico|mp3|mp4|webm|m4a|ogg|wav|mov|pdf))["'`]/gi;
+  // Detecta QUALQUER string com caminho relativo (./X, ../X, public/X) terminando em
+  // extensão de asset. Pega: `import "../font.ttf"`, `localFont({ src: "../X.ttf" })`,
+  // `require("./img.png")`, etc. Caminhos RELATIVOS no source significam que o
+  // arquivo precisa estar no disco no build time — não pode ir pro R2.
+  const ASSET_EXT_GROUP = "ttf|otf|woff2?|eot|png|jpe?g|gif|webp|svg|avif|ico|mp3|mp4|webm|m4a|ogg|wav|mov|pdf";
+  const REL_PATH_RE = new RegExp(
+    `["'\`]((?:\\./|\\.\\./|public/)[^"'\`]+\\.(?:${ASSET_EXT_GROUP}))["'\`]`,
+    "gi",
+  );
 
   function walk(dir) {
     for (const entry of readdirSync(dir)) {
@@ -980,9 +987,8 @@ function detectImportedAssets(siteCopyPath) {
       if (!EXTS.test(entry)) continue;
       const content = readFileSync(full, "utf8");
       let m;
-      while ((m = IMPORT_RE.exec(content)) !== null) {
-        const importPath = m[1];
-        const filename = basename(importPath);
+      while ((m = REL_PATH_RE.exec(content)) !== null) {
+        const filename = basename(m[1]);
         imported.add(filename);
       }
     }

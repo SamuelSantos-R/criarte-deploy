@@ -224,6 +224,16 @@ function walkSource(dir, cb, base = dir) {
 async function preflightChecks(cwd, category, slug) {
   const issues = []; // { level: 'error'|'warn', msg, fix? }
 
+  // 0. Você tá na pasta errada? (raiz do monorepo)
+  if (existsSync(join(cwd, "sites")) && existsSync(join(cwd, "discloud.config"))) {
+    issues.push({
+      level: "error",
+      msg: "Você está na RAIZ do monorepo multi-site, não em um site individual.",
+      fix: "Entre na pasta do site (ex: cd sites/casamento/joao-maria) ou na pasta do site finalizado fora do monorepo.",
+    });
+    return issues;
+  }
+
   // 1. Tem package.json?
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) {

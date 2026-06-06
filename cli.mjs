@@ -600,7 +600,10 @@ async function cmdDeploy(argv) {
   if (!slugRe.test(slug))     { err(`Nome inválido: "${slug}"`); process.exit(1); }
 
   const fullSlug = `${category}/${slug}`;
-  const targetUrl = `${DEPLOY_DOMAIN}/${fullSlug}`;
+  // Usa panel_url do login como destino se configurado — pra quem migrou
+  // pra Coolify (criartedesing.ao na Discloud tá quebrada).
+  const liveDomain = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
+  const targetUrl = `${liveDomain}/${fullSlug}`;
 
   // ====== Análise pré-deploy ======
   screen.phase("🔍 Análise", `${fullSlug} · ${targetUrl}`);

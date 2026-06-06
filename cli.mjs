@@ -19,10 +19,9 @@ import { BANNER } from "./banner.mjs";
 // ============================================================================
 const REPO = "SamuelSantos-R/multisite-system";
 const DEPLOY_DOMAIN = "https://criartedesing.ao";
-const ACTIONS_URL = `https://github.com/${REPO}/actions`;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "2.1.0";
+const VERSION = "3.0.0";
 
 // ============================================================================
 // UI helpers
@@ -655,11 +654,11 @@ async function cmdDeploy(argv) {
   sp3.succeed("Código enviado pro GitHub");
   rmSync(tmp, { recursive: true, force: true });
 
-  // ====== Monitora o CI até o fim ======
+  // ====== Monitora o deploy direto pela URL ======
   console.log();
   hr();
   heading("👀 Acompanhando o deploy");
-  const monitorResult = await monitorDeploy(config.token, fullSlug);
+  const monitorResult = await monitorDeploy(targetUrl);
 
   // ====== Resultado final ======
   console.log();
@@ -684,103 +683,56 @@ async function cmdDeploy(argv) {
 }
 
 // ============================================================================
-// MONITOR DO CI — espera o workflow_run desse push terminar
+// MONITOR DO DEPLOY — polla a URL final até responder 200
 // ============================================================================
-async function monitorDeploy(token, fullSlug) {
+// A Discloud agora monitora o GitHub direto (sem Actions). O build acontece
+// na infra dela e o restart só rola quando atinge 100%. O mesmo vale pro
+// Coolify rodando em paralelo no Hetzner. Não temos mais um workflow_run
+// pra polar — checamos a URL final.
+async function monitorDeploy(targetUrl) {
+  const TIMEOUT_MS = 10 * 60 * 1000; // 10min teto (build Discloud + restart fica em ~3-5min)
+  const POLL_MS = 8000;
+
+  // 1) Detecta estado inicial: site novo (404) ou re-deploy (200)?
+  let initialOk = false;
+  try {
+    const r = await fetch(targetUrl, { method: "HEAD", redirect: "follow" });
+    initialOk = r.ok;
+  } catch {}
+
+  const sp = new Spinner(
+    initialOk
+      ? "Re-deploy em andamento (build Discloud + restart, ~3-5min)..."
+      : "Aguardando primeira publicação do site (build Discloud, ~3-5min)..."
+  ).start();
+
+  // 2) Re-deploy: não dá pra distinguir o build novo do antigo via HTTP só,
+  //    então espera fixo 4min e considera concluído.
+  if (initialOk) {
+    await sleep(4 * 60 * 1000);
+    sp.succeed("Re-deploy provavelmente concluído");
+    return { ok: true, url: targetUrl };
+  }
+
+  // 3) Site novo: polla até 200 aparecer
   const start = Date.now();
-  const TIMEOUT_MS = 15 * 60 * 1000; // 15min teto
-  const POLL_MS = 6000;
-
-  // 1) Acha o workflow run criado pelo nosso push (espera até 60s pra ele aparecer)
-  let run = null;
-  const findSp = new Spinner("Aguardando o GitHub registrar o build...").start();
-  const lookStart = Date.now();
-  while (Date.now() - lookStart < 60000) {
-    const res = await ghFetch(
-      `/repos/${REPO}/actions/workflows/deploy-discloud.yml/runs?per_page=3`,
-      token,
-    );
-    if (res && res.workflow_runs?.length) {
-      // Pega o mais recente que tá in_progress, queued OU completed nos últimos 90s
-      const fresh = res.workflow_runs.find((r) => {
-        const age = Date.now() - new Date(r.created_at).getTime();
-        return age < 90_000;
-      });
-      if (fresh) { run = fresh; break; }
-    }
-    await sleep(3000);
-  }
-  if (!run) {
-    findSp.fail("Não detectei o workflow no GitHub Actions");
-    return { ok: false, reason: "Talvez o push não tenha disparado o CI. Verifica em " + ACTIONS_URL };
-  }
-  findSp.succeed(`Build #${run.run_number} registrado (commit "${(run.display_title || "").slice(0, 50)}…")`);
-  console.log(`   ${c.dim}→ ${run.html_url}${c.reset}`);
-
-  // 2) Polla até completar
-  let lastStatus = null;
-  let lastJob = null;
-  const runSp = new Spinner("Build em fila...").start();
-
   while (Date.now() - start < TIMEOUT_MS) {
-    const cur = await ghFetch(`/repos/${REPO}/actions/runs/${run.id}`, token);
-    if (!cur) {
-      await sleep(POLL_MS);
-      continue;
-    }
-
-    // Mostra status do job atual (validate / deploy)
-    if (cur.status === "in_progress") {
-      const jobsRes = await ghFetch(`/repos/${REPO}/actions/runs/${run.id}/jobs`, token);
-      const inProgressJob = jobsRes?.jobs?.find((j) => j.status === "in_progress");
-      const currentJob = inProgressJob?.name || lastJob || "build";
-      if (currentJob !== lastJob || cur.status !== lastStatus) {
-        runSp.update(`Rodando: ${c.bold}${currentJob}${c.reset}`);
-        lastJob = currentJob;
+    try {
+      const r = await fetch(targetUrl, { method: "HEAD", redirect: "follow" });
+      if (r.ok) {
+        sp.succeed("Site no ar");
+        return { ok: true, url: targetUrl };
       }
-    } else if (cur.status === "queued" && lastStatus !== "queued") {
-      runSp.update("Aguardando runner disponível...");
-    }
-    lastStatus = cur.status;
-
-    if (cur.status === "completed") {
-      if (cur.conclusion === "success") {
-        runSp.succeed(`Deploy concluído (${cur.conclusion})`);
-        return { ok: true, url: cur.html_url };
-      } else {
-        runSp.fail(`Deploy falhou (${cur.conclusion})`);
-        // Tenta pegar o motivo real: último step que falhou
-        const jobsRes = await ghFetch(`/repos/${REPO}/actions/runs/${run.id}/jobs`, token);
-        const failedJob = jobsRes?.jobs?.find((j) => j.conclusion === "failure");
-        const failedStep = failedJob?.steps?.find((s) => s.conclusion === "failure");
-        const reason = failedStep
-          ? `Falhou em "${failedStep.name}" do job "${failedJob.name}"`
-          : `Conclusão: ${cur.conclusion}`;
-        return { ok: false, reason, url: cur.html_url };
-      }
-    }
-
+    } catch {}
     await sleep(POLL_MS);
   }
 
-  runSp.warn("Tempo esgotado (15min) — ainda rodando");
-  return { ok: false, reason: "Build demorou mais que 15min. Acompanhe manualmente.", url: run.html_url };
-}
-
-async function ghFetch(path, token) {
-  try {
-    const r = await fetch(`https://api.github.com${path}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch {
-    return null;
-  }
+  sp.warn("Tempo esgotado (10min) — build ainda pode estar rodando");
+  return {
+    ok: false,
+    reason: "Deploy demorou mais que 10min. Verifica o painel da Discloud ou acessa a URL manualmente.",
+    url: targetUrl,
+  };
 }
 
 function sleep(ms) {

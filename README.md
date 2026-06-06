@@ -79,6 +79,7 @@ Pra trocar o token ou conta: `criarte-deploy login` novamente.
 2. Copia a pasta do site pra `sites/<categoria>/<nome>/` (ignorando `node_modules`, `.next`, `.env`, etc)
 3. Commita + faz push usando o token salvo
 4. Apaga o temp
-5. O CI do GitHub Actions builda + deploya na Discloud automático
+5. **Discloud + Coolify** monitoram o repo 24h, detectam o push, buildam e fazem restart automático
+6. O CLI polla a URL final até ela responder 200 (ou 4min fixos pra re-deploys)
 
 A pessoa nunca vê o monorepo. Só precisa do site finalizado e do CLI.

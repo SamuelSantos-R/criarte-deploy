@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.2.0";
+const VERSION = "3.4.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -576,9 +576,20 @@ function writeSiteMeta(cwd, category, slug, expires_at) {
 async function cmdDeploy(argv) {
   screen.phase("📦 Publicar site");
 
-  const config = requireLogin();
+  let config = requireLogin();
   const cwd = process.cwd();
   const folderName = basename(cwd);
+
+  // Se panel_url não tá configurado, oferece setup rápido inline
+  if (!config.panel_url || !config.admin_api_token) {
+    warn("Painel não configurado — sem isso o deploy não é registrado e o monitor cai no fallback de domínio.");
+    const setup = await ask(`Configurar agora? ${c.dim}(S/n)${c.reset} → `, { default: "s" });
+    if (setup.toLowerCase() !== "n" && setup.toLowerCase() !== "nao" && setup.toLowerCase() !== "não") {
+      await cmdPanel();
+      config = loadConfig();
+      screen.phase("📦 Publicar site");
+    }
+  }
 
   // Pega argumentos
   let category = argv[0];
@@ -604,6 +615,8 @@ async function cmdDeploy(argv) {
   // pra Coolify (criartedesing.ao na Discloud tá quebrada).
   const liveDomain = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
   const targetUrl = `${liveDomain}/${fullSlug}`;
+  const futureDomain = DEFAULT_PANEL_URL.replace(/\/$/, "");
+  const futureUrl = futureDomain !== liveDomain ? `${futureDomain}/${fullSlug}` : null;
 
   // ====== Análise pré-deploy ======
   screen.phase("🔍 Análise", `${fullSlug} · ${targetUrl}`);
@@ -637,6 +650,9 @@ async function cmdDeploy(argv) {
   console.log(`  ${c.dim}Pasta:${c.reset}    ${cwd}`);
   console.log(`  ${c.dim}Destino:${c.reset}  sites/${fullSlug}/`);
   console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}${c.reset}`);
+  if (futureUrl) {
+    console.log(`  ${c.dim}Futuro:${c.reset}   ${c.dim}${futureUrl}${c.reset} ${c.dim}(quando o DNS migrar)${c.reset}`);
+  }
   console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${expires_at}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
   console.log();
 
@@ -796,7 +812,7 @@ async function cmdDeploy(argv) {
 
   // ====== Monitora o deploy direto pela URL ======
   screen.phase("👀 Acompanhando o deploy", fullSlug);
-  const monitorResult = await monitorDeploy(targetUrl);
+  const monitorResult = await monitorDeploy(targetUrl, config.panel_url);
 
   // ====== Resultado final ======
   if (monitorResult.ok) {
@@ -813,52 +829,85 @@ async function cmdDeploy(argv) {
 // ============================================================================
 // MONITOR DO DEPLOY — polla a URL final até responder 200
 // ============================================================================
-// A Discloud agora monitora o GitHub direto (sem Actions). O build acontece
-// na infra dela e o restart só rola quando atinge 100%. O mesmo vale pro
-// Coolify rodando em paralelo no Hetzner. Não temos mais um workflow_run
-// pra polar — checamos a URL final.
-async function monitorDeploy(targetUrl) {
-  const TIMEOUT_MS = 10 * 60 * 1000; // 10min teto (build Discloud + restart fica em ~3-5min)
-  const POLL_MS = 8000;
+// Coolify monitora o GitHub via App e rebuilda na infra (Hetzner). Build leva
+// ~2-4min. Não temos workflow_run pra polar — checamos a URL final.
+async function monitorDeploy(targetUrl, panelUrl) {
+  const TIMEOUT_MS = 10 * 60 * 1000;
+  const POLL_MS = 6000;
+  const MAX_ATTEMPTS = Math.floor(TIMEOUT_MS / POLL_MS);
 
   // 1) Detecta estado inicial: site novo (404) ou re-deploy (200)?
   let initialOk = false;
   try {
-    const r = await fetch(targetUrl, { method: "HEAD", redirect: "follow" });
+    const r = await fetch(targetUrl, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(5000) });
     initialOk = r.ok;
   } catch {}
 
-  const sp = new Spinner(
-    initialOk
-      ? "Re-deploy em andamento (build Discloud + restart, ~3-5min)..."
-      : "Aguardando primeira publicação do site (build Discloud, ~3-5min)..."
-  ).start();
-
-  // 2) Re-deploy: não dá pra distinguir o build novo do antigo via HTTP só,
-  //    então espera fixo 4min e considera concluído.
-  if (initialOk) {
-    await sleep(4 * 60 * 1000);
-    sp.succeed("Re-deploy provavelmente concluído");
-    return { ok: true, url: targetUrl };
+  // 2) Pega snapshot do uptime do painel ANTES do build — quando subir de novo,
+  //    uptime reseta = sabemos que o rebuild aconteceu (heurística melhor que só URL)
+  let preUptime = null;
+  if (panelUrl) {
+    try {
+      const r = await fetch(`${panelUrl.replace(/\/$/, "")}/api/health`, { signal: AbortSignal.timeout(5000) });
+      if (r.ok) preUptime = (await r.json()).uptime_s;
+    } catch {}
   }
 
-  // 3) Site novo: polla até 200 aparecer
+  const sp = new Spinner(
+    initialOk
+      ? "Re-deploy: aguardando Coolify rebuildar + restartar..."
+      : "Site novo: aguardando primeira build..."
+  ).start();
+
   const start = Date.now();
+  let attempts = 0;
+  let restartDetected = false;
+
   while (Date.now() - start < TIMEOUT_MS) {
+    attempts++;
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    sp.update(
+      `${initialOk ? "Re-deploy" : "Site novo"} ${c.dim}· ${elapsed}s · tentativa ${attempts}/${MAX_ATTEMPTS}${c.reset}${restartDetected ? c.green + " · restart detectado" + c.reset : ""}`
+    );
+
+    // Checa restart do painel via health endpoint (uptime caiu = rebuildou)
+    if (panelUrl && preUptime !== null && !restartDetected) {
+      try {
+        const r = await fetch(`${panelUrl.replace(/\/$/, "")}/api/health`, { signal: AbortSignal.timeout(4000) });
+        if (r.ok) {
+          const { uptime_s } = await r.json();
+          if (uptime_s < preUptime) restartDetected = true;
+        }
+      } catch {}
+    }
+
+    // Pra novo: 200 = pronto
+    // Pra re-deploy: restart detectado + 200 = pronto (assume cache invalidado)
     try {
-      const r = await fetch(targetUrl, { method: "HEAD", redirect: "follow" });
+      const r = await fetch(targetUrl, { method: "HEAD", redirect: "follow", signal: AbortSignal.timeout(5000) });
       if (r.ok) {
-        sp.succeed("Site no ar");
-        return { ok: true, url: targetUrl };
+        if (!initialOk) {
+          sp.succeed(`Site no ar em ${elapsed}s`);
+          return { ok: true, url: targetUrl };
+        }
+        if (restartDetected) {
+          // Re-deploy: dá uns segundinhos extras pra cache do navegador invalidar
+          await sleep(3000);
+          sp.succeed(`Re-deploy completo em ${elapsed}s (restart confirmado)`);
+          return { ok: true, url: targetUrl };
+        }
       }
     } catch {}
+
     await sleep(POLL_MS);
   }
 
-  sp.warn("Tempo esgotado (10min) — build ainda pode estar rodando");
+  sp.warn(`Timeout em ${Math.round(TIMEOUT_MS/60000)}min`);
   return {
     ok: false,
-    reason: "Deploy demorou mais que 10min. Verifica o painel da Discloud ou acessa a URL manualmente.",
+    reason: restartDetected
+      ? "Painel rebuildou mas a URL não respondeu OK — pode ser erro de rota. Verifique manualmente."
+      : "Coolify não rebuildou em 10min — verifique o painel da Coolify (Logs ou Deployments).",
     url: targetUrl,
   };
 }
@@ -921,41 +970,227 @@ function cmdHelp() {
   showBanner();
   console.log(`Publica sites finalizados no sistema multi-site sem precisar baixar o monorepo.
 
-${c.bold}Comandos:${c.reset}
-
-  ${c.cyan}criarte-deploy login${c.reset}
-    Configura o token do GitHub (1ª vez apenas).
+${c.bold}Comandos principais:${c.reset}
 
   ${c.cyan}criarte-deploy${c.reset}
-    Publica o site da pasta atual. Pergunta categoria e nome.
+    Publica o site da pasta atual (pergunta categoria + nome).
 
   ${c.cyan}criarte-deploy <categoria> <nome>${c.reset}
     Publica direto, sem perguntar.
     Ex: ${c.dim}criarte-deploy casamento joao-maria${c.reset}
 
   ${c.cyan}criarte-deploy check${c.reset}
-    Analisa a estrutura do site da pasta atual e mostra problemas,
-    SEM enviar pro GitHub. Ótimo pra checar antes de publicar.
+    Analisa estrutura do site SEM enviar.
+
+  ${c.cyan}criarte-deploy list${c.reset}
+    Lista todos os sites publicados.
+
+${c.bold}Configuração:${c.reset}
+
+  ${c.cyan}criarte-deploy login${c.reset}
+    Configura tudo (GitHub + painel). Roda 1x.
+
+  ${c.cyan}criarte-deploy panel${c.reset}
+    Atualiza só URL+token do painel (sem refazer login GitHub).
+
+  ${c.cyan}criarte-deploy doctor${c.reset}
+    Diagnostica conexão GitHub + painel + R2.
+    Roda antes de migrar muitos sites.
+
+${c.bold}Assets pesados:${c.reset}
 
   ${c.cyan}criarte-deploy r2-setup${c.reset}
-    Configura upload automático de assets pesados pro Cloudflare R2.
-    Reduz drasticamente o tamanho do zip da Discloud. Recomendado!
+    Ativa upload de assets pesados pro Cloudflare R2.
 
   ${c.cyan}criarte-deploy r2-disable${c.reset}
     Desativa R2 — assets voltam pro git.
-
-  ${c.cyan}criarte-deploy list${c.reset}
-    Mostra todos os sites publicados.
-
-  ${c.cyan}criarte-deploy help${c.reset}
-    Mostra essa ajuda.
 
 ${c.bold}Fluxo do dia-a-dia (depois do login):${c.reset}
 
   ${c.dim}$${c.reset} cd ~/Desktop/joao-maria
   ${c.dim}$${c.reset} criarte-deploy
-  ${c.dim}→ responde categoria e nome → confirma → ☕ café → site no ar${c.reset}
+  ${c.dim}→ categoria → nome → validade → confirma → ☕ café → site no ar${c.reset}
+
+${c.bold}Migração de muitos sites:${c.reset}
+
+  ${c.dim}1.${c.reset} ${c.cyan}criarte-deploy doctor${c.reset}            ${c.dim}# garante que tudo tá ok${c.reset}
+  ${c.dim}2.${c.reset} ${c.dim}cd ~/sites/joao-maria${c.reset}
+  ${c.dim}3.${c.reset} ${c.cyan}criarte-deploy casamento joao-maria${c.reset}
+  ${c.dim}4.${c.reset} ${c.dim}# repete pro próximo${c.reset}
 `);
+}
+
+// ============================================================================
+// PANEL — setup rápido só do panel_url + ADMIN_API_TOKEN
+// (pra quem já tinha login GitHub mas precisa apontar pro Coolify)
+// ============================================================================
+async function cmdPanel() {
+  screen.phase("🔗 Configurar painel");
+  const existing = loadConfig();
+  if (!existing) {
+    err("Você ainda não fez login. Rode: criarte-deploy login");
+    process.exit(1);
+  }
+
+  console.log(`URL atual: ${c.cyan}${existing.panel_url || "(não configurado)"}${c.reset}`);
+  console.log(`Token:     ${existing.admin_api_token ? c.green + "✓ configurado" + c.reset : c.yellow + "✗ não configurado" + c.reset}`);
+  console.log();
+
+  const url = await ask(`URL do painel ${c.dim}(ex: http://...sslip.io)${c.reset}: `,
+    { default: existing.panel_url || DEFAULT_PANEL_URL });
+  const token = await ask(`Token (ADMIN_API_TOKEN): `, { hidden: true });
+
+  const normalized = url.trim().replace(/\/$/, "");
+  if (!/^https?:\/\//.test(normalized)) {
+    err(`URL inválida: "${normalized}" — precisa começar com http:// ou https://`);
+    process.exit(1);
+  }
+  if (!token || token.length < 16) {
+    err("Token muito curto (mínimo 16 chars).");
+    process.exit(1);
+  }
+
+  // Testa antes de salvar
+  const sp = new Spinner("Testando conexão com o painel...").start();
+  try {
+    const res = await fetch(`${normalized}/api/health`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) {
+      sp.fail(`Painel respondeu ${res.status}`);
+      err("Verifique a URL — talvez o painel esteja offline ou em outra URL.");
+      process.exit(1);
+    }
+    const health = await res.json();
+    sp.succeed(`Painel respondeu (uptime ${Math.round((health.uptime_s || 0) / 60)}min)`);
+  } catch (e) {
+    sp.fail("Falha ao conectar");
+    err(e.message);
+    process.exit(1);
+  }
+
+  // Testa o token
+  const sp2 = new Spinner("Validando token...").start();
+  try {
+    const res = await fetch(`${normalized}/api/dashboard`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.status === 401) {
+      sp2.fail("Token inválido (401)");
+      err("O ADMIN_API_TOKEN não bate com o que tá no painel.");
+      process.exit(1);
+    }
+    if (!res.ok) {
+      sp2.warn(`Painel respondeu ${res.status} (não-fatal)`);
+    } else {
+      sp2.succeed("Token válido");
+    }
+  } catch (e) {
+    sp2.warn(`Não consegui validar: ${e.message}`);
+  }
+
+  saveConfig({ ...existing, panel_url: normalized, admin_api_token: token });
+  ok("Configuração salva.");
+  console.log();
+  info(`Próximos deploys vão pra ${c.cyan}${normalized}${c.reset}`);
+}
+
+// ============================================================================
+// DOCTOR — health-check completo
+// ============================================================================
+async function cmdDoctor() {
+  screen.phase("🩺 Diagnóstico");
+  const config = loadConfig();
+
+  let allOk = true;
+  const check = (label, ok, detail = "") => {
+    const sym = ok ? `${c.green}✓${c.reset}` : `${c.red}✗${c.reset}`;
+    console.log(`  ${sym} ${label}${detail ? ` ${c.dim}— ${detail}${c.reset}` : ""}`);
+    if (!ok) allOk = false;
+  };
+
+  console.log(`${c.bold}Config local${c.reset}`);
+  check("config existe", !!config, config ? CONFIG_FILE : "rode 'criarte-deploy login'");
+  if (!config) { console.log(); err("Sem config, não dá pra continuar."); process.exit(1); }
+  check("GitHub token", !!config.token, config.token ? `${config.token.slice(0, 7)}...` : "ausente");
+  check("Email", !!config.email, config.email);
+  check("Panel URL", !!config.panel_url, config.panel_url || "ausente (rode 'criarte-deploy panel')");
+  check("Admin API token", !!config.admin_api_token, config.admin_api_token ? "configurado" : "ausente");
+  check("R2 config", !!config.r2, config.r2 ? `bucket ${config.r2.bucket}` : "desativado (opcional)");
+  console.log();
+
+  console.log(`${c.bold}GitHub${c.reset}`);
+  const ghSp = new Spinner("Validando GitHub token e acesso ao repo...").start();
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}`, {
+      headers: { Authorization: `Bearer ${config.token}`, Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const repo = await res.json();
+      ghSp.clear();
+      check("Token válido + acesso ao repo", true, `${repo.full_name} (${repo.private ? "privado" : "público"})`);
+    } else {
+      ghSp.clear();
+      check("Token válido", false, `HTTP ${res.status}`);
+    }
+  } catch (e) {
+    ghSp.clear();
+    check("Conexão com api.github.com", false, e.message);
+  }
+  console.log();
+
+  if (config.panel_url) {
+    console.log(`${c.bold}Painel${c.reset}`);
+    const healthSp = new Spinner(`Pingando ${config.panel_url}...`).start();
+    try {
+      const res = await fetch(`${config.panel_url.replace(/\/$/, "")}/api/health`, { signal: AbortSignal.timeout(8000) });
+      const body = res.ok ? await res.json() : null;
+      healthSp.clear();
+      check("/api/health respondendo", res.ok, body ? `uptime ${Math.round((body.uptime_s || 0) / 60)}min · node ${body.node_version || "?"}` : `HTTP ${res.status}`);
+    } catch (e) {
+      healthSp.clear();
+      check("/api/health respondendo", false, e.message);
+    }
+
+    if (config.admin_api_token) {
+      const dashSp = new Spinner("Verificando token contra /api/dashboard...").start();
+      try {
+        const res = await fetch(`${config.panel_url.replace(/\/$/, "")}/api/dashboard`, {
+          headers: { Authorization: `Bearer ${config.admin_api_token}` },
+          signal: AbortSignal.timeout(8000),
+        });
+        dashSp.clear();
+        if (res.ok) {
+          const data = await res.json();
+          const stats = data.server?.process ? `RAM ${data.server.process.ram_mb.toFixed(0)}MB · ${data.sites?.total || 0} sites` : "dashboard ok";
+          check("Token válido (dashboard acessível)", true, stats);
+        } else if (res.status === 401) {
+          check("Token válido", false, "401 — ADMIN_API_TOKEN não bate com o do servidor");
+        } else {
+          check("Dashboard reachable", false, `HTTP ${res.status}`);
+        }
+      } catch (e) {
+        dashSp.clear();
+        check("Token válido", false, e.message);
+      }
+    }
+    console.log();
+  }
+
+  if (config.r2) {
+    console.log(`${c.bold}Cloudflare R2${c.reset}`);
+    check("Account ID", !!config.r2.accountId);
+    check("Bucket", !!config.r2.bucket, config.r2.bucket);
+    check("Access keys", !!(config.r2.accessKeyId && config.r2.secretAccessKey));
+    check("Public URL", !!config.r2.publicUrl, config.r2.publicUrl);
+    console.log();
+  }
+
+  if (allOk) {
+    ok("Tudo verde. Pode migrar sites sem medo.");
+  } else {
+    warn("Algumas verificações falharam. Corrija antes de migrar em massa.");
+  }
 }
 
 // ============================================================================
@@ -1402,7 +1637,6 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
 // Router
 // ============================================================================
 const [, , cmd, ...rest] = process.argv;
-const COMMANDS = new Set(["login", "list", "ls", "check", "help", "--help", "-h", "-v", "--version", "version"]);
 
 (async () => {
   try {
@@ -1412,6 +1646,8 @@ const COMMANDS = new Set(["login", "list", "ls", "check", "help", "--help", "-h"
     }
     switch (cmd) {
       case "login":      await cmdLogin();     break;
+      case "panel":      await cmdPanel();     break;
+      case "doctor":     await cmdDoctor();    break;
       case "r2-setup":   await cmdR2Setup();   break;
       case "r2-disable": await cmdR2Disable(); break;
       case "list":

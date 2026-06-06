@@ -51,6 +51,24 @@ function miniHeader(label) {
 }
 
 // ============================================================================
+// Screen — frame único estilo Claude Code
+// Cada fase chama screen.phase() pra limpar a tela e redrawnar só o que importa.
+// ============================================================================
+const screen = {
+  clear() {
+    if (!process.stdout.isTTY) return;
+    // Esconde cursor durante o redraw (evita flicker), reset, limpa tudo, cursor pra origem
+    process.stdout.write("\x1b[?25l\x1b[2J\x1b[3J\x1b[H\x1b[?25h");
+  },
+  phase(label, subtitle) {
+    this.clear();
+    console.log(`${c.magenta}${c.bold}❀ Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}  ${c.dim}·${c.reset}  ${c.bold}${label}${c.reset}`);
+    if (subtitle) console.log(`${c.dim}${subtitle}${c.reset}`);
+    console.log();
+  },
+};
+
+// ============================================================================
 // Spinner (estilo Claude Code / npm)
 // ============================================================================
 const FRAMES = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
@@ -87,6 +105,14 @@ class Spinner {
   succeed(text) { this.stop("✓", c.green, text); }
   fail(text)    { this.stop("✗", c.red, text); }
   warn(text)    { this.stop("⚠", c.yellow, text); }
+  // Para o spinner sem imprimir linha permanente — útil quando a próxima fase
+  // vai chamar screen.phase() e redrawnar tudo do zero.
+  clear() {
+    if (this.iv) clearInterval(this.iv);
+    if (process.stdout.isTTY) {
+      process.stdout.write("\x1b[2K\r\x1b[?25h");
+    }
+  }
 }
 
 // ============================================================================
@@ -447,7 +473,7 @@ async function applyFix(kind, cwd, category, slug) {
 // DEPLOY
 // ============================================================================
 async function cmdDeploy(argv) {
-  miniHeader("📦 Publicar site");
+  screen.phase("📦 Publicar site");
 
   const config = requireLogin();
   const cwd = process.cwd();
@@ -476,12 +502,10 @@ async function cmdDeploy(argv) {
   const targetUrl = `${DEPLOY_DOMAIN}/${fullSlug}`;
 
   // ====== Análise pré-deploy ======
-  console.log();
-  hr();
-  heading("🔍 Análise da estrutura");
+  screen.phase("🔍 Análise", `${fullSlug} · ${targetUrl}`);
   const sp1 = new Spinner("Analisando arquivos, dependências e configuração...").start();
   const issues = await preflightChecks(cwd, category, slug);
-  sp1.succeed("Análise concluída");
+  sp1.clear();
 
   const result = await renderIssues(issues, cwd, category, slug);
 
@@ -500,8 +524,7 @@ async function cmdDeploy(argv) {
   }
 
   // ====== Resumo ======
-  hr();
-  heading("📋 Resumo");
+  screen.phase("📋 Resumo", fullSlug);
   console.log(`  ${c.dim}Pasta:${c.reset}    ${cwd}`);
   console.log(`  ${c.dim}Destino:${c.reset}  sites/${fullSlug}/`);
   console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}${c.reset}`);
@@ -514,9 +537,7 @@ async function cmdDeploy(argv) {
   }
 
   // ====== Clone temp ======
-  console.log();
-  hr();
-  heading("🚀 Enviando");
+  screen.phase("🚀 Enviando", fullSlug);
 
   const tmp = mkdtempSync(join(tmpdir(), "criarte-deploy-"));
   const sp2 = new Spinner("Conectando ao repositório do sistema...").start();
@@ -655,29 +676,17 @@ async function cmdDeploy(argv) {
   rmSync(tmp, { recursive: true, force: true });
 
   // ====== Monitora o deploy direto pela URL ======
-  console.log();
-  hr();
-  heading("👀 Acompanhando o deploy");
+  screen.phase("👀 Acompanhando o deploy", fullSlug);
   const monitorResult = await monitorDeploy(targetUrl);
 
   // ====== Resultado final ======
-  console.log();
-  hr();
-  console.log();
   if (monitorResult.ok) {
-    console.log(`${c.green}${c.bold}🎉 Site no ar!${c.reset}`);
-    console.log();
-    console.log(`🌐 ${c.bold}${targetUrl}${c.reset}`);
-    console.log();
+    screen.phase("🎉 Site no ar", fullSlug);
+    console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}${c.reset}\n`);
   } else {
-    console.log(`${c.red}${c.bold}❌ Deploy falhou.${c.reset}`);
-    console.log();
-    if (monitorResult.reason) console.log(`${c.red}${monitorResult.reason}${c.reset}`);
-    if (monitorResult.url) {
-      console.log();
-      console.log(`📋 Ver log completo: ${c.cyan}${monitorResult.url}${c.reset}`);
-    }
-    console.log();
+    screen.phase("❌ Deploy falhou", fullSlug);
+    if (monitorResult.reason) console.log(`${c.red}${monitorResult.reason}${c.reset}\n`);
+    if (monitorResult.url) console.log(`📋 Ver detalhes: ${c.cyan}${monitorResult.url}${c.reset}\n`);
     process.exit(1);
   }
 }

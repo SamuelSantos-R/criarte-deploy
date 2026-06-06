@@ -19,9 +19,29 @@ import { BANNER } from "./banner.mjs";
 // ============================================================================
 const REPO = "SamuelSantos-R/multisite-system";
 const DEPLOY_DOMAIN = "https://criartedesing.ao";
+const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.0.0";
+const VERSION = "3.2.0";
+
+// Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
+// Não bloqueia o fluxo se falhar — é só telemetria pro app.
+async function registerDeployInPanel(config, slug, action, commit_sha) {
+  if (!config.panel_url || !config.admin_api_token) return;
+  try {
+    await fetch(`${config.panel_url.replace(/\/$/, "")}/api/deploys/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.admin_api_token}`,
+      },
+      body: JSON.stringify({ slug, action, commit_sha: commit_sha || null }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // silencioso
+  }
+}
 
 // ============================================================================
 // UI helpers
@@ -220,9 +240,25 @@ async function cmdLogin() {
 
   const name  = user.name || user.login;
   const email = user.email || `${user.login}@users.noreply.github.com`;
-  saveConfig({ token, name, email, login: user.login });
+
+  // Opcional: integração com o painel pra alimentar a aba Fila do app iOS
+  console.log();
+  console.log(`${c.dim}Opcional: integrar com o painel pra que seus deploys apareçam na aba Fila do app iOS.${c.reset}`);
+  console.log(`${c.dim}Deixe em branco pra pular.${c.reset}`);
+  const panel_url = await ask(`URL do painel ${c.dim}(${DEFAULT_PANEL_URL})${c.reset}: `, { default: "" });
+  const admin_api_token = panel_url || panel_url === ""
+    ? await ask(`Token ADMIN_API_TOKEN ${c.dim}(skip)${c.reset}: `, { hidden: true })
+    : "";
+
+  const cfg = { token, name, email, login: user.login };
+  if (admin_api_token) {
+    cfg.panel_url = panel_url || DEFAULT_PANEL_URL;
+    cfg.admin_api_token = admin_api_token;
+  }
+  saveConfig(cfg);
 
   ok(`Configuração salva em ${c.dim}${CONFIG_FILE}${c.reset}`);
+  if (cfg.panel_url) ok(`Integração com painel ativa (${cfg.panel_url})`);
   console.log();
   console.log("🎉 Pronto! Agora é só ir na pasta de um site e rodar:");
   console.log(`   ${c.cyan}criarte-deploy${c.reset}\n`);
@@ -673,7 +709,16 @@ async function cmdDeploy(argv) {
     process.exit(1);
   }
   sp3.succeed("Código enviado pro GitHub");
+
+  // Pega o SHA do commit recém-criado pra registrar no painel
+  let commitSha = null;
+  try {
+    commitSha = execSync(`git rev-parse HEAD`, { cwd: tmp, stdio: "pipe" }).toString().trim();
+  } catch {}
   rmSync(tmp, { recursive: true, force: true });
+
+  // Registra deploy no painel pra alimentar a aba Fila do app iOS (best-effort)
+  await registerDeployInPanel(config, fullSlug, isUpdate ? "update" : "new", commitSha);
 
   // ====== Monitora o deploy direto pela URL ======
   screen.phase("👀 Acompanhando o deploy", fullSlug);

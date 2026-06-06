@@ -506,6 +506,71 @@ async function applyFix(kind, cwd, category, slug) {
 }
 
 // ============================================================================
+// EXPIRAÇÃO — pergunta quanto tempo o site fica no ar
+// ============================================================================
+async function askExpiration(siteJsonPath) {
+  let current = null;
+  if (existsSync(siteJsonPath)) {
+    try { current = JSON.parse(readFileSync(siteJsonPath, "utf8")).expires_at || null; }
+    catch {}
+  }
+
+  console.log(`Quanto tempo o site fica no ar?`);
+  console.log(`  ${c.dim}0${c.reset}   Sem expiração (permanente)`);
+  console.log(`  ${c.dim}1${c.reset}   1 mês`);
+  console.log(`  ${c.dim}3${c.reset}   3 meses`);
+  console.log(`  ${c.dim}6${c.reset}   6 meses`);
+  console.log(`  ${c.dim}12${c.reset}  1 ano`);
+  console.log(`  ${c.dim}D${c.reset}   Data específica (YYYY-MM-DD)`);
+  if (current) console.log(`  ${c.dim}M${c.reset}   Manter atual (${current.slice(0, 10)})`);
+
+  const def = current ? "M" : "3";
+  const raw = (await ask(`→ `, { default: def })).trim().toLowerCase();
+
+  if (raw === "" || raw === def.toLowerCase()) {
+    if (def === "M") return current;
+    return monthsFromNow(parseInt(def, 10));
+  }
+  if (raw === "0" || raw === "n" || raw === "sem") return null;
+  if (raw === "m" && current) return current;
+  if (raw === "d") {
+    while (true) {
+      const date = (await ask(`Data ${c.dim}(YYYY-MM-DD)${c.reset} → `)).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date + "T00:00:00Z"))) return date;
+      err("Formato inválido. Use YYYY-MM-DD (ex: 2027-12-31).");
+    }
+  }
+  const months = parseInt(raw, 10);
+  if (!Number.isFinite(months) || months <= 0) {
+    warn(`Valor não reconhecido "${raw}" — assumindo 3 meses.`);
+    return monthsFromNow(3);
+  }
+  return monthsFromNow(months);
+}
+
+function monthsFromNow(months) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+function writeSiteMeta(cwd, category, slug, expires_at) {
+  const siteJsonPath = join(cwd, "site.json");
+  let meta = {};
+  if (existsSync(siteJsonPath)) {
+    try { meta = JSON.parse(readFileSync(siteJsonPath, "utf8")); } catch {}
+  }
+  meta.category = category;
+  if (!meta.name) {
+    meta.name = slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+  }
+  if (typeof meta.description !== "string") meta.description = "";
+  if (expires_at) meta.expires_at = expires_at;
+  else delete meta.expires_at;
+  writeFileSync(siteJsonPath, JSON.stringify(meta, null, 2) + "\n");
+}
+
+// ============================================================================
 // DEPLOY
 // ============================================================================
 async function cmdDeploy(argv) {
@@ -559,11 +624,17 @@ async function cmdDeploy(argv) {
     }
   }
 
+  // ====== Expiração ======
+  screen.phase("⏳ Validade", fullSlug);
+  const expires_at = await askExpiration(join(cwd, "site.json"));
+  writeSiteMeta(cwd, category, slug, expires_at);
+
   // ====== Resumo ======
   screen.phase("📋 Resumo", fullSlug);
   console.log(`  ${c.dim}Pasta:${c.reset}    ${cwd}`);
   console.log(`  ${c.dim}Destino:${c.reset}  sites/${fullSlug}/`);
   console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}${c.reset}`);
+  console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${expires_at}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
   console.log();
 
   const confirm = await ask(`Confirma o envio? ${c.dim}(s/N)${c.reset} → `);

@@ -29,13 +29,72 @@ const VERSION = "3.4.0";
 async function registerDeployInPanel(config, slug, action, commit_sha) {
   if (!config.panel_url || !config.admin_api_token) return;
   try {
-    await fetch(`${config.panel_url.replace(/\/$/, "")}/api/deploys/register`, {
+    await fetch(`${config.panel_url.replace(/\\/$/, "")}/api/deploys/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.admin_api_token}`,
       },
       body: JSON.stringify({ slug, action, commit_sha: commit_sha || null }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    // silencioso
+  }
+}
+
+/**
+ * Preflight check remoto — valida se o slug está disponível antes de clonar o repo.
+ * Chama /api/sites/preflight no painel pra verificar:
+ * - Slug disponível (não existe ainda, ou existe e é update)
+ * - Sem lock ativo (ninguém deployando o mesmo slug)
+ * - Categoria e nome válidos
+ *
+ * Retorna null se ok, ou uma string com o erro.
+ */
+async function remotePreflight(config, slug, action) {
+  if (!config.panel_url || !config.admin_api_token) return null; // sem painel, segue
+  try {
+    const res = await fetch(
+      `${config.panel_url.replace(/\\/$/, "")}/api/sites/preflight`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.admin_api_token}`,
+        },
+        body: JSON.stringify({ slug, action }),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (res.ok) return null; // tudo ok
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 423) {
+      return `🔒 "${slug}" está bloqueado — ${body.message || "outro deploy em andamento"}. Aguarde uns minutos e tente de novo.`;
+    }
+    if (res.status === 409) {
+      return `⚠️  "${slug}" já existe no sistema. Use action: "update" se quiser atualizar.`;
+    }
+    return body.message || `Erro ${res.status} na validação remota.`;
+  } catch {
+    return null; // falha de rede não deve bloquear
+  }
+}
+
+/**
+ * Notifica o painel que o deploy terminou, liberando o lock.
+ * Chama /api/deploys/callback com o status final.
+ */
+async function notifyDeployComplete(config, slug, status, commit_sha) {
+  if (!config.panel_url || !config.admin_api_token) return;
+  try {
+    await fetch(`${config.panel_url.replace(/\\/$/, "")}/api/deploys/callback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.admin_api_token}`,
+      },
+      body: JSON.stringify({ slug, status, commit_sha: commit_sha || null }),
       signal: AbortSignal.timeout(5000),
     });
   } catch {
@@ -554,7 +613,7 @@ function monthsFromNow(months) {
   return d.toISOString().slice(0, 10);
 }
 
-function writeSiteMeta(cwd, category, slug, expires_at) {
+function writeSiteMeta(cwd, category, slug, expires_at, subdomain) {
   const siteJsonPath = join(cwd, "site.json");
   let meta = {};
   if (existsSync(siteJsonPath)) {
@@ -567,6 +626,8 @@ function writeSiteMeta(cwd, category, slug, expires_at) {
   if (typeof meta.description !== "string") meta.description = "";
   if (expires_at) meta.expires_at = expires_at;
   else delete meta.expires_at;
+  if (subdomain) meta.subdomain = subdomain;
+  else delete meta.subdomain;
   writeFileSync(siteJsonPath, JSON.stringify(meta, null, 2) + "\n");
 }
 
@@ -575,6 +636,18 @@ function writeSiteMeta(cwd, category, slug, expires_at) {
 // ============================================================================
 async function cmdDeploy(argv) {
   screen.phase("📦 Publicar site");
+
+  // Filtra flags antes de pegar args posicionais (categoria + slug)
+  const noWait = argv.includes("--no-wait");
+  // Extrai --subdomain <valor> E remove do argv
+  let subdomain = null;
+  const subIdx = argv.indexOf("--subdomain");
+  if (subIdx >= 0) {
+    subdomain = argv[subIdx + 1] || null;
+    if (subdomain && (subdomain.startsWith("--") || subdomain.startsWith("-"))) subdomain = null;
+    argv.splice(subIdx, subdomain ? 2 : 1);
+  }
+  argv = argv.filter((a) => !a.startsWith("--"));
 
   let config = requireLogin();
   const cwd = process.cwd();
@@ -618,6 +691,33 @@ async function cmdDeploy(argv) {
   const futureDomain = DEFAULT_PANEL_URL.replace(/\/$/, "");
   const futureUrl = futureDomain !== liveDomain ? `${futureDomain}/${fullSlug}` : null;
 
+  // ====== Subdomínio personalizado (pra migrar sites legados da Discloud) ======
+  // Permite flag --subdomain dominio.com ou pergunta interativo
+  if (!subdomain) {
+    console.log();
+    console.log(`${c.bold}Subdomínio personalizado${c.reset} ${c.dim}(opcional)${c.reset}`);
+    console.log(`${c.dim}Se o site já tinha um subdomínio na Discloud (ex: mariaepaulo.criartedesing.ao),${c.reset}`);
+    console.log(`${c.dim}informe aqui pra manter o mesmo endereço. Deixe vazio pra pular.${c.reset}`);
+    const raw = await ask(`Subdomínio ${c.dim}(ex: mariaepaulo.criartedesing.ao)${c.reset}: `);
+    if (raw.trim()) {
+      subdomain = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    }
+  }
+  const subdomainUrl = subdomain ? `https://${subdomain}` : null;
+
+  // ====== Preflight remoto (valida slug + lock check no painel) ======
+  const action = "new"; // será ajustado depois do clone (se já existir)
+  const preflightErr = await remotePreflight(config, fullSlug, action);
+  if (preflightErr && preflightErr.includes("🔒")) {
+    screen.phase("🔒 Bloqueado", fullSlug);
+    err(preflightErr);
+    process.exit(1);
+  }
+  if (preflightErr && preflightErr.includes("já existe")) {
+    // Vamos verificar durante o clone — pode ser update
+    info(`${c.dim}Preflight: ${preflightErr}${c.reset}`);
+  }
+
   // ====== Análise pré-deploy ======
   screen.phase("🔍 Análise", `${fullSlug} · ${targetUrl}`);
   const sp1 = new Spinner("Analisando arquivos, dependências e configuração...").start();
@@ -643,13 +743,17 @@ async function cmdDeploy(argv) {
   // ====== Expiração ======
   screen.phase("⏳ Validade", fullSlug);
   const expires_at = await askExpiration(join(cwd, "site.json"));
-  writeSiteMeta(cwd, category, slug, expires_at);
+  writeSiteMeta(cwd, category, slug, expires_at, subdomain);
 
   // ====== Resumo ======
   screen.phase("📋 Resumo", fullSlug);
   console.log(`  ${c.dim}Pasta:${c.reset}    ${cwd}`);
   console.log(`  ${c.dim}Destino:${c.reset}  sites/${fullSlug}/`);
-  console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}${c.reset}`);
+  if (subdomainUrl) {
+    console.log(`  ${c.dim}Subdomínio:${c.reset} ${c.bold}${c.cyan}${subdomainUrl}${c.reset}`);
+  } else {
+    console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}${c.reset}`);
+  }
   if (futureUrl) {
     console.log(`  ${c.dim}Futuro:${c.reset}   ${c.dim}${futureUrl}${c.reset} ${c.dim}(quando o DNS migrar)${c.reset}`);
   }
@@ -811,17 +915,40 @@ async function cmdDeploy(argv) {
   await registerDeployInPanel(config, fullSlug, isUpdate ? "update" : "new", commitSha);
 
   // ====== Monitora o deploy direto pela URL ======
+  // Se tem subdomínio, mostra ele como URL principal mesmo monitorando a slug
+  const displayUrl = subdomainUrl || targetUrl;
+  if (noWait) {
+    screen.phase("🚀 Push enviado", fullSlug);
+    console.log(`Push pra ${c.cyan}${REPO}${c.reset} concluído.`);
+    console.log(`Coolify vai detectar e rebuildar em ~30s. Site no ar em ~2-4min.`);
+    console.log();
+    if (subdomainUrl) {
+      console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);
+      console.log(`🔗 ${c.dim}${targetUrl}${c.reset} ${c.dim}(slug, fallback)${c.reset}`);
+    } else {
+      console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}${c.reset}\n`);
+    }
+    return;
+  }
   screen.phase("👀 Acompanhando o deploy", fullSlug);
   const monitorResult = await monitorDeploy(targetUrl, config.panel_url);
 
   // ====== Resultado final ======
   if (monitorResult.ok) {
     screen.phase("🎉 Site no ar", fullSlug);
-    console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}${c.reset}\n`);
+    if (subdomainUrl) {
+      console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);
+      console.log(`🔗 ${c.dim}${targetUrl}${c.reset} ${c.dim}(slug, fallback)${c.reset}\n`);
+    } else {
+      console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}${c.reset}\n`);
+    }
+    // Notifica painel que deploy concluiu com sucesso
+    await notifyDeployComplete(config, fullSlug, "live", commitSha);
   } else {
     screen.phase("❌ Deploy falhou", fullSlug);
     if (monitorResult.reason) console.log(`${c.red}${monitorResult.reason}${c.reset}\n`);
     if (monitorResult.url) console.log(`📋 Ver detalhes: ${c.cyan}${monitorResult.url}${c.reset}\n`);
+    await notifyDeployComplete(config, fullSlug, "failed", commitSha);
     process.exit(1);
   }
 }
@@ -939,7 +1066,8 @@ async function cmdList() {
   for (const [cat, items] of Object.entries(byCat)) {
     console.log(`\n${c.bold}${cat}${c.reset} ${c.dim}(${items.length})${c.reset}`);
     for (const s of items) {
-      console.log(`  ${c.green}●${c.reset} ${s.name.padEnd(28)} ${c.dim}${DEPLOY_DOMAIN}/${s.slug}${c.reset}`);
+      const sub = s.subdomain ? ` ${c.green}→${c.reset} ${c.bold}https://${s.subdomain}${c.reset}` : "";
+      console.log(`  ${c.green}●${c.reset} ${s.name.padEnd(28)} ${c.dim}${DEPLOY_DOMAIN}/${s.slug}${c.reset}${sub}`);
     }
   }
   console.log();
@@ -975,9 +1103,10 @@ ${c.bold}Comandos principais:${c.reset}
   ${c.cyan}criarte-deploy${c.reset}
     Publica o site da pasta atual (pergunta categoria + nome).
 
-  ${c.cyan}criarte-deploy <categoria> <nome>${c.reset}
+  ${c.cyan}criarte-deploy ${c.dim}<categoria> <nome> [--subdomain dominio.com]${c.reset}
     Publica direto, sem perguntar.
     Ex: ${c.dim}criarte-deploy casamento joao-maria${c.reset}
+    Ex: ${c.dim}criarte-deploy casamento joao-maria --subdomain joaoemaria.criartedesing.ao${c.reset}
 
   ${c.cyan}criarte-deploy check${c.reset}
     Analisa estrutura do site SEM enviar.

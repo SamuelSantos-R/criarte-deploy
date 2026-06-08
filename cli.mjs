@@ -1103,10 +1103,7 @@ ${c.bold}Comandos principais:${c.reset}
   ${c.cyan}criarte-deploy${c.reset}
     Publica o site da pasta atual (pergunta categoria + nome).
 
-  ${c.cyan}criarte-deploy ${c.dim}<categoria> <nome> [--subdomain dominio.com]${c.reset}
-    Publica direto, sem perguntar.
-    Ex: ${c.dim}criarte-deploy casamento joao-maria${c.reset}
-    Ex: ${c.dim}criarte-deploy casamento joao-maria --subdomain joaoemaria.criartedesing.ao${c.reset}
+  ${c.cyan}criarte-deploy ${c.dim}<categoria> <nome> [--subdomain dominio.com]${c.reset}\n    Publica direto, sem perguntar.\n    Ex: ${c.dim}criarte-deploy casamento joao-maria${c.reset}\n    Ex: ${c.dim}criarte-deploy casamento joao-maria --subdomain joaoemaria.criartedesing.ao${c.reset}\n\n  ${c.cyan}criarte-deploy --direct ${c.dim}[categoria] [nome]${c.reset}\n    Upload direto pra VPS via API — sem git, sem rebuild do Coolify.\n    O site fica no ar em segundos, sem afetar os outros sites.\n    Ex: ${c.dim}criarte-deploy --direct casamento joao-maria${c.reset}
 
   ${c.cyan}criarte-deploy check${c.reset}
     Analisa estrutura do site SEM enviar.
@@ -1763,14 +1760,228 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
 }
 
 // ============================================================================
+// DIRECT DEPLOY (upload direto pra VPS via API — sem git, sem rebuild)
+// ============================================================================
+async function cmdDirectDeploy(argv) {
+  const config = requireLogin();
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  if (!targetUrl) {
+    err("URL do painel não configurada. Rode: criarte-deploy panel");
+    process.exit(1);
+  }
+  if (!config.admin_api_token) {
+    err("Token de admin não configurado. Rode: criarte-deploy panel");
+    process.exit(1);
+  }
+
+  screen.phase("📦 Publicar site (upload direto)", "VPS: " + targetUrl);
+
+  let noWait = argv.includes("--no-wait");
+
+  // Extrai flags
+  let subdomain = null;
+  const subIdx = argv.indexOf("--subdomain");
+  if (subIdx >= 0) {
+    subdomain = argv[subIdx + 1] || null;
+    if (subdomain && (subdomain.startsWith("--") || subdomain.startsWith("-"))) subdomain = null;
+    argv.splice(subIdx, subdomain ? 2 : 1);
+  }
+  argv = argv.filter((a) => !a.startsWith("--"));
+
+  const cwd = process.cwd();
+  let [rawCategory, rawSlug] = argv;
+
+  // Pergunta categoria
+  let category = rawCategory;
+  while (!category || !/^[a-z0-9-]+$/.test(category)) {
+    const raw = await ask(`Categoria ${c.dim}(ex: casamento, aniversario)${c.reset}: `);
+    if (raw && /^[a-z0-9-]+$/.test(raw.trim().toLowerCase())) {
+      category = raw.trim().toLowerCase();
+    } else {
+      warn("Apenas letras minúsculas, números e hífens.");
+    }
+  }
+
+  // Slug
+  let slug = rawSlug;
+  if (!slug) {
+    slug = basename(cwd).toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const suggested = slug;
+    const raw = await ask(`Slug ${c.dim}(${suggested})${c.reset}: `);
+    if (raw.trim()) slug = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    else slug = suggested;
+    if (!slug) { err("Slug inválido"); process.exit(1); }
+  } else {
+    slug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
+  }
+
+  const fullSlug = `${category}/${slug}`;
+  const liveDomain = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
+  const targetUrlSlug = `${liveDomain}/${fullSlug}`;
+  const futureDomain = DEFAULT_PANEL_URL.replace(/\/$/, "");
+  const futureUrl = futureDomain !== liveDomain ? `${futureDomain}/${fullSlug}` : null;
+
+  // Subdomínio personalizado
+  if (!subdomain) {
+    console.log();
+    console.log(`${c.bold}Subdomínio personalizado${c.reset} ${c.dim}(opcional)${c.reset}`);
+    console.log(`${c.dim}Deixe vazio pra pular. O site vai ficar em ${fullSlug}${c.reset}`);
+    const raw = await ask(`Subdomínio ${c.dim}(ex: cliente.criartedesing.ao)${c.reset}: `);
+    if (raw.trim()) {
+      subdomain = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    }
+  }
+  const subdomainUrl = subdomain ? `https://${subdomain}` : null;
+
+  // Análise pré-deploy
+  screen.phase("🔍 Análise", `${fullSlug}`);
+  const sp1 = new Spinner("Analisando arquivos...").start();
+  const publicDir = join(cwd, "public");
+  const outDir = join(cwd, "out");
+  const buildDir = existsSync(outDir) ? outDir : (existsSync(publicDir) ? publicDir : cwd);
+  sp1.clear();
+
+  // Conta arquivos
+  let totalFiles = 0;
+  let totalSize = 0;
+  function walk(dir) {
+    for (const e of readdirSync(dir)) {
+      const full = join(dir, e);
+      const st = statSync(full);
+      if (st.isDirectory()) { walk(full); continue; }
+      if (st.isFile()) {
+        totalFiles++;
+        totalSize += st.size;
+      }
+    }
+  }
+  walk(buildDir);
+  const sizeMb = (totalSize / 1024 / 1024).toFixed(1);
+  ok(`${totalFiles} arquivo(s), ${sizeMb}MB`);
+
+  // Expiração
+  screen.phase("⏳ Validade", fullSlug);
+  const expires_at = await askExpiration(join(cwd, "site.json"));
+
+  // Resumo
+  screen.phase("📋 Resumo", fullSlug);
+  console.log(`  ${c.dim}Pasta:${c.reset}    ${cwd}`);
+  console.log(`  ${c.dim}Destino:${c.reset}  ${fullSlug}`);
+  if (subdomainUrl) {
+    console.log(`  ${c.dim}Subdomínio:${c.reset} ${c.bold}${c.cyan}${subdomainUrl}${c.reset}`);
+  } else {
+    console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}/${fullSlug}${c.reset}`);
+  }
+  console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${expires_at}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
+  console.log();
+
+  const confirm = await ask(`Confirmar envio? ${c.dim}(s/N)${c.reset} → `);
+  if (confirm.toLowerCase() !== "s" && confirm.toLowerCase() !== "sim") {
+    warn("Cancelado.");
+    process.exit(0);
+  }
+
+  // ====== Cria o zip ======
+  screen.phase("🚀 Enviando", fullSlug);
+  const sp2 = new Spinner("Compactando arquivos...").start();
+
+  const tmpZip = join(tmpdir(), `criarte-deploy-${slug}.zip`);
+  try {
+    // No Mac/Linux: zip -r tmp.zip <dir>
+    execSync(`cd "${buildDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 60000 });
+  } catch (e) {
+    sp2.fail("Falha ao criar zip");
+    err(e.stderr?.toString() || e.message);
+    process.exit(1);
+  }
+  sp2.succeed(`${totalFiles} arquivo(s) compactados (${sizeMb}MB)`);
+
+  // ====== Upload pra VPS ======
+  const sp3 = new Spinner("Enviando pra VPS...").start();
+  const uploadUrl = `${targetUrl}/api/sites/upload`;
+  const zipBuffer = readFileSync(tmpZip);
+
+  try {
+    // Usa FormData via fetch (Node 18+ tem fetch nativo)
+    const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
+    const bodyParts = [];
+
+    // slug
+    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="slug"\r\n\r\n${fullSlug}\r\n`);
+    // name
+    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\n${slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ")}\r\n`);
+    // category
+    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="category"\r\n\r\n${category}\r\n`);
+    // subdomain (opcional)
+    if (subdomain) {
+      bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="subdomain"\r\n\r\n${subdomain}\r\n`);
+    }
+    // expires_at (opcional)
+    if (expires_at) {
+      bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="expires_at"\r\n\r\n${expires_at}\r\n`);
+    }
+    // file (zip)
+    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${slug}.zip"\r\nContent-Type: application/zip\r\n\r\n`);
+    bodyParts.push(zipBuffer.toString("binary"));
+    bodyParts.push(`\r\n--${boundary}--\r\n`);
+
+    const body = Buffer.from(bodyParts.join(""), "binary");
+    const res = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${config.admin_api_token}`,
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": body.length.toString(),
+      },
+      body,
+      signal: AbortSignal.timeout(120000),
+    });
+
+    const result = await res.json();
+    rmSync(tmpZip);
+
+    if (!res.ok || !result.success) {
+      sp3.fail("Falha no upload");
+      err(result.error || `HTTP ${res.status}`);
+      process.exit(1);
+    }
+
+    sp3.succeed(`Site publicado em ${result.url}`);
+
+    // Mostra resultado
+    if (!noWait) {
+      screen.phase("🎉 Site no ar!", fullSlug);
+      if (subdomainUrl) {
+        console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);
+        console.log(`🔗 ${c.dim}${targetUrl}/${fullSlug}${c.reset} ${c.dim}(slug, fallback)${c.reset}\n`);
+      } else {
+        console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}/${fullSlug}${c.reset}\n`);
+      }
+      ok(`${result.files} arquivo(s) enviados`);
+    }
+  } catch (e) {
+    sp3.fail("Falha no upload");
+    err(e.message);
+    if (existsSync(tmpZip)) rmSync(tmpZip);
+    process.exit(1);
+  }
+}
+
+// ============================================================================
 // Router
 // ============================================================================
 const [, , cmd, ...rest] = process.argv;
+const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--direct";
 
 (async () => {
   try {
     if (cmd === "-v" || cmd === "--version" || cmd === "version") {
       console.log(VERSION);
+      return;
+    }
+    if (hasDirect) {
+      const deployArgs = cmd === "--direct" ? rest : rest.filter(a => a !== "--direct");
+      await cmdDirectDeploy(deployArgs);
       return;
     }
     switch (cmd) {

@@ -1900,8 +1900,8 @@ async function cmdDirectDeploy(argv) {
     if (isNextSource) {
       // Projeto fonte: zipa tudo exceto node_modules, .next, out
       const ignoreDirs = ["node_modules", ".next", "out", ".git", "dist", ".turbo", ".vscode", ".idea", ".cache"];
-      const ignoreStr = ignoreDirs.map(d => `-x "${d}/**"`).join(" ");
-      execSync(`cd "${cwd}" && zip -r "${tmpZip}" . ${ignoreStr}`, { stdio: "pipe", timeout: 60000 });
+      const grepExcludes = ignoreDirs.map(d => `-e "^./${d}/"`).join(" ");
+      execSync(`cd "${cwd}" && find . -type f | grep -v ${grepExcludes} | zip -@ "${tmpZip}"`, { stdio: "pipe", timeout: 60000 });
     } else {
       // Site estático: zipa a pasta de build
       execSync(`cd "${buildDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 60000 });

@@ -29,7 +29,7 @@ const VERSION = "3.4.0";
 async function registerDeployInPanel(config, slug, action, commit_sha) {
   if (!config.panel_url || !config.admin_api_token) return;
   try {
-    await fetch(`${config.panel_url.replace(/\\/$/, "")}/api/deploys/register`, {
+    await fetch(`${config.panel_url.replace(/\/$/, "")}/api/deploys/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -56,7 +56,7 @@ async function remotePreflight(config, slug, action) {
   if (!config.panel_url || !config.admin_api_token) return null; // sem painel, segue
   try {
     const res = await fetch(
-      `${config.panel_url.replace(/\\/$/, "")}/api/sites/preflight`,
+      `${config.panel_url.replace(/\/$/, "")}/api/sites/preflight`,
       {
         method: "POST",
         headers: {
@@ -88,7 +88,7 @@ async function remotePreflight(config, slug, action) {
 async function notifyDeployComplete(config, slug, status, commit_sha) {
   if (!config.panel_url || !config.admin_api_token) return;
   try {
-    await fetch(`${config.panel_url.replace(/\\/$/, "")}/api/deploys/callback`, {
+    await fetch(`${config.panel_url.replace(/\/$/, "")}/api/deploys/callback`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1843,7 +1843,17 @@ async function cmdDirectDeploy(argv) {
       const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
       const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
       isNextSource = !!deps.next;
-    } catch {}
+      console.log("[debug] deps.next =", deps.next, "→ isNextSource =", isNextSource);
+      if (isNextSource) {
+        console.log("[debug] buildDir será cwd (source project)");
+      } else {
+        console.log("[debug] buildDir será out/ ou public/ (static site)");
+      }
+    } catch (e) {
+      console.log("[debug] erro ao ler package.json:", e.message);
+    }
+  } else {
+    console.log("[debug] package.json não encontrado em:", pkgPath);
   }
   if (isNextSource) info("Projeto Next.js detectado — build será feito na VPS");
   const publicDir = join(cwd, "public");
@@ -1965,18 +1975,31 @@ async function cmdDirectDeploy(argv) {
       process.exit(1);
     }
 
-    sp3.succeed(`Site publicado em ${result.url}${result.built ? " (build na VPS)" : ""}`);
+    sp3.succeed(
+      isNextSource
+        ? `Build iniciado! O site será publicado em alguns minutos. Acompanhe em ${result.slug}`
+        : `Site publicado em ${result.url}`
+    );
 
     // Mostra resultado
     if (!noWait) {
       screen.phase("🎉 Site no ar!", fullSlug);
-      if (subdomainUrl) {
-        console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);
-        console.log(`🔗 ${c.dim}${targetUrl}/${fullSlug}${c.reset} ${c.dim}(slug, fallback)${c.reset}\n`);
+      if (isNextSource) {
+        console.log(`📦 ${c.bold}Build em andamento${c.reset}`);
+        console.log(`   ${c.dim}Slug:${c.reset} ${fullSlug}`);
+        console.log(`   ${c.dim}Status:${c.reset} ${result.message || "Building..."}`);
+        console.log();
+        console.log(`🌐 ${c.cyan}${targetUrl}/${fullSlug}${c.reset}`);
+        console.log(`   ${c.dim}(O site aparece automaticamente quando o build terminar)${c.reset}`);
       } else {
-        console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}/${fullSlug}${c.reset}\n`);
+        if (subdomainUrl) {
+          console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);
+          console.log(`🔗 ${c.dim}${targetUrl}/${fullSlug}${c.reset} ${c.dim}(slug, fallback)${c.reset}\n`);
+        } else {
+          console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}/${fullSlug}${c.reset}\n`);
+        }
+        if (result.files) ok(`${result.files} arquivo(s) enviados`);
       }
-      ok(`${result.files} arquivo(s) enviados`);
     }
   } catch (e) {
     sp3.fail("Falha no upload");

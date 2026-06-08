@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.4.1";
+const VERSION = "3.5.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1905,27 +1905,76 @@ async function cmdDirectDeploy(argv) {
     process.exit(0);
   }
 
-  // ====== Cria o zip ======
+  // ====== Staging: copia cwd pra temp dir antes de zipar ======
+  // Permite limpar órfãos + upar pro R2 + reescrever paths SEM tocar no projeto original
+  screen.phase("📂 Staging", fullSlug);
+  const stagingDir = mkdtempSync(join(tmpdir(), `criarte-stage-${slug}-`));
+  const sp1b = new Spinner("Copiando arquivos pro staging...").start();
+  const IGNORE_STAGE = new Set(["node_modules", ".next", "out", ".git", "dist", ".turbo", ".vscode", ".idea", ".cache", "__pycache__"]);
+  function copyTree(src, dst) {
+    mkdirSync(dst, { recursive: true });
+    for (const entry of readdirSync(src)) {
+      if (IGNORE_STAGE.has(entry)) continue;
+      const s = join(src, entry);
+      const d = join(dst, entry);
+      const st = statSync(s);
+      if (st.isDirectory()) copyTree(s, d);
+      else cpSync(s, d);
+    }
+  }
+  try {
+    copyTree(isNextSource ? cwd : buildDir, stagingDir);
+    sp1b.succeed("Staging pronto");
+  } catch (e) {
+    sp1b.fail("Falha no staging");
+    err(e.message);
+    rmSync(stagingDir, { recursive: true, force: true });
+    process.exit(1);
+  }
+
+  // ====== Limpa órfãos (assets em public/ não referenciados) ======
+  if (isNextSource) {
+    try { await maybeCleanOrphans(stagingDir); } catch (e) { warn(`Skip orphan cleanup: ${e.message}`); }
+  }
+
+  // ====== Upload de assets pesados pro R2 ======
+  if (config.r2 && isNextSource) {
+    try {
+      const r2Result = await uploadAssetsToR2(stagingDir, category, slug, config.r2);
+      if (r2Result.uploaded > 0 || r2Result.skipped > 0) {
+        const touched = rewriteSourceForR2(stagingDir, config.r2, r2Result.remoteMap, category, slug);
+        const totalMb = (r2Result.totalBytes / 1024 / 1024).toFixed(1);
+        console.log();
+        ok(`R2: ${r2Result.uploaded} novo(s), ${r2Result.skipped} já existia(m) — ${totalMb}MB`);
+        ok(`Source reescrito em ${touched} arquivo(s) — assets servidos pelo R2`);
+      }
+    } catch (e) {
+      err(`Falha no upload R2: ${e.message}`);
+      info("Pulando R2 — assets vão pra VPS no zip.");
+    }
+  } else if (!config.r2 && isNextSource) {
+    info(`${c.dim}R2 não configurado — assets vão pra VPS. Rode ${c.cyan}criarte-deploy r2-setup${c.reset}${c.dim} pra ativar.${c.reset}`);
+  }
+
+  // ====== Cria o zip a partir do staging ======
   screen.phase("🚀 Enviando", fullSlug);
   const sp2 = new Spinner("Compactando arquivos...").start();
 
   const tmpZip = join(tmpdir(), `criarte-deploy-${slug}.zip`);
   try {
-    if (isNextSource) {
-      // Projeto fonte: zipa tudo exceto node_modules, .next, out
-      const ignoreDirs = ["node_modules", ".next", "out", ".git", "dist", ".turbo", ".vscode", ".idea", ".cache"];
-      const grepExcludes = ignoreDirs.map(d => `-e "^./${d}/"`).join(" ");
-      execSync(`cd "${cwd}" && find . -type f | grep -v ${grepExcludes} | zip -@ "${tmpZip}"`, { stdio: "pipe", timeout: 60000 });
-    } else {
-      // Site estático: zipa a pasta de build
-      execSync(`cd "${buildDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 60000 });
-    }
+    execSync(`cd "${stagingDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 120000 });
   } catch (e) {
     sp2.fail("Falha ao criar zip");
     err(e.stderr?.toString() || e.message);
+    rmSync(stagingDir, { recursive: true, force: true });
     process.exit(1);
   }
-  sp2.succeed(`${totalFiles} arquivo(s) compactados (${sizeMb}MB)`);
+
+  // Recalcula tamanho do zip pós-staging (órfãos removidos + R2)
+  const finalSize = statSync(tmpZip).size;
+  const finalMb = (finalSize / 1024 / 1024).toFixed(1);
+  sp2.succeed(`Zip pronto: ${finalMb}MB ${finalSize < totalSize ? c.dim + `(${sizeMb}MB original)` + c.reset : ""}`);
+  rmSync(stagingDir, { recursive: true, force: true });
 
   // ====== Upload pra VPS ======
   const sp3 = new Spinner("Enviando pra VPS...").start();

@@ -1861,14 +1861,18 @@ async function cmdDirectDeploy(argv) {
   const buildDir = isNextSource ? cwd : (existsSync(outDir) ? outDir : (existsSync(publicDir) ? publicDir : cwd));
   sp1.clear();
 
-  // Conta arquivos
+  // Conta arquivos (exclui node_modules e outras pastas ignoradas)
+  const IGNORE_DIRS_WALK = new Set(["node_modules", ".next", "out", ".git", "dist", ".turbo", ".vscode", ".idea", ".cache", "__pycache__"]);
   let totalFiles = 0;
   let totalSize = 0;
   function walk(dir) {
     for (const e of readdirSync(dir)) {
       const full = join(dir, e);
       const st = statSync(full);
-      if (st.isDirectory()) { walk(full); continue; }
+      if (st.isDirectory()) {
+        if (!IGNORE_DIRS_WALK.has(e)) walk(full);
+        continue;
+      }
       if (st.isFile()) {
         totalFiles++;
         totalSize += st.size;
@@ -1963,34 +1967,59 @@ async function cmdDirectDeploy(argv) {
         "Content-Length": body.length.toString(),
       },
       body,
-      signal: AbortSignal.timeout(isNextSource ? 480000 : 120000),
+      // Timeout reduzido: upload é assíncrono, resposta vem rápido
+      signal: AbortSignal.timeout(60000),
     });
 
     const result = await res.json();
     rmSync(tmpZip);
 
     if (!res.ok || !result.success) {
-      sp3.fail(isNextSource ? "Falha no build" : "Falha no upload");
+      sp3.fail(isNextSource ? "Falha ao iniciar build" : "Falha no upload");
       err(result.error || `HTTP ${res.status}`);
       process.exit(1);
     }
 
-    sp3.succeed(
-      isNextSource
-        ? `Build iniciado! O site será publicado em alguns minutos. Acompanhe em ${result.slug}`
-        : `Site publicado em ${result.url}`
-    );
+    // Upload enviado com sucesso — build iniciou (ou já completou)
+    if (isNextSource && result.buildId) {
+      sp3.succeed("Build iniciado na VPS");
+    } else {
+      sp3.succeed(isNextSource ? "Build concluído" : `Site publicado em ${result.url}`);
+    }
 
     // Mostra resultado
     if (!noWait) {
       screen.phase("🎉 Site no ar!", fullSlug);
-      if (isNextSource) {
-        console.log(`📦 ${c.bold}Build em andamento${c.reset}`);
-        console.log(`   ${c.dim}Slug:${c.reset} ${fullSlug}`);
-        console.log(`   ${c.dim}Status:${c.reset} ${result.message || "Building..."}`);
-        console.log();
+      if (isNextSource && result.buildId) {
+        // Poll build status
+        const statusUrl = `${targetUrl}/api/builds/status?buildId=${result.buildId}`;
+        const statusSp = new Spinner("Build em andamento...").start();
+        let done = false;
+        const startPoll = Date.now();
+        const POLL_TIMEOUT = 10 * 60 * 1000; // 10min
+        while (Date.now() - startPoll < POLL_TIMEOUT && !done) {
+          await new Promise(r => setTimeout(r, 5000));
+          try {
+            const sr = await fetch(statusUrl, {
+              headers: { Authorization: `Bearer ${config.admin_api_token}` },
+              signal: AbortSignal.timeout(5000),
+            });
+            if (!sr.ok) continue;
+            const statusData = await sr.json();
+            const buildStatus = statusData.status || statusData.job?.status || "unknown";
+            statusSp.update(`Build: ${buildStatus} ${c.dim}· ${Math.round((Date.now() - startPoll)/1000)}s${c.reset}`);
+            if (buildStatus === "done" || buildStatus === "completed") {
+              statusSp.succeed(`Build concluído em ${Math.round((Date.now() - startPoll)/1000)}s`);
+              done = true;
+            } else if (buildStatus === "failed") {
+              statusSp.fail(`Build falhou: ${statusData.error || statusData.job?.error || "erro desconhecido"}`);
+              done = true;
+            }
+          } catch {}
+        }
+        if (!done) statusSp.warn("Build ainda em andamento — verifique manualmente");
         console.log(`🌐 ${c.cyan}${targetUrl}/${fullSlug}${c.reset}`);
-        console.log(`   ${c.dim}(O site aparece automaticamente quando o build terminar)${c.reset}`);
+        console.log(`   ${c.dim}O build continua em background mesmo se você fechar o terminal${c.reset}`);
       } else {
         if (subdomainUrl) {
           console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);

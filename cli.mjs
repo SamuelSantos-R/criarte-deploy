@@ -1836,9 +1836,19 @@ async function cmdDirectDeploy(argv) {
   // Análise pré-deploy
   screen.phase("🔍 Análise", `${fullSlug}`);
   const sp1 = new Spinner("Analisando arquivos...").start();
+  const pkgPath = join(cwd, "package.json");
+  let isNextSource = false;
+  if (existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+      const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+      isNextSource = !!deps.next;
+    } catch {}
+  }
+  if (isNextSource) info("Projeto Next.js detectado — build será feito na VPS");
   const publicDir = join(cwd, "public");
   const outDir = join(cwd, "out");
-  const buildDir = existsSync(outDir) ? outDir : (existsSync(publicDir) ? publicDir : cwd);
+  const buildDir = isNextSource ? cwd : (existsSync(outDir) ? outDir : (existsSync(publicDir) ? publicDir : cwd));
   sp1.clear();
 
   // Conta arquivos
@@ -1887,8 +1897,15 @@ async function cmdDirectDeploy(argv) {
 
   const tmpZip = join(tmpdir(), `criarte-deploy-${slug}.zip`);
   try {
-    // No Mac/Linux: zip -r tmp.zip <dir>
-    execSync(`cd "${buildDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 60000 });
+    if (isNextSource) {
+      // Projeto fonte: zipa tudo exceto node_modules, .next, out
+      const ignoreDirs = ["node_modules", ".next", "out", ".git", "dist", ".turbo", ".vscode", ".idea", ".cache"];
+      const ignoreStr = ignoreDirs.map(d => `-x "${d}/**"`).join(" ");
+      execSync(`cd "${cwd}" && zip -r "${tmpZip}" . ${ignoreStr}`, { stdio: "pipe", timeout: 60000 });
+    } else {
+      // Site estático: zipa a pasta de build
+      execSync(`cd "${buildDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 60000 });
+    }
   } catch (e) {
     sp2.fail("Falha ao criar zip");
     err(e.stderr?.toString() || e.message);
@@ -1898,7 +1915,9 @@ async function cmdDirectDeploy(argv) {
 
   // ====== Upload pra VPS ======
   const sp3 = new Spinner("Enviando pra VPS...").start();
-  const uploadUrl = `${targetUrl}/api/sites/upload`;
+  const uploadUrl = isNextSource
+    ? `${targetUrl}/api/sites/deploy-source`
+    : `${targetUrl}/api/sites/upload`;
   const zipBuffer = readFileSync(tmpZip);
 
   try {
@@ -1934,19 +1953,19 @@ async function cmdDirectDeploy(argv) {
         "Content-Length": body.length.toString(),
       },
       body,
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(isNextSource ? 480000 : 120000),
     });
 
     const result = await res.json();
     rmSync(tmpZip);
 
     if (!res.ok || !result.success) {
-      sp3.fail("Falha no upload");
+      sp3.fail(isNextSource ? "Falha no build" : "Falha no upload");
       err(result.error || `HTTP ${res.status}`);
       process.exit(1);
     }
 
-    sp3.succeed(`Site publicado em ${result.url}`);
+    sp3.succeed(`Site publicado em ${result.url}${result.built ? " (build na VPS)" : ""}`);
 
     // Mostra resultado
     if (!noWait) {

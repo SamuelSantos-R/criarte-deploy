@@ -1926,7 +1926,7 @@ async function cmdDirectDeploy(argv) {
   // ====== Upload pra VPS ======
   const sp3 = new Spinner("Enviando pra VPS...").start();
   const uploadUrl = isNextSource
-    ? `${targetUrl}/api/sites/deploy-source`
+    ? `${targetUrl}/api/sites/upload`
     : `${targetUrl}/api/sites/upload`;
   const zipBuffer = readFileSync(tmpZip);
 

@@ -2003,7 +2003,10 @@ async function cmdDirectDeploy(argv) {
     }
   } catch (e) {
     sp3.fail("Falha no upload");
-    err(e.message);
+    err(`Erro: ${e.message}`);
+    err(`Tipo: ${e.constructor?.name || "desconhecido"}`);
+    err(`URL: ${uploadUrl}`);
+    if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
     if (existsSync(tmpZip)) rmSync(tmpZip);
     process.exit(1);
   }

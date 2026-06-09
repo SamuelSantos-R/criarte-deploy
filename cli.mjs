@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.7.0";
+const VERSION = "3.8.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -2029,89 +2029,99 @@ async function cmdDirectDeploy(argv) {
     info(`${c.dim}R2 não configurado — assets vão pra VPS. Rode ${c.cyan}criarte-deploy r2-setup${c.reset}${c.dim} pra ativar.${c.reset}`);
   }
 
-  // ====== Cria o zip a partir do staging ======
+  // ====== Envio: rsync (preferido se configurado) ou zip+HTTP ======
   screen.phase("🚀 Enviando", fullSlug);
-  const sp2 = new Spinner("Compactando arquivos...").start();
+  const useRsync = !!(config.rsync && config.rsync.host && hasRsyncAndSsh());
+  let tmpZip = null;
+  let sp3;
+  let result;
 
-  const tmpZip = join(tmpdir(), `criarte-deploy-${slug}.zip`);
-  try {
-    execSync(`cd "${stagingDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 120000 });
-  } catch (e) {
-    sp2.fail("Falha ao criar zip");
-    err(e.stderr?.toString() || e.message);
-    rmSync(stagingDir, { recursive: true, force: true });
-    process.exit(1);
-  }
-
-  // Recalcula tamanho do zip pós-staging (órfãos removidos + R2)
-  const finalSize = statSync(tmpZip).size;
-  const finalMb = (finalSize / 1024 / 1024).toFixed(1);
-  sp2.succeed(`Zip pronto: ${finalMb}MB ${finalSize < totalSize ? c.dim + `(${sizeMb}MB original)` + c.reset : ""}`);
-  rmSync(stagingDir, { recursive: true, force: true });
-
-  // ====== Upload pra VPS ======
-  const sp3 = new Spinner("Enviando pra VPS...").start();
-  const uploadUrl = isNextSource
-    ? `${targetUrl}/api/sites/upload`
-    : `${targetUrl}/api/sites/upload`;
-  const zipBuffer = readFileSync(tmpZip);
-
-  try {
-    // Monta multipart usando FormData nativo + Blob — preserva binários sem
-    // round-trip por string "binary" (que corrompia zips grandes → "Failed to
-    // parse body as FormData").
-    const form = new FormData();
-    form.append("slug", fullSlug);
-    form.append("name", slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" "));
-    form.append("category", category);
-    if (subdomain) form.append("subdomain", subdomain);
-    if (expires_at) form.append("expires_at", expires_at);
-    form.append("file", new Blob([zipBuffer], { type: "application/zip" }), `${slug}.zip`);
-
-    const sizeMb = zipBuffer.length / (1024 * 1024);
-    const uploadTimeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, 60000 + sizeMb * 1000));
-
-    // Retry com backoff: até 3 tentativas pra erros transientes (timeout, ECONNRESET, 5xx)
-    const MAX_ATTEMPTS = 3;
-    let res, lastErr;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      sp3.update(`Enviando ${sizeMb.toFixed(1)}MB pra VPS ${c.dim}(tentativa ${attempt}/${MAX_ATTEMPTS}, timeout ${Math.round(uploadTimeoutMs/60000)}min)${c.reset}`);
-      try {
-        res = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${config.admin_api_token}` },
-          body: form,
-          signal: AbortSignal.timeout(uploadTimeoutMs),
-          // @ts-ignore - undici-specific, ignora se runtime não suportar
-          duplex: "half",
-        });
-        if (res.ok || (res.status >= 400 && res.status < 500)) break; // não retenta 4xx
-        lastErr = new Error(`HTTP ${res.status}`);
-      } catch (e) {
-        lastErr = e;
-        const transient = /timeout|ECONNRESET|ENETUNREACH|ETIMEDOUT|fetch failed/i.test(String(e?.message || e?.code || ""));
-        if (!transient || attempt === MAX_ATTEMPTS) throw e;
-        sp3.update(`Falha transiente (${e.message}) — re-tentando em 3s...`);
-        await new Promise(r => setTimeout(r, 3000));
-      }
-    }
-    if (!res) throw lastErr || new Error("upload falhou após retries");
-
-    const result = await res.json();
-    rmSync(tmpZip);
-
-    if (!res.ok || !result.success) {
-      sp3.fail(isNextSource ? "Falha ao iniciar build" : "Falha no upload");
-      err(result.error || `HTTP ${res.status}`);
+  if (useRsync) {
+    sp3 = { fail: () => {}, succeed: () => {} };
+    try {
+      const niceName = slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ");
+      result = await deployViaRsync(config, stagingDir, fullSlug, niceName, category, subdomain, expires_at);
+      rmSync(stagingDir, { recursive: true, force: true });
+    } catch (e) {
+      rmSync(stagingDir, { recursive: true, force: true });
+      err(`Falha no deploy via rsync: ${e.message}`);
       process.exit(1);
     }
-
-    // Upload enviado com sucesso — build iniciou (ou já completou)
-    if (isNextSource && result.buildId) {
-      sp3.succeed("Build iniciado na VPS");
-    } else {
-      sp3.succeed(isNextSource ? "Build concluído" : `Site publicado em ${result.url}`);
+  } else {
+    const sp2 = new Spinner("Compactando arquivos...").start();
+    tmpZip = join(tmpdir(), `criarte-deploy-${slug}.zip`);
+    try {
+      execSync(`cd "${stagingDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 120000 });
+    } catch (e) {
+      sp2.fail("Falha ao criar zip");
+      err(e.stderr?.toString() || e.message);
+      rmSync(stagingDir, { recursive: true, force: true });
+      process.exit(1);
     }
+    const finalSize = statSync(tmpZip).size;
+    const finalMb = (finalSize / 1024 / 1024).toFixed(1);
+    sp2.succeed(`Zip pronto: ${finalMb}MB ${finalSize < totalSize ? c.dim + `(${sizeMb}MB original)` + c.reset : ""}`);
+    rmSync(stagingDir, { recursive: true, force: true });
+
+    sp3 = new Spinner("Enviando pra VPS...").start();
+    const uploadUrl = `${targetUrl}/api/sites/upload`;
+    const zipBuffer = readFileSync(tmpZip);
+    try {
+      const form = new FormData();
+      form.append("slug", fullSlug);
+      form.append("name", slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" "));
+      form.append("category", category);
+      if (subdomain) form.append("subdomain", subdomain);
+      if (expires_at) form.append("expires_at", expires_at);
+      form.append("file", new Blob([zipBuffer], { type: "application/zip" }), `${slug}.zip`);
+
+      const sizeMbU = zipBuffer.length / (1024 * 1024);
+      const uploadTimeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, 60000 + sizeMbU * 1000));
+      const MAX_ATTEMPTS = 3;
+      let res, lastErr;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        sp3.update(`Enviando ${sizeMbU.toFixed(1)}MB pra VPS ${c.dim}(tentativa ${attempt}/${MAX_ATTEMPTS}, timeout ${Math.round(uploadTimeoutMs/60000)}min)${c.reset}`);
+        try {
+          res = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${config.admin_api_token}` },
+            body: form,
+            signal: AbortSignal.timeout(uploadTimeoutMs),
+            // @ts-ignore
+            duplex: "half",
+          });
+          if (res.ok || (res.status >= 400 && res.status < 500)) break;
+          lastErr = new Error(`HTTP ${res.status}`);
+        } catch (e) {
+          lastErr = e;
+          const transient = /timeout|ECONNRESET|ENETUNREACH|ETIMEDOUT|fetch failed/i.test(String(e?.message || e?.code || ""));
+          if (!transient || attempt === MAX_ATTEMPTS) throw e;
+          sp3.update(`Falha transiente (${e.message}) — re-tentando em 3s...`);
+          await new Promise(r => setTimeout(r, 3000));
+        }
+      }
+      if (!res) throw lastErr || new Error("upload falhou após retries");
+      result = await res.json();
+      rmSync(tmpZip); tmpZip = null;
+      if (!res.ok || !result.success) {
+        sp3.fail(isNextSource ? "Falha ao iniciar build" : "Falha no upload");
+        err(result.error || `HTTP ${res.status}`);
+        process.exit(1);
+      }
+      if (isNextSource && result.buildId) sp3.succeed("Build iniciado na VPS");
+      else sp3.succeed(isNextSource ? "Build concluído" : `Site publicado em ${result.url}`);
+    } catch (e) {
+      sp3.fail("Falha no upload");
+      err(`Erro: ${e.message}`);
+      err(`Tipo: ${e.constructor?.name || "desconhecido"}`);
+      err(`URL: ${uploadUrl}`);
+      if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
+      if (tmpZip && existsSync(tmpZip)) rmSync(tmpZip);
+      process.exit(1);
+    }
+  }
+
+  try {
 
     // Mostra resultado
     if (!noWait) {
@@ -2185,14 +2195,91 @@ async function cmdDirectDeploy(argv) {
       }
     }
   } catch (e) {
-    sp3.fail("Falha no upload");
-    err(`Erro: ${e.message}`);
-    err(`Tipo: ${e.constructor?.name || "desconhecido"}`);
-    err(`URL: ${uploadUrl}`);
+    err(`Erro pós-deploy: ${e.message}`);
     if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
-    if (existsSync(tmpZip)) rmSync(tmpZip);
     process.exit(1);
   }
+}
+
+// ============================================================================
+// SSH/Rsync deploy — robusto pra conexões lentas/instáveis (Angola, etc)
+// ============================================================================
+function hasRsyncAndSsh() {
+  try { execSync("command -v rsync && command -v ssh", { stdio: "pipe" }); return true; }
+  catch { return false; }
+}
+
+async function cmdSshSetup() {
+  miniHeader("🔐 Configurar SSH para deploy via rsync");
+  if (!hasRsyncAndSsh()) {
+    err("rsync e/ou ssh não encontrados. Instala antes (brew install rsync).");
+    process.exit(1);
+  }
+  const existing = loadConfig() || {};
+  const cur = existing.rsync || {};
+  console.log(`${c.dim}Atual:${c.reset} ${cur.host ? `${cur.user || "root"}@${cur.host}:${cur.path || "/srv/builds"}` : "não configurado"}`);
+  console.log();
+
+  const host = (await ask(`Host do VPS ${c.dim}(IP ou domínio)${c.reset} ${cur.host ? `[${cur.host}]` : ""}: `)).trim() || cur.host;
+  if (!host) { err("Host é obrigatório."); process.exit(1); }
+  const user = (await ask(`Usuário SSH ${c.dim}(root)${c.reset} ${cur.user ? `[${cur.user}]` : ""}: `)).trim() || cur.user || "root";
+  const path = (await ask(`Caminho remoto ${c.dim}(/srv/builds)${c.reset} ${cur.path ? `[${cur.path}]` : ""}: `)).trim() || cur.path || "/srv/builds";
+
+  const sp = new Spinner("Testando conexão SSH...").start();
+  try {
+    execSync(`ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${user}@${host} "test -d ${path} && echo ok || (mkdir -p ${path} && echo created)"`, { stdio: "pipe", timeout: 15000 });
+    sp.succeed("SSH funcionando + diretório remoto pronto");
+  } catch (e) {
+    sp.fail("Falha SSH");
+    err(e.stderr?.toString() || e.message);
+    warn("Verifica: 1) chave SSH no ~/.ssh/authorized_keys do VPS  2) firewall liberando porta 22 pro teu IP");
+    process.exit(1);
+  }
+
+  saveConfig({ ...existing, rsync: { host, user, path } });
+  ok(`Config salva. Deploys futuros vão usar rsync automaticamente.`);
+  info(`${c.dim}Pra desativar: edite ${CONFIG_FILE} e remova o bloco "rsync".${c.reset}`);
+}
+
+async function deployViaRsync(config, stagingDir, fullSlug, name, category, subdomain, expires_at) {
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  const { host, user, path: remoteBase } = config.rsync;
+  const buildId = `${fullSlug.replace(/[^a-z0-9-]/g, "_")}_${Date.now()}`;
+  const remoteDir = `${remoteBase.replace(/\/$/, "")}/${buildId}`;
+
+  const sp = new Spinner(`Rsync → ${user}@${host}:${remoteDir}`).start();
+  try {
+    execSync(
+      `rsync -az --partial --partial-dir=.rsync-partial --delete ` +
+      `-e "ssh -o ConnectTimeout=15 -o ServerAliveInterval=20 -o ServerAliveCountMax=10" ` +
+      `"${stagingDir}/" "${user}@${host}:${remoteDir}/"`,
+      { stdio: "pipe", timeout: 30 * 60 * 1000 }
+    );
+    sp.succeed("Arquivos sincronizados via rsync (resume automático ativo)");
+  } catch (e) {
+    sp.fail("Falha no rsync");
+    err(e.stderr?.toString() || e.message);
+    throw e;
+  }
+
+  const sp2 = new Spinner("Disparando build no servidor...").start();
+  const res = await fetch(`${targetUrl}/api/sites/build-from-path`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.admin_api_token}`,
+    },
+    body: JSON.stringify({ slug: fullSlug, buildId, name, category, subdomain, expires_at }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok || !result.success) {
+    sp2.fail("Servidor rejeitou o trigger de build");
+    err(result.error || `HTTP ${res.status}`);
+    throw new Error(result.error || `HTTP ${res.status}`);
+  }
+  sp2.succeed("Build iniciado");
+  return result;
 }
 
 // ============================================================================
@@ -2218,6 +2305,7 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "doctor":     await cmdDoctor();    break;
       case "r2-setup":   await cmdR2Setup();   break;
       case "r2-disable": await cmdR2Disable(); break;
+      case "ssh-setup":  await cmdSshSetup();  break;
       case "list":
       case "ls":         await cmdList();      break;
       case "rm":
@@ -2227,14 +2315,14 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "help":
       case "--help":
       case "-h":     cmdHelp();          break;
-      case undefined: await cmdDeploy([]); break;
+      case undefined: await cmdDirectDeploy([]); break;
       default:
         if (cmd && cmd.startsWith("-")) {
           err(`Comando desconhecido: ${cmd}`);
           cmdHelp();
           process.exit(1);
         }
-        await cmdDeploy([cmd, ...rest]);
+        await cmdDirectDeploy([cmd, ...rest]);
     }
   } catch (e) {
     process.stdout.write("\x1b[?25h"); // garante cursor visível

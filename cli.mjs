@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.5.1";
+const VERSION = "3.6.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1769,6 +1769,72 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
 // ============================================================================
 // DIRECT DEPLOY (upload direto pra VPS via API — sem git, sem rebuild)
 // ============================================================================
+async function cmdRemove(argv) {
+  const config = requireLogin();
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  if (!targetUrl || !config.admin_api_token) {
+    err("Painel/token não configurados. Rode: criarte-deploy panel");
+    process.exit(1);
+  }
+
+  let argSlug = argv.find(a => !a.startsWith("-"));
+  let force = argv.includes("--force") || argv.includes("-f");
+  if (!argSlug) {
+    err("Uso: criarte-deploy rm <categoria>/<nome> [--force]");
+    process.exit(1);
+  }
+  const slug = argSlug.toLowerCase().replace(/^\/+|\/+$/g, "");
+  if (!/^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(slug)) {
+    err(`Slug inválido: ${slug}`);
+    process.exit(1);
+  }
+
+  miniHeader(`🗑  Remover site: ${slug}`);
+  console.log(`  ${c.dim}Servidor:${c.reset} ${targetUrl}`);
+  console.log(`  ${c.dim}Slug:${c.reset}     ${c.bold}${slug}${c.reset}`);
+  console.log(`  ${c.dim}Apaga:${c.reset}    arquivos da VPS + assets do R2 + registro`);
+  console.log();
+
+  if (!force) {
+    const ans = await ask(`Confirmar remoção? ${c.red}(digite o slug pra confirmar)${c.reset} → `);
+    if (ans.trim().toLowerCase() !== slug) {
+      warn("Cancelado.");
+      process.exit(0);
+    }
+  }
+
+  const sp = new Spinner("Removendo...").start();
+  try {
+    const res = await fetch(`${targetUrl}/api/sites/remove`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.admin_api_token}`,
+      },
+      body: JSON.stringify({ slug }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      sp.fail(`Falha: ${data.error || `HTTP ${res.status}`}`);
+      process.exit(1);
+    }
+    sp.succeed("Removido");
+    console.log();
+    if (data.existed === false) warn("Site não estava no registry (talvez já tivesse sido removido).");
+    ok(`VPS: ${data.fs ? "arquivos apagados" : "nada a apagar"}`);
+    if (data.r2) {
+      ok(`R2: ${data.r2.deleted} objeto(s) deletado(s)${data.r2.errors?.length ? ` ${c.yellow}(${data.r2.errors.length} erro(s))${c.reset}` : ""}`);
+    } else {
+      info(`${c.dim}R2 não configurado no servidor — assets do R2 (se houver) não foram tocados.${c.reset}`);
+    }
+  } catch (e) {
+    sp.fail("Erro de rede");
+    err(e.message);
+    process.exit(1);
+  }
+}
+
 async function cmdDirectDeploy(argv) {
   const config = requireLogin();
   const targetUrl = (config.panel_url || "").replace(/\/$/, "");
@@ -2150,6 +2216,9 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "r2-disable": await cmdR2Disable(); break;
       case "list":
       case "ls":         await cmdList();      break;
+      case "rm":
+      case "remove":
+      case "delete":     await cmdRemove(rest); break;
       case "check":      await cmdCheck();     break;
       case "help":
       case "--help":

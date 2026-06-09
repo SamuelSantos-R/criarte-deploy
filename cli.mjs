@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.6.1";
+const VERSION = "3.7.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -2057,45 +2057,45 @@ async function cmdDirectDeploy(argv) {
   const zipBuffer = readFileSync(tmpZip);
 
   try {
-    // Usa FormData via fetch (Node 18+ tem fetch nativo)
-    const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
-    const bodyParts = [];
+    // Monta multipart usando FormData nativo + Blob — preserva binários sem
+    // round-trip por string "binary" (que corrompia zips grandes → "Failed to
+    // parse body as FormData").
+    const form = new FormData();
+    form.append("slug", fullSlug);
+    form.append("name", slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" "));
+    form.append("category", category);
+    if (subdomain) form.append("subdomain", subdomain);
+    if (expires_at) form.append("expires_at", expires_at);
+    form.append("file", new Blob([zipBuffer], { type: "application/zip" }), `${slug}.zip`);
 
-    // slug
-    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="slug"\r\n\r\n${fullSlug}\r\n`);
-    // name
-    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\n${slug.split("-").map(w => w[0].toUpperCase() + w.slice(1)).join(" ")}\r\n`);
-    // category
-    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="category"\r\n\r\n${category}\r\n`);
-    // subdomain (opcional)
-    if (subdomain) {
-      bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="subdomain"\r\n\r\n${subdomain}\r\n`);
-    }
-    // expires_at (opcional)
-    if (expires_at) {
-      bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="expires_at"\r\n\r\n${expires_at}\r\n`);
-    }
-    // file (zip)
-    bodyParts.push(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${slug}.zip"\r\nContent-Type: application/zip\r\n\r\n`);
-    bodyParts.push(zipBuffer.toString("binary"));
-    bodyParts.push(`\r\n--${boundary}--\r\n`);
-
-    const body = Buffer.from(bodyParts.join(""), "binary");
-    // Timeout escala com o tamanho: 60s base + 1s por MB. Min 5min, max 30min.
-    // Cobre conexões lentas (1-2 Mbps) sem travar em uploads pequenos.
-    const sizeMb = body.length / (1024 * 1024);
+    const sizeMb = zipBuffer.length / (1024 * 1024);
     const uploadTimeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, 60000 + sizeMb * 1000));
-    sp3.update(`Enviando ${sizeMb.toFixed(1)}MB pra VPS ${c.dim}(timeout ${Math.round(uploadTimeoutMs/60000)}min)${c.reset}`);
-    const res = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${config.admin_api_token}`,
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": body.length.toString(),
-      },
-      body,
-      signal: AbortSignal.timeout(uploadTimeoutMs),
-    });
+
+    // Retry com backoff: até 3 tentativas pra erros transientes (timeout, ECONNRESET, 5xx)
+    const MAX_ATTEMPTS = 3;
+    let res, lastErr;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      sp3.update(`Enviando ${sizeMb.toFixed(1)}MB pra VPS ${c.dim}(tentativa ${attempt}/${MAX_ATTEMPTS}, timeout ${Math.round(uploadTimeoutMs/60000)}min)${c.reset}`);
+      try {
+        res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${config.admin_api_token}` },
+          body: form,
+          signal: AbortSignal.timeout(uploadTimeoutMs),
+          // @ts-ignore - undici-specific, ignora se runtime não suportar
+          duplex: "half",
+        });
+        if (res.ok || (res.status >= 400 && res.status < 500)) break; // não retenta 4xx
+        lastErr = new Error(`HTTP ${res.status}`);
+      } catch (e) {
+        lastErr = e;
+        const transient = /timeout|ECONNRESET|ENETUNREACH|ETIMEDOUT|fetch failed/i.test(String(e?.message || e?.code || ""));
+        if (!transient || attempt === MAX_ATTEMPTS) throw e;
+        sp3.update(`Falha transiente (${e.message}) — re-tentando em 3s...`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
+    if (!res) throw lastErr || new Error("upload falhou após retries");
 
     const result = await res.json();
     rmSync(tmpZip);

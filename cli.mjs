@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.6.0";
+const VERSION = "3.6.1";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -2081,6 +2081,11 @@ async function cmdDirectDeploy(argv) {
     bodyParts.push(`\r\n--${boundary}--\r\n`);
 
     const body = Buffer.from(bodyParts.join(""), "binary");
+    // Timeout escala com o tamanho: 60s base + 1s por MB. Min 5min, max 30min.
+    // Cobre conexões lentas (1-2 Mbps) sem travar em uploads pequenos.
+    const sizeMb = body.length / (1024 * 1024);
+    const uploadTimeoutMs = Math.min(30 * 60 * 1000, Math.max(5 * 60 * 1000, 60000 + sizeMb * 1000));
+    sp3.update(`Enviando ${sizeMb.toFixed(1)}MB pra VPS ${c.dim}(timeout ${Math.round(uploadTimeoutMs/60000)}min)${c.reset}`);
     const res = await fetch(uploadUrl, {
       method: "POST",
       headers: {
@@ -2089,8 +2094,7 @@ async function cmdDirectDeploy(argv) {
         "Content-Length": body.length.toString(),
       },
       body,
-      // Timeout reduzido: upload é assíncrono, resposta vem rápido
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(uploadTimeoutMs),
     });
 
     const result = await res.json();

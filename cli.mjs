@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.8.1";
+const VERSION = "3.8.2";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1875,17 +1875,21 @@ async function cmdDirectDeploy(argv) {
     }
   }
 
-  // Slug
+  // Slug — normaliza: tira acentos, converte espaços/especiais em hífen
+  const slugify = (s) => s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
   let slug = rawSlug;
   if (!slug) {
-    slug = basename(cwd).toLowerCase().replace(/[^a-z0-9-]/g, "");
+    slug = slugify(basename(cwd));
     const suggested = slug;
     const raw = await ask(`Slug ${c.dim}(${suggested})${c.reset}: `);
-    if (raw.trim()) slug = raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (raw.trim()) slug = slugify(raw.trim());
     else slug = suggested;
     if (!slug) { err("Slug inválido"); process.exit(1); }
   } else {
-    slug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    slug = slugify(slug);
   }
 
   const fullSlug = `${category}/${slug}`;

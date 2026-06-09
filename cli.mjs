@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.8.0";
+const VERSION = "3.8.1";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -2008,6 +2008,27 @@ async function cmdDirectDeploy(argv) {
   // ====== Limpa órfãos (assets em public/ não referenciados) ======
   if (isNextSource) {
     try { await maybeCleanOrphans(stagingDir); } catch (e) { warn(`Skip orphan cleanup: ${e.message}`); }
+  }
+
+  // ====== Remove API routes (incompatíveis com output: "export") ======
+  // Static export não consegue pré-renderizar rotas que usam searchParams,
+  // cookies, headers, etc. Como o deploy serve só HTML estático, qualquer
+  // app/api/ ou pages/api/ é morto no destino. Remove no staging pra build
+  // não quebrar.
+  if (isNextSource) {
+    const removed = [];
+    for (const apiDir of ["app/api", "src/app/api", "pages/api", "src/pages/api"]) {
+      const full = join(stagingDir, apiDir);
+      if (existsSync(full)) {
+        const subRoutes = readdirSync(full).filter(n => !n.startsWith("."));
+        rmSync(full, { recursive: true, force: true });
+        for (const r of subRoutes) removed.push(`${apiDir}/${r}`);
+      }
+    }
+    if (removed.length > 0) {
+      warn(`API routes removidas do staging (incompatíveis com static export):`);
+      for (const r of removed) console.log(`  ${c.dim}- ${r}${c.reset}`);
+    }
   }
 
   // ====== Upload de assets pesados pro R2 ======

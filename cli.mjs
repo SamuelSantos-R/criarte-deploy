@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.5.0";
+const VERSION = "3.5.1";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -116,6 +116,13 @@ const warn  = (s) => console.log(`${c.yellow}⚠${c.reset}  ${s}`);
 const err   = (s) => console.log(`${c.red}✗${c.reset} ${s}`);
 const hr    = ()  => console.log(`${c.dim}${"─".repeat(56)}${c.reset}`);
 const heading = (s) => console.log(`\n${c.bold}${c.magenta}${s}${c.reset}\n`);
+
+// OSC-8 hyperlink — terminais modernos (iTerm2, Terminal.app, WezTerm, Kitty) tornam clicável.
+// Fallback: imprime só a URL em texto.
+function linkify(url, color = c.cyan) {
+  if (!process.stdout.isTTY) return url;
+  return `\x1b]8;;${url}\x1b\\${color}${url}${c.reset}\x1b]8;;\x1b\\`;
+}
 
 function showBanner() {
   if (!process.stdout.isTTY) return;
@@ -2067,14 +2074,42 @@ async function cmdDirectDeploy(argv) {
           } catch {}
         }
         if (!done) statusSp.warn("Build ainda em andamento — verifique manualmente");
-        console.log(`🌐 ${c.cyan}${targetUrl}/${fullSlug}${c.reset}`);
+
+        // Pós-build: confirma que a URL responde 200 de verdade antes de declarar "no ar"
+        if (done) {
+          const liveUrl = `${targetUrl}/${fullSlug}`;
+          const liveSp = new Spinner("Verificando se o site está respondendo...").start();
+          const startLive = Date.now();
+          const LIVE_TIMEOUT = 90 * 1000;
+          let liveOk = false;
+          let lastCode = 0;
+          while (Date.now() - startLive < LIVE_TIMEOUT) {
+            try {
+              const lr = await fetch(`${liveUrl}?_=${Date.now()}`, {
+                method: "GET",
+                redirect: "follow",
+                signal: AbortSignal.timeout(8000),
+                headers: { "Cache-Control": "no-cache" },
+              });
+              lastCode = lr.status;
+              if (lr.ok) { liveOk = true; break; }
+            } catch {}
+            liveSp.update(`Aguardando 200 OK ${c.dim}(último: ${lastCode || "-"}, ${Math.round((Date.now()-startLive)/1000)}s)${c.reset}`);
+            await new Promise(r => setTimeout(r, 2000));
+          }
+          if (liveOk) liveSp.succeed(`Site respondendo 200 OK em ${Math.round((Date.now()-startLive)/1000)}s`);
+          else liveSp.warn(`Site ainda não respondeu 200 (último: ${lastCode}). Pode ser cache da Cloudflare — tente em 1min.`);
+        }
+
+        const liveUrl = `${targetUrl}/${fullSlug}`;
+        console.log(`🌐 ${linkify(liveUrl)}`);
         console.log(`   ${c.dim}O build continua em background mesmo se você fechar o terminal${c.reset}`);
       } else {
         if (subdomainUrl) {
-          console.log(`🌐 ${c.bold}${c.cyan}${subdomainUrl}${c.reset} ${c.dim}(subdomínio)${c.reset}`);
-          console.log(`🔗 ${c.dim}${targetUrl}/${fullSlug}${c.reset} ${c.dim}(slug, fallback)${c.reset}\n`);
+          console.log(`🌐 ${linkify(subdomainUrl, c.bold + c.cyan)} ${c.dim}(subdomínio)${c.reset}`);
+          console.log(`🔗 ${linkify(`${targetUrl}/${fullSlug}`, c.dim)} ${c.dim}(slug, fallback)${c.reset}\n`);
         } else {
-          console.log(`🌐 ${c.bold}${c.cyan}${targetUrl}/${fullSlug}${c.reset}\n`);
+          console.log(`🌐 ${linkify(`${targetUrl}/${fullSlug}`, c.bold + c.cyan)}\n`);
         }
         if (result.files) ok(`${result.files} arquivo(s) enviados`);
       }

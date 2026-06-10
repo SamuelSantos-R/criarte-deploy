@@ -1875,10 +1875,38 @@ async function cmdDirectDeploy(argv) {
   const cwd = process.cwd();
   let [rawCategory, rawSlug] = argv;
 
-  // Pergunta categoria
+  // Slug — normaliza: tira acentos, converte espaços/especiais em hífen
+  const slugify = (s) => s.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  // Auto-detecta categoria + slug quando o arg tem barra (ex: rsvp/adelia-alvaro)
   let category = rawCategory;
+  let slug = rawSlug;
+
+  if (rawCategory && rawCategory.includes("/")) {
+    const parts = rawCategory.split("/");
+    const detectedCat = slugify(parts[0]);
+    const detectedSlug = slugify(parts.slice(1).join("-")) || (rawSlug ? slugify(rawSlug) : slugify(basename(cwd)));
+    info(`${c.dim}Categoria detectada do slug:${c.reset} ${c.cyan}${detectedCat}${c.reset} ${c.dim}/ ${c.reset}${c.cyan}${detectedSlug}${c.reset}`);
+    const keep = await ask(`Usar ${c.bold}${detectedCat}/${detectedSlug}${c.reset}? ${c.dim}(Enter=sim, ou digite a categoria/slug correta)${c.reset}: `);
+    if (!keep.trim()) {
+      category = detectedCat;
+      slug = detectedSlug;
+    } else if (keep.includes("/")) {
+      const p = keep.trim().split("/");
+      category = slugify(p[0]) || detectedCat;
+      slug = slugify(p.slice(1).join("-")) || detectedSlug;
+    } else {
+      category = slugify(keep.trim()) || detectedCat;
+      if (!slug) slug = detectedSlug;
+    }
+  }
+
+  // Pergunta categoria se ainda não detectada
   while (!category || !/^[a-z0-9-]+$/.test(category)) {
-    const raw = await ask(`Categoria ${c.dim}(ex: casamento, aniversario)${c.reset}: `);
+    const raw = await ask(`Categoria ${c.dim}(ex: casamento, rsvp, cha-de-panela)${c.reset}: `);
     if (raw && /^[a-z0-9-]+$/.test(raw.trim().toLowerCase())) {
       category = raw.trim().toLowerCase();
     } else {
@@ -1886,12 +1914,7 @@ async function cmdDirectDeploy(argv) {
     }
   }
 
-  // Slug — normaliza: tira acentos, converte espaços/especiais em hífen
-  const slugify = (s) => s.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  let slug = rawSlug;
+  // Slug — normaliza
   if (!slug) {
     slug = slugify(basename(cwd));
     const suggested = slug;
@@ -2098,6 +2121,7 @@ async function cmdDirectDeploy(argv) {
     } catch (e) {
       rmSync(stagingDir, { recursive: true, force: true });
       err(`Falha no deploy via rsync: ${e.message}`);
+      if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
       process.exit(1);
     }
   } else {
@@ -2342,25 +2366,97 @@ async function provisionRsvpSite(config, slug, envMap, extras = {}) {
   return { ok: res.ok && data.ok, status: res.status, error: data.error, slug_existe: data.error === "slug_existe" };
 }
 
+// Consulta o servidor pra ver se o RSVP já está registrado pro slug.
+async function fetchRsvpSite(config, slug) {
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  const adminToken = config.rsvp_admin_token;
+  if (!adminToken) return null;
+  try {
+    const res = await fetch(`${targetUrl}/api/rsvp/sites/provision?slug=${encodeURIComponent(slug)}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    return data?.ok ? data.site : null;
+  } catch {
+    return null;
+  }
+}
+
+// Atualiza RSVP existente via PUT.
+async function updateRsvpSite(config, slug, payload) {
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  const adminToken = config.rsvp_admin_token;
+  if (!adminToken) throw new Error("rsvp_admin_token ausente");
+  const res = await fetch(`${targetUrl}/api/rsvp/sites/provision`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify({ slug, ...payload }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok && data.ok, status: res.status, error: data.error };
+}
+
 async function handleRsvpBase(stagingDir, fullSlug, config, _targetUrl) {
   const envMap = readEnvLocal(stagingDir);
-  if (!config.rsvp_admin_token) {
-    warn("rsvp_admin_token não configurado — pulando provisão automática.");
-    info(`Configure com: ${c.cyan}criarte-deploy rsvp-setup${c.reset}`);
-  } else {
-    const sp = new Spinner("Registrando casamento no servidor...").start();
-    const r = await provisionRsvpSite(config, fullSlug, envMap);
-    if (r.ok) sp.succeed(`Casamento registrado em ${c.bold}${fullSlug}${c.reset}`);
-    else if (r.slug_existe) sp.warn(`Casamento já estava registrado (${c.dim}ok${c.reset})`);
-    else sp.fail(`Falha ao registrar: ${r.error || "HTTP " + r.status}`);
+
+  // 1) Verifica se RSVP já está configurado no servidor
+  let site = null;
+  if (config.rsvp_admin_token) {
+    const sp = new Spinner("Verificando configuração RSVP no servidor...").start();
+    site = await fetchRsvpSite(config, fullSlug);
+    if (site) {
+      sp.succeed(`RSVP já configurado — email destino: ${c.brand}${site.email_destino}${c.reset}`);
+    } else {
+      sp.info("RSVP ainda não configurado para este slug");
+    }
   }
+
+  if (!site) {
+    // Não configurado — pergunta se quer configurar agora
+    if (!config.rsvp_admin_token) {
+      warn("rsvp_admin_token não configurado — pulando provisão automática.");
+      info(`Configure com: ${c.cyan}criarte-deploy rsvp-setup${c.reset}`);
+    } else {
+      const setup = await ask(`${c.bold}Registrar RSVP no servidor agora?${c.reset} ${c.dim}(Enter=sim, N=pular)${c.reset}: `);
+      if (setup.toLowerCase() !== "n" && setup.toLowerCase() !== "nao") {
+        console.log();
+        const sp2 = new Spinner("Registrando casamento no servidor...").start();
+        const r = await provisionRsvpSite(config, fullSlug, envMap);
+        if (r.ok) sp2.succeed(`Casamento registrado em ${c.bold}${fullSlug}${c.reset}`);
+        else if (r.slug_existe) sp2.warn(`Casamento já estava registrado (${c.dim}ok${c.reset})`);
+        else sp2.fail(`Falha ao registrar: ${r.error || "HTTP " + r.status}`);
+      } else {
+        info(`${c.dim}Pulando registro RSVP (pode configurar depois com rsvp-setup)${c.reset}`);
+      }
+    }
+  } else {
+    // Já configurado — mostra dados essenciais e pergunta se quer alterar
+    console.log(`  ${c.dim}Noivos:${c.reset}          ${site.noivos}`);
+    console.log(`  ${c.dim}Data:${c.reset}            ${site.data_evento}`);
+    console.log(`  ${c.dim}Email destino:${c.reset}   ${c.brand}${site.email_destino}${c.reset}`);
+    console.log(`  ${c.dim}Login do casal:${c.reset}  ${site.admin_email}`);
+    console.log();
+    const change = await ask(`Alterar email destino? ${c.dim}(Enter=manter ${site.email_destino}, ou digite novo email)${c.reset}: `);
+    if (change.trim() && change.includes("@")) {
+      const sp3 = new Spinner("Atualizando RSVP no servidor...").start();
+      const r = await updateRsvpSite(config, fullSlug, { emailDestino: change.trim() });
+      if (r.ok) sp3.succeed(`Email destino atualizado para ${c.brand}${change.trim()}${c.reset}`);
+      else sp3.fail(`Falha ao atualizar: ${r.error || "HTTP " + r.status}`);
+    } else {
+      info(`${c.dim}Mantendo email destino: ${c.brand}${site.email_destino}${c.reset}`);
+    }
+  }
+
   const sp2 = new Spinner("Reescrevendo chamadas do front pra endpoints centrais...").start();
   const touched = rewriteRsvpFetches(stagingDir);
   sp2.succeed(`${touched} arquivo(s) reescritos`);
 }
 
 // ============================================================================
-// RSVP-SETUP — provisão interativa
+// RSVP-SETUP — provisão interativa (agora detecta se já existe)
 // ============================================================================
 async function cmdRsvpSetup(argv) {
   const config = requireLogin();
@@ -2370,7 +2466,6 @@ async function cmdRsvpSetup(argv) {
   }
   screen.phase("💌 RSVP — Configurar casamento");
 
-  // Pode rodar de dentro da pasta da base ou solto
   const cwd = process.cwd();
   const envMap = readEnvLocal(cwd);
   const hasBase = Object.keys(envMap).length > 0;
@@ -2393,64 +2488,112 @@ async function cmdRsvpSetup(argv) {
     console.log();
   }
 
-  // 2) Coleta dados — sempre pergunta, mostra default do .env.local
-  section("Dados do casamento");
+  // 2) Slug
   const slugDefault = argv[0] || (hasBase ? `rsvp/${basename(cwd).toLowerCase().replace(/[^a-z0-9-]/g, "-")}` : "");
   const slug = (await ask(`Slug ${c.dim}(ex: rsvp/adelia-alvaro)${c.reset}`, { default: slugDefault })).trim();
   if (!slug || !/^[a-z0-9][a-z0-9\/-]*[a-z0-9]$/.test(slug)) { err("Slug inválido."); process.exit(1); }
 
-  const noivos = (await ask(`Nome dos noivos ${c.dim}(ex: Adélia & Álvaro)${c.reset}`,
-    { default: envMap.NEXT_PUBLIC_NOIVOS })).trim();
-  const dataEvento = (await ask(`Data do evento ${c.dim}(ex: 19 septembre 2026)${c.reset}`,
-    { default: envMap.NEXT_PUBLIC_DATA_EVENTO })).trim();
+  // 3) Verifica se o RSVP já existe no servidor
+  let site = null;
+  const sp0 = new Spinner("Verificando configuração existente...").start();
+  site = await fetchRsvpSite(config, slug);
+  if (site) {
+    sp0.succeed(`RSVP já configurado para ${c.bold}${slug}${c.reset}`);
+    console.log();
+    section("📋 Configuração atual");
+    console.log(`  ${c.dim}Noivos:${c.reset}          ${site.noivos}`);
+    console.log(`  ${c.dim}Data:${c.reset}            ${site.data_evento}`);
+    console.log(`  ${c.dim}Email destino:${c.reset}   ${c.brand}${site.email_destino}${c.reset}`);
+    console.log(`  ${c.dim}Login do casal:${c.reset}  ${site.admin_email}`);
+    console.log(`  ${c.dim}Secret PDF:${c.reset}      ${site.secret_pdf}`);
+    console.log(`  ${c.dim}Resend:${c.reset}          ${site.tem_resend_key ? c.dim + "configurada" + c.reset : c.dim + "default do servidor" + c.reset}`);
+    console.log();
 
-  section("📬 Email — onde caem as confirmações");
-  const emailDestino = (await ask(`Email destino das notificações`,
-    { default: envMap.EMAIL_DESTINO })).trim();
+    // Pergunta se quer alterar cada campo
+    const newNoivos = await ask(`Nome dos noivos ${c.dim}(Enter=manter "${site.noivos}")${c.reset}: `);
+    const newDataEvento = await ask(`Data do evento ${c.dim}(Enter=manter "${site.data_evento}")${c.reset}: `);
+    const newEmailDestino = await ask(`Email destino ${c.dim}(Enter=manter "${site.email_destino}")${c.reset}: `);
+    const newAdminEmail = await ask(`Email de login ${c.dim}(Enter=manter "${site.admin_email}")${c.reset}: `);
+    const newAdminPassword = await ask(`Nova senha ${c.dim}(Enter=manter atual)${c.reset}: `, { hidden: true });
+    const newSecretPdf = await ask(`Secret do PDF ${c.dim}(Enter=manter "${site.secret_pdf}")${c.reset}: `);
+    const newResendApiKey = await ask(`Resend API key ${c.dim}(Enter=manter, "x" pra limpar)${c.reset}: `, { hidden: true });
 
-  section("🔐 Login do casal");
-  const adminEmail = (await ask(`Email de login`,
-    { default: envMap.ADMIN_EMAIL || emailDestino })).trim();
-  let adminPasswordHash = envMap.ADMIN_PASSWORD_HASH || "";
-  let adminPassword = "";
-  if (adminPasswordHash) {
-    info(`Hash bcrypt já existe no .env.local — vou usar.`);
+    const changes = {};
+    if (newNoivos.trim()) changes.noivos = newNoivos.trim();
+    if (newDataEvento.trim()) changes.dataEvento = newDataEvento.trim();
+    if (newEmailDestino.trim()) changes.emailDestino = newEmailDestino.trim();
+    if (newAdminEmail.trim()) changes.adminEmail = newAdminEmail.trim();
+    if (newAdminPassword.trim()) changes.adminPassword = newAdminPassword.trim();
+    if (newSecretPdf.trim()) changes.secretPdf = newSecretPdf.trim();
+    if (newResendApiKey.trim()) changes.resendApiKey = newResendApiKey.trim() === "x" ? "" : newResendApiKey.trim();
+
+    if (Object.keys(changes).length === 0) {
+      info("Nada alterado.");
+    } else {
+      console.log();
+      const spUp = new Spinner("Atualizando RSVP no servidor...").start();
+      const r = await updateRsvpSite(config, slug, changes);
+      if (r.ok) spUp.succeed("RSVP atualizado");
+      else { spUp.fail(`Falha: ${r.error || "HTTP " + r.status}`); process.exit(1); }
+      if (changes.emailDestino) ok(`Novo email destino: ${c.brand}${changes.emailDestino}${c.reset}`);
+      if (changes.noivos) ok(`Novos noivos: ${changes.noivos}`);
+    }
   } else {
-    adminPassword = await ask(`Senha (texto claro — será hashada)`, { hidden: true });
-    if (!adminPassword) { err("Senha obrigatória."); process.exit(1); }
+    sp0.info("Nenhum RSVP encontrado para este slug — configurando novo.");
+
+    const noivos = (await ask(`Nome dos noivos ${c.dim}(ex: Adélia & Álvaro)${c.reset}`,
+      { default: envMap.NEXT_PUBLIC_NOIVOS })).trim();
+    const dataEvento = (await ask(`Data do evento ${c.dim}(ex: 19 septembre 2026)${c.reset}`,
+      { default: envMap.NEXT_PUBLIC_DATA_EVENTO })).trim();
+
+    section("📬 Email — onde caem as confirmações");
+    const emailDestino = (await ask(`Email destino das notificações`,
+      { default: envMap.EMAIL_DESTINO })).trim();
+
+    section("🔐 Login do casal");
+    const adminEmail = (await ask(`Email de login`,
+      { default: envMap.ADMIN_EMAIL || emailDestino })).trim();
+    let adminPasswordHash = envMap.ADMIN_PASSWORD_HASH || "";
+    let adminPassword = "";
+    if (adminPasswordHash) {
+      info(`Hash bcrypt já existe no .env.local — vou usar.`);
+    } else {
+      adminPassword = await ask(`Senha (texto claro — será hashada)`, { hidden: true });
+      if (!adminPassword) { err("Senha obrigatória."); process.exit(1); }
+    }
+
+    section("🪪 Outros");
+    const secretPdf = (await ask(`Secret do PDF ${c.dim}(letras/números, ex: AA2026)${c.reset}`,
+      { default: envMap.CRON_SECRET || `RSVP${Date.now().toString(36).toUpperCase()}` })).trim();
+    const useGlobalResend = config.resend_api_key && !envMap.RESEND_API_KEY;
+    const resendApiKey = (await ask(`Resend API key ${c.dim}(deixe vazio pra usar do servidor)${c.reset}`,
+      { default: envMap.RESEND_API_KEY || (useGlobalResend ? "(usar global)" : ""), hidden: true })).replace(/^\(.*\)$/, "");
+
+    // Resumo + confirmação
+    section("✦ Resumo");
+    console.log(`  ${c.dim}Slug:${c.reset}            ${c.bold}${slug}${c.reset}`);
+    console.log(`  ${c.dim}Noivos:${c.reset}          ${noivos}`);
+    console.log(`  ${c.dim}Data:${c.reset}            ${dataEvento}`);
+    console.log(`  ${c.dim}Email destino:${c.reset}   ${c.brand}${emailDestino}${c.reset}`);
+    console.log(`  ${c.dim}Login do casal:${c.reset}  ${adminEmail}`);
+    console.log(`  ${c.dim}Senha:${c.reset}           ${adminPasswordHash ? c.dim + "(hash do .env.local)" + c.reset : c.dim + "•••• (será hashada)" + c.reset}`);
+    console.log(`  ${c.dim}Secret PDF:${c.reset}      ${secretPdf}`);
+    console.log(`  ${c.dim}Resend:${c.reset}          ${resendApiKey ? c.dim + "específica desse casamento" + c.reset : c.dim + "default do servidor" + c.reset}`);
+    console.log();
+    const confirm = await ask(`Confirmar registro? ${c.dim}(s/N)${c.reset} `);
+    if (confirm.toLowerCase() !== "s" && confirm.toLowerCase() !== "sim") {
+      warn("Cancelado.");
+      process.exit(0);
+    }
+
+    const sp = new Spinner("Registrando no servidor...").start();
+    const r = await provisionRsvpSite(config, slug, {}, {
+      noivos, dataEvento, emailDestino, adminEmail, adminPasswordHash, adminPassword, secretPdf, resendApiKey,
+    });
+    if (r.ok) sp.succeed("Casamento registrado");
+    else if (r.slug_existe) sp.warn("Slug já existia — nada foi alterado");
+    else { sp.fail(`Falha: ${r.error || "HTTP " + r.status}`); process.exit(1); }
   }
-
-  section("🪪 Outros");
-  const secretPdf = (await ask(`Secret do PDF ${c.dim}(letras/números, ex: AA2026)${c.reset}`,
-    { default: envMap.CRON_SECRET || `RSVP${Date.now().toString(36).toUpperCase()}` })).trim();
-  const useGlobalResend = config.resend_api_key && !envMap.RESEND_API_KEY;
-  const resendApiKey = (await ask(`Resend API key ${c.dim}(deixe vazio pra usar do servidor)${c.reset}`,
-    { default: envMap.RESEND_API_KEY || (useGlobalResend ? "(usar global)" : ""), hidden: true })).replace(/^\(.*\)$/, "");
-
-  // 3) Resumo + confirmação
-  section("✦ Resumo");
-  console.log(`  ${c.dim}Slug:${c.reset}            ${c.bold}${slug}${c.reset}`);
-  console.log(`  ${c.dim}Noivos:${c.reset}          ${noivos}`);
-  console.log(`  ${c.dim}Data:${c.reset}            ${dataEvento}`);
-  console.log(`  ${c.dim}Email destino:${c.reset}   ${c.brand}${emailDestino}${c.reset}`);
-  console.log(`  ${c.dim}Login do casal:${c.reset}  ${adminEmail}`);
-  console.log(`  ${c.dim}Senha:${c.reset}           ${adminPasswordHash ? c.dim + "(hash do .env.local)" + c.reset : c.dim + "•••• (será hashada)" + c.reset}`);
-  console.log(`  ${c.dim}Secret PDF:${c.reset}      ${secretPdf}`);
-  console.log(`  ${c.dim}Resend:${c.reset}          ${resendApiKey ? c.dim + "específica desse casamento" + c.reset : c.dim + "default do servidor" + c.reset}`);
-  console.log();
-  const confirm = await ask(`Confirmar registro? ${c.dim}(s/N)${c.reset} `);
-  if (confirm.toLowerCase() !== "s" && confirm.toLowerCase() !== "sim") {
-    warn("Cancelado.");
-    process.exit(0);
-  }
-
-  const sp = new Spinner("Registrando no servidor...").start();
-  const r = await provisionRsvpSite(config, slug, {}, {
-    noivos, dataEvento, emailDestino, adminEmail, adminPasswordHash, adminPassword, secretPdf, resendApiKey,
-  });
-  if (r.ok) sp.succeed("Casamento registrado");
-  else if (r.slug_existe) sp.warn("Slug já existia — nada foi alterado");
-  else { sp.fail(`Falha: ${r.error || "HTTP " + r.status}`); process.exit(1); }
 
   console.log();
   boxed([
@@ -2549,23 +2692,36 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
   }
 
   const sp2 = new Spinner("Disparando build no servidor...").start();
-  const res = await fetch(`${targetUrl}/api/sites/build-from-path`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.admin_api_token}`,
-    },
-    body: JSON.stringify({ slug: fullSlug, buildId, name, category, subdomain, expires_at }),
-    signal: AbortSignal.timeout(30000),
-  });
-  const result = await res.json().catch(() => ({}));
-  if (!res.ok || !result.success) {
-    sp2.fail("Servidor rejeitou o trigger de build");
-    err(result.error || `HTTP ${res.status}`);
-    throw new Error(result.error || `HTTP ${res.status}`);
+  const MAX_ATTEMPTS = 3;
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(`${targetUrl}/api/sites/build-from-path`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.admin_api_token}`,
+        },
+        body: JSON.stringify({ slug: fullSlug, buildId, name, category, subdomain, expires_at }),
+        signal: AbortSignal.timeout(30000),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || !result.success) {
+        sp2.fail("Servidor rejeitou o trigger de build");
+        err(result.error || `HTTP ${res.status}`);
+        throw new Error(result.error || `HTTP ${res.status}`);
+      }
+      sp2.succeed("Build iniciado");
+      return result;
+    } catch (e) {
+      lastErr = e;
+      const transient = /timeout|ECONNRESET|ENETUNREACH|ETIMEDOUT|fetch failed/i.test(String(e?.message || e?.code || ""));
+      if (!transient || attempt === MAX_ATTEMPTS) throw e;
+      sp2.update(`Falha transiente (${e.message}) — re-tentando em 3s...`);
+      await new Promise(r => setTimeout(r, 3000));
+    }
   }
-  sp2.succeed("Build iniciado");
-  return result;
+  throw lastErr || new Error("fetch failed after retries");
 }
 
 // ============================================================================

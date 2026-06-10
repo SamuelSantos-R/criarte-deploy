@@ -2367,21 +2367,28 @@ async function provisionRsvpSite(config, slug, envMap, extras = {}) {
 }
 
 // Consulta o servidor pra ver se o RSVP já está registrado pro slug.
+// Retorna null se o site não existe (404) — nesse caso o CLI pode oferecer criar.
+// Retorna undefined se houve erro de rede/auth — o caller deve logar e pular.
 async function fetchRsvpSite(config, slug) {
   const targetUrl = (config.panel_url || "").replace(/\/$/, "");
   const adminToken = config.rsvp_admin_token;
-  if (!adminToken) return null;
+  if (!adminToken) return undefined;
+  let res;
   try {
-    const res = await fetch(`${targetUrl}/api/rsvp/sites/provision?slug=${encodeURIComponent(slug)}`, {
+    res = await fetch(`${targetUrl}/api/rsvp/sites/provision?slug=${encodeURIComponent(slug)}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
       signal: AbortSignal.timeout(10000),
     });
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    return data?.ok ? data.site : null;
   } catch {
-    return null;
+    return undefined;
   }
+  if (res.status === 404) return null; // site não existe — ok, pode criar
+  if (!res.ok) {
+    warn(`Servidor retornou HTTP ${res.status} ao consultar RSVP. Verifique o token rsvp_admin_token.`);
+    return undefined;
+  }
+  const data = await res.json().catch(() => null);
+  return data?.ok ? data.site : null;
 }
 
 // Atualiza RSVP existente via PUT.
@@ -2403,23 +2410,27 @@ async function handleRsvpBase(stagingDir, fullSlug, config, _targetUrl) {
   const envMap = readEnvLocal(stagingDir);
 
   // 1) Verifica se RSVP já está configurado no servidor
-  let site = null;
+  let site = undefined;
   if (config.rsvp_admin_token) {
     const sp = new Spinner("Verificando configuração RSVP no servidor...").start();
     site = await fetchRsvpSite(config, fullSlug);
     if (site) {
       sp.succeed(`RSVP já configurado — email destino: ${c.brand}${site.email_destino}${c.reset}`);
-    } else {
+    } else if (site === null) {
       sp.clear();
       info("RSVP ainda não configurado para este slug");
     }
+    // site === undefined: erro já foi logado por fetchRsvpSite — sp.clear e segue
+    if (site === undefined) sp.clear();
   }
 
   if (!site) {
-    // Não configurado — pergunta se quer configurar agora
+    // Não configurado ou erro — pergunta se quer configurar agora
     if (!config.rsvp_admin_token) {
       warn("rsvp_admin_token não configurado — pulando provisão automática.");
       info(`Configure com: ${c.cyan}criarte-deploy rsvp-setup${c.reset}`);
+    } else if (site === undefined) {
+      info(`${c.dim}Pulando provisão RSVP devido a erro de comunicação${c.reset}`);
     } else {
       const setup = await ask(`${c.bold}Registrar RSVP no servidor agora?${c.reset} ${c.dim}(Enter=sim, N=pular)${c.reset}: `);
       if (setup.toLowerCase() !== "n" && setup.toLowerCase() !== "nao") {
@@ -2495,7 +2506,7 @@ async function cmdRsvpSetup(argv) {
   if (!slug || !/^[a-z0-9][a-z0-9\/-]*[a-z0-9]$/.test(slug)) { err("Slug inválido."); process.exit(1); }
 
   // 3) Verifica se o RSVP já existe no servidor
-  let site = null;
+  let site = undefined;
   const sp0 = new Spinner("Verificando configuração existente...").start();
   site = await fetchRsvpSite(config, slug);
   if (site) {
@@ -2539,7 +2550,7 @@ async function cmdRsvpSetup(argv) {
       if (changes.emailDestino) ok(`Novo email destino: ${c.brand}${changes.emailDestino}${c.reset}`);
       if (changes.noivos) ok(`Novos noivos: ${changes.noivos}`);
     }
-  } else {
+  } else if (site === null) {
     sp0.clear();
     info("Nenhum RSVP encontrado para este slug — configurando novo.");
 
@@ -2595,6 +2606,12 @@ async function cmdRsvpSetup(argv) {
     if (r.ok) sp.succeed("Casamento registrado");
     else if (r.slug_existe) sp.warn("Slug já existia — nada foi alterado");
     else { sp.fail(`Falha: ${r.error || "HTTP " + r.status}`); process.exit(1); }
+  } else {
+    // site === undefined — erro de comunicação
+    sp0.fail("Erro ao consultar configuração — verifique o token rsvp_admin_token");
+    console.log();
+    info(`${c.dim}Rode:${c.reset} ${c.cyan}criarte-deploy rsvp-setup${c.reset} ${c.dim}e configure o token.${c.reset}`);
+    process.exit(1);
   }
 
   console.log();

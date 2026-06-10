@@ -2410,7 +2410,7 @@ async function handleRsvpBase(stagingDir, fullSlug, config, _targetUrl) {
     if (site) {
       sp.succeed(`RSVP já configurado — email destino: ${c.brand}${site.email_destino}${c.reset}`);
     } else {
-      sp.info("RSVP ainda não configurado para este slug");
+      sp.stopAndPersist({ symbol: c.dim + "○" + c.reset, text: "RSVP ainda não configurado para este slug" });
     }
   }
 
@@ -2539,7 +2539,7 @@ async function cmdRsvpSetup(argv) {
       if (changes.noivos) ok(`Novos noivos: ${changes.noivos}`);
     }
   } else {
-    sp0.info("Nenhum RSVP encontrado para este slug — configurando novo.");
+    sp0.stopAndPersist({ symbol: c.dim + "○" + c.reset, text: "Nenhum RSVP encontrado para este slug — configurando novo." });
 
     const noivos = (await ask(`Nome dos noivos ${c.dim}(ex: Adélia & Álvaro)${c.reset}`,
       { default: envMap.NEXT_PUBLIC_NOIVOS })).trim();

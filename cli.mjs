@@ -11,7 +11,7 @@ import {
 import { homedir, tmpdir } from "node:os";
 import { join, basename, relative, extname } from "node:path";
 import readline from "node:readline";
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { BANNER } from "./banner.mjs";
 
 // ============================================================================
@@ -1153,6 +1153,7 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy panel")}                     ${dim("URL/token do painel")}`);
   console.log(`  ${cmd("criarte-deploy ssh-setup")}                 ${dim("rsync via SSH (resume em conexões lentas)")}`);
   console.log(`  ${cmd("criarte-deploy r2-setup")}                  ${dim("Cloudflare R2 pra assets pesados")}`);
+  console.log(`  ${cmd("criarte-deploy r2-cors")}                   ${dim("configura CORS no bucket R2")}`);
   console.log(`  ${cmd("criarte-deploy doctor")}                    ${dim("diagnostica config completa")}`);
   console.log(`  ${cmd("criarte-deploy check")}                     ${dim("análise pré-deploy (sem enviar)")}`);
 
@@ -1386,6 +1387,26 @@ async function cmdR2Setup() {
       ContentType: "text/plain",
     }));
     sp.succeed("Credenciais válidas — consegui escrever no bucket");
+
+    // Configura CORS no bucket pra fontes e assets não bloquearem no browser
+    const corsSp = new Spinner("Configurando CORS no bucket...").start();
+    try {
+      await s3.send(new PutBucketCorsCommand({
+        Bucket: bucket,
+        CORSConfiguration: {
+          CORSRules: [{
+            AllowedOrigins: ["https://criartedesing.ao", "https://www.criartedesing.ao"],
+            AllowedMethods: ["GET", "HEAD"],
+            AllowedHeaders: ["*"],
+            MaxAgeSeconds: 86400,
+          }],
+        },
+      }));
+      corsSp.succeed("CORS configurado — assets do R2 vão carregar sem bloqueio");
+    } catch (corsErr) {
+      corsSp.warn(`CORS não configurado: ${corsErr.message}`);
+      info(`${c.dim}Configure manualmente no dashboard do Cloudflare: R2 → ${bucket} → Settings → CORS${c.reset}`);
+    }
   } catch (e) {
     sp.fail("Credenciais inválidas ou sem permissão");
     err(e.message);
@@ -1409,6 +1430,42 @@ async function cmdR2Disable() {
   delete config.r2;
   saveConfig(config);
   ok("R2 desativado. Próximos deploys vão incluir tudo no git.");
+}
+
+async function cmdR2Cors() {
+  miniHeader("🌐 Configurar CORS no bucket R2");
+  const config = requireLogin();
+  if (!config.r2) {
+    err("R2 não configurado. Rode primeiro: criarte-deploy r2-setup");
+    process.exit(1);
+  }
+  const { endpoint, bucket, accessKeyId, secretAccessKey } = config.r2;
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  const sp = new Spinner("Configurando CORS no bucket...").start();
+  try {
+    await s3.send(new PutBucketCorsCommand({
+      Bucket: bucket,
+      CORSConfiguration: {
+        CORSRules: [{
+          AllowedOrigins: ["https://criartedesing.ao", "https://www.criartedesing.ao"],
+          AllowedMethods: ["GET", "HEAD"],
+          AllowedHeaders: ["*"],
+          MaxAgeSeconds: 86400,
+        }],
+      },
+    }));
+    sp.succeed("CORS configurado");
+    ok("Fontes, imagens e outros assets do R2 agora carregam sem bloqueio CORS.");
+  } catch (e) {
+    sp.fail(`Falha: ${e.message}`);
+    info(`${c.dim}Configure manualmente: Cloudflare dashboard → R2 → ${bucket} → Settings → CORS Policy${c.reset}`);
+    info(`${c.dim}Allowed Origins: https://criartedesing.ao, https://www.criartedesing.ao${c.reset}`);
+    process.exit(1);
+  }
 }
 
 // Tamanho mínimo pra enviar pro R2. Arquivos menores que isso ficam no Git
@@ -2765,6 +2822,7 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "panel":      await cmdPanel();     break;
       case "doctor":     await cmdDoctor();    break;
       case "r2-setup":   await cmdR2Setup();   break;
+      case "r2-cors":    await cmdR2Cors();    break;
       case "r2-disable": await cmdR2Disable(); break;
       case "ssh-setup":   await cmdSshSetup();   break;
       case "rsvp-setup":  await cmdRsvpSetup(rest); break;

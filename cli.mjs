@@ -22,7 +22,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.8.2";
+const VERSION = "3.9.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -106,16 +106,47 @@ async function notifyDeployComplete(config, slug, status, commit_sha) {
 // UI helpers
 // ============================================================================
 const c = {
-  reset: "\x1b[0m", bold: "\x1b[1m", dim: "\x1b[2m",
+  reset: "\x1b[0m", bold: "\x1b[1m", dim: "\x1b[2m", italic: "\x1b[3m",
   red: "\x1b[31m", green: "\x1b[32m", yellow: "\x1b[33m",
   blue: "\x1b[34m", magenta: "\x1b[35m", cyan: "\x1b[36m", gray: "\x1b[90m",
+  // Truecolor — gradiente "Criarte" (dourado→rosa) inspirado no Claude Code
+  brand:    "\x1b[38;2;200;160;90m",   // dourado quente
+  brand2:   "\x1b[38;2;232;144;130m",  // rosa terracota
+  accent:   "\x1b[38;2;132;160;200m",  // azul aço suave
+  muted:    "\x1b[38;2;140;140;140m",
+  ok:       "\x1b[38;2;100;180;120m",
+  warnFg:   "\x1b[38;2;230;180;90m",
+  errFg:    "\x1b[38;2;220;100;100m",
 };
-const ok    = (s) => console.log(`${c.green}✓${c.reset} ${s}`);
-const info  = (s) => console.log(`${c.cyan}ℹ${c.reset} ${s}`);
-const warn  = (s) => console.log(`${c.yellow}⚠${c.reset}  ${s}`);
-const err   = (s) => console.log(`${c.red}✗${c.reset} ${s}`);
+const ok    = (s) => console.log(`${c.ok}✓${c.reset} ${s}`);
+const info  = (s) => console.log(`${c.accent}ℹ${c.reset} ${s}`);
+const warn  = (s) => console.log(`${c.warnFg}⚠${c.reset}  ${s}`);
+const err   = (s) => console.log(`${c.errFg}✗${c.reset} ${s}`);
 const hr    = ()  => console.log(`${c.dim}${"─".repeat(56)}${c.reset}`);
-const heading = (s) => console.log(`\n${c.bold}${c.magenta}${s}${c.reset}\n`);
+const heading = (s) => console.log(`\n${c.bold}${c.brand}${s}${c.reset}\n`);
+
+// Box estilo Claude Code — para destacar painéis curtos sem poluir
+function boxed(lines, { color = c.brand, padding = 1 } = {}) {
+  const visibleLen = (s) => s.replace(/\x1b\[[0-9;]*m/g, "").length;
+  const maxLen = Math.max(...lines.map(visibleLen));
+  const inner = maxLen + padding * 2;
+  const top = `${color}╭${"─".repeat(inner)}╮${c.reset}`;
+  const bot = `${color}╰${"─".repeat(inner)}╯${c.reset}`;
+  const pad = " ".repeat(padding);
+  console.log(top);
+  for (const line of lines) {
+    const fill = " ".repeat(maxLen - visibleLen(line));
+    console.log(`${color}│${c.reset}${pad}${line}${fill}${pad}${color}│${c.reset}`);
+  }
+  console.log(bot);
+}
+
+// Linha de seção fina — dois espaços, dot, label
+function section(label, sub) {
+  const s = sub ? `${c.dim}${sub}${c.reset}` : "";
+  console.log(`\n${c.brand}❖${c.reset} ${c.bold}${label}${c.reset}${s ? "  " + s : ""}`);
+  console.log(`${c.dim}${"─".repeat(48)}${c.reset}`);
+}
 
 // OSC-8 hyperlink — terminais modernos (iTerm2, Terminal.app, WezTerm, Kitty) tornam clicável.
 // Fallback: imprime só a URL em texto.
@@ -127,13 +158,13 @@ function linkify(url, color = c.cyan) {
 function showBanner() {
   if (!process.stdout.isTTY) return;
   console.log(BANNER);
-  console.log(`${c.bold}${c.magenta}        Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}`);
-  console.log(`${c.dim}        publique sites em segundos${c.reset}\n`);
+  console.log(`${c.bold}${c.brand}        Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}`);
+  console.log(`${c.dim}        ${c.italic}publish wedding sites in seconds${c.reset}\n`);
 }
 
 // Header compacto pra comandos do dia-a-dia — sem poluir o terminal
 function miniHeader(label) {
-  console.log(`\n${c.magenta}${c.bold}❀ Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}  ${c.dim}·${c.reset}  ${c.bold}${label}${c.reset}\n`);
+  console.log(`\n${c.brand}${c.bold}❀ Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}  ${c.dim}·${c.reset}  ${c.bold}${label}${c.reset}\n`);
 }
 
 // ============================================================================
@@ -148,7 +179,7 @@ const screen = {
   },
   phase(label, subtitle) {
     this.clear();
-    console.log(`${c.magenta}${c.bold}❀ Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}  ${c.dim}·${c.reset}  ${c.bold}${label}${c.reset}`);
+    console.log(`${c.brand}${c.bold}❀ Criarte Deploy${c.reset} ${c.dim}v${VERSION}${c.reset}  ${c.dim}·${c.reset}  ${c.bold}${label}${c.reset}`);
     if (subtitle) console.log(`${c.dim}${subtitle}${c.reset}`);
     console.log();
   },
@@ -1103,54 +1134,34 @@ async function cmdCheck() {
 // ============================================================================
 function cmdHelp() {
   showBanner();
-  console.log(`Publica sites finalizados no sistema multi-site sem precisar baixar o monorepo.
+  const cmd = (s) => `${c.brand}${s}${c.reset}`;
+  const dim = (s) => `${c.dim}${s}${c.reset}`;
+  console.log(`${c.italic}${c.dim}Publica sites estáticos no sistema multi-site da Criarte.${c.reset}\n`);
 
-${c.bold}Comandos principais:${c.reset}
+  section("✦ Deploy");
+  console.log(`  ${cmd("criarte-deploy")}                          ${dim("publica o site da pasta atual")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("<categoria> <nome>")}        ${dim("sem perguntas (modo headless)")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --subdomain <dom>")}     ${dim("aponta subdomínio personalizado")}`);
+  console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
 
-  ${c.cyan}criarte-deploy${c.reset}
-    Publica o site da pasta atual (pergunta categoria + nome).
+  section("💌 RSVP (casamentos com painel admin)");
+  console.log(`  ${cmd("criarte-deploy rsvp-setup")} ${dim("[slug]")}            ${dim("registra um casamento no servidor")}`);
+  console.log(`  ${cmd("criarte-deploy resend-setup")}              ${dim("guarda a Resend key default")}`);
 
-  ${c.cyan}criarte-deploy ${c.dim}<categoria> <nome> [--subdomain dominio.com]${c.reset}\n    Publica direto, sem perguntar.\n    Ex: ${c.dim}criarte-deploy casamento joao-maria${c.reset}\n    Ex: ${c.dim}criarte-deploy casamento joao-maria --subdomain joaoemaria.criartedesing.ao${c.reset}\n\n  ${c.cyan}criarte-deploy --direct ${c.dim}[categoria] [nome]${c.reset}\n    Upload direto pra VPS via API — sem git, sem rebuild do Coolify.\n    O site fica no ar em segundos, sem afetar os outros sites.\n    Ex: ${c.dim}criarte-deploy --direct casamento joao-maria${c.reset}
+  section("⚙ Configuração (1x)");
+  console.log(`  ${cmd("criarte-deploy login")}                     ${dim("token GitHub + painel")}`);
+  console.log(`  ${cmd("criarte-deploy panel")}                     ${dim("URL/token do painel")}`);
+  console.log(`  ${cmd("criarte-deploy ssh-setup")}                 ${dim("rsync via SSH (resume em conexões lentas)")}`);
+  console.log(`  ${cmd("criarte-deploy r2-setup")}                  ${dim("Cloudflare R2 pra assets pesados")}`);
+  console.log(`  ${cmd("criarte-deploy doctor")}                    ${dim("diagnostica config completa")}`);
+  console.log(`  ${cmd("criarte-deploy check")}                     ${dim("análise pré-deploy (sem enviar)")}`);
 
-  ${c.cyan}criarte-deploy check${c.reset}
-    Analisa estrutura do site SEM enviar.
-
-  ${c.cyan}criarte-deploy list${c.reset}
-    Lista todos os sites publicados.
-
-${c.bold}Configuração:${c.reset}
-
-  ${c.cyan}criarte-deploy login${c.reset}
-    Configura tudo (GitHub + painel). Roda 1x.
-
-  ${c.cyan}criarte-deploy panel${c.reset}
-    Atualiza só URL+token do painel (sem refazer login GitHub).
-
-  ${c.cyan}criarte-deploy doctor${c.reset}
-    Diagnostica conexão GitHub + painel + R2.
-    Roda antes de migrar muitos sites.
-
-${c.bold}Assets pesados:${c.reset}
-
-  ${c.cyan}criarte-deploy r2-setup${c.reset}
-    Ativa upload de assets pesados pro Cloudflare R2.
-
-  ${c.cyan}criarte-deploy r2-disable${c.reset}
-    Desativa R2 — assets voltam pro git.
-
-${c.bold}Fluxo do dia-a-dia (depois do login):${c.reset}
-
-  ${c.dim}$${c.reset} cd ~/Desktop/joao-maria
-  ${c.dim}$${c.reset} criarte-deploy
-  ${c.dim}→ categoria → nome → validade → confirma → ☕ café → site no ar${c.reset}
-
-${c.bold}Migração de muitos sites:${c.reset}
-
-  ${c.dim}1.${c.reset} ${c.cyan}criarte-deploy doctor${c.reset}            ${c.dim}# garante que tudo tá ok${c.reset}
-  ${c.dim}2.${c.reset} ${c.dim}cd ~/sites/joao-maria${c.reset}
-  ${c.dim}3.${c.reset} ${c.cyan}criarte-deploy casamento joao-maria${c.reset}
-  ${c.dim}4.${c.reset} ${c.dim}# repete pro próximo${c.reset}
-`);
+  section("📚 Fluxo típico");
+  console.log(`  ${c.dim}1.${c.reset} ${cmd("criarte-deploy login")}       ${dim("# 1 vez")}`);
+  console.log(`  ${c.dim}2.${c.reset} ${cmd("criarte-deploy ssh-setup")}   ${dim("# 1 vez — destrava upload em conexão lenta")}`);
+  console.log(`  ${c.dim}3.${c.reset} ${c.dim}cd ~/Desktop/joao-maria${c.reset}`);
+  console.log(`  ${c.dim}4.${c.reset} ${cmd("criarte-deploy")}             ${dim("# pergunta o resto e publica")}`);
+  console.log();
 }
 
 // ============================================================================
@@ -2014,11 +2025,23 @@ async function cmdDirectDeploy(argv) {
     try { await maybeCleanOrphans(stagingDir); } catch (e) { warn(`Skip orphan cleanup: ${e.message}`); }
   }
 
+  // ====== Detecta base RSVP e auto-provisiona + reescreve fetchs ======
+  // Bases RSVP têm src/lib/d1.ts e/ou pasta src/app/api/criar-confirmacao/.
+  // Como app/api/ não funciona em static export, reescrevemos os fetchs do
+  // front pra apontar pros aliases retrocompatíveis no servidor (que detectam
+  // slug do Referer e fazem o trabalho real).
+  const isRsvpBase = isNextSource && (
+    existsSync(join(stagingDir, "src", "lib", "d1.ts")) ||
+    existsSync(join(stagingDir, "src", "app", "api", "criar-confirmacao")) ||
+    existsSync(join(stagingDir, "app", "api", "criar-confirmacao"))
+  );
+
+  if (isRsvpBase) {
+    section("💌 Base RSVP detectada", "auto-provisão + ajuste de fetchs");
+    await handleRsvpBase(stagingDir, fullSlug, config, targetUrl);
+  }
+
   // ====== Remove API routes (incompatíveis com output: "export") ======
-  // Static export não consegue pré-renderizar rotas que usam searchParams,
-  // cookies, headers, etc. Como o deploy serve só HTML estático, qualquer
-  // app/api/ ou pages/api/ é morto no destino. Remove no staging pra build
-  // não quebrar.
   if (isNextSource) {
     const removed = [];
     for (const apiDir of ["app/api", "src/app/api", "pages/api", "src/pages/api"]) {
@@ -2029,9 +2052,14 @@ async function cmdDirectDeploy(argv) {
         for (const r of subRoutes) removed.push(`${apiDir}/${r}`);
       }
     }
+    // Também remove libs server-only que ficaram órfãs
+    for (const orphan of ["src/lib/d1.ts", "src/lib/auth.ts"]) {
+      const full = join(stagingDir, orphan);
+      if (existsSync(full)) { rmSync(full, { force: true }); removed.push(orphan); }
+    }
     if (removed.length > 0) {
-      warn(`API routes removidas do staging (incompatíveis com static export):`);
-      for (const r of removed) console.log(`  ${c.dim}- ${r}${c.reset}`);
+      console.log(`  ${c.dim}removidos do staging (server-side, não rodam em export):${c.reset}`);
+      for (const r of removed) console.log(`    ${c.dim}·${c.reset} ${c.dim}${r}${c.reset}`);
     }
   }
 
@@ -2227,6 +2255,239 @@ async function cmdDirectDeploy(argv) {
 }
 
 // ============================================================================
+// RSVP base — auto-provisão + reescrita de fetchs do front
+// ============================================================================
+
+// Lê /.env.local da base e devolve um mapa de variáveis (best-effort).
+function readEnvLocal(stagingDir) {
+  const map = {};
+  const candidates = [".env.local", ".env.production", ".env"];
+  for (const f of candidates) {
+    const p = join(stagingDir, f);
+    if (!existsSync(p)) continue;
+    const txt = readFileSync(p, "utf8");
+    for (const raw of txt.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) continue;
+      const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.*)$/i);
+      if (!m) continue;
+      let v = m[2].trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      v = v.replace(/^\\\$/, "$"); // unescape $
+      if (!(m[1] in map)) map[m[1]] = v;
+    }
+  }
+  return map;
+}
+
+// Reescreve fetch("/api/<antigo>") → fetch("/api/rsvp/<novo>") em todo o
+// staging. O servidor já tem aliases retrocompatíveis, mas reescrever deixa
+// o source mais limpo e funciona mesmo sem aliases.
+function rewriteRsvpFetches(stagingDir) {
+  const EXTS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs"]);
+  const map = [
+    [/(["'`])\/api\/criar-confirmacao\1/g, '$1/api/rsvp/criar$1'],
+    [/(["'`])\/api\/notificar-confirmacao\1/g, '$1/api/rsvp/criar$1'],
+    [/(["'`])\/api\/listar-confirmacoes\1/g, '$1/api/rsvp/listar$1'],
+    [/(["'`])\/api\/deletar-confirmacao\1/g, '$1/api/rsvp/deletar$1'],
+    [/(["'`])\/api\/enviar-lista\1/g, '$1/api/rsvp/enviar-lista$1'],
+    [/(["'`])\/api\/login\1/g, '$1/api/rsvp/auth/login$1'],
+    [/(["'`])\/api\/logout\1/g, '$1/api/rsvp/auth/logout$1'],
+    [/(["'`])\/api\/me\1/g, '$1/api/rsvp/auth/me$1'],
+    [/(["'`])\/api\/baixar-lista\1/g, '$1/api/rsvp/baixar-pdf$1'],
+  ];
+  let touched = 0;
+  (function walk(dir) {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith(".") || e.name === "node_modules") continue;
+      const full = join(dir, e.name);
+      if (e.isDirectory()) { walk(full); continue; }
+      if (!EXTS.has(extname(e.name))) continue;
+      let content = readFileSync(full, "utf8");
+      let changed = false;
+      for (const [re, to] of map) {
+        const next = content.replace(re, to);
+        if (next !== content) { content = next; changed = true; }
+      }
+      if (changed) { writeFileSync(full, content); touched++; }
+    }
+  })(stagingDir);
+  return touched;
+}
+
+async function provisionRsvpSite(config, slug, envMap, extras = {}) {
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  const adminToken = config.rsvp_admin_token || extras.adminToken;
+  if (!adminToken) {
+    throw new Error("rsvp_admin_token ausente — rode 'criarte-deploy rsvp-setup' primeiro");
+  }
+  const payload = {
+    slug,
+    noivos: extras.noivos || envMap.NEXT_PUBLIC_NOIVOS || "",
+    dataEvento: extras.dataEvento || envMap.NEXT_PUBLIC_DATA_EVENTO || "",
+    emailDestino: extras.emailDestino || envMap.EMAIL_DESTINO || "",
+    adminEmail: extras.adminEmail || envMap.ADMIN_EMAIL || envMap.EMAIL_DESTINO || "",
+    adminPasswordHash: extras.adminPasswordHash || envMap.ADMIN_PASSWORD_HASH || "",
+    adminPassword: extras.adminPassword || "",
+    secretPdf: extras.secretPdf || envMap.CRON_SECRET || `RSVP${Date.now().toString(36).toUpperCase()}`,
+    resendApiKey: extras.resendApiKey || config.resend_api_key || envMap.RESEND_API_KEY || "",
+  };
+  const res = await fetch(`${targetUrl}/api/rsvp/sites/provision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(15000),
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok && data.ok, status: res.status, error: data.error, slug_existe: data.error === "slug_existe" };
+}
+
+async function handleRsvpBase(stagingDir, fullSlug, config, _targetUrl) {
+  const envMap = readEnvLocal(stagingDir);
+  if (!config.rsvp_admin_token) {
+    warn("rsvp_admin_token não configurado — pulando provisão automática.");
+    info(`Configure com: ${c.cyan}criarte-deploy rsvp-setup${c.reset}`);
+  } else {
+    const sp = new Spinner("Registrando casamento no servidor...").start();
+    const r = await provisionRsvpSite(config, fullSlug, envMap);
+    if (r.ok) sp.succeed(`Casamento registrado em ${c.bold}${fullSlug}${c.reset}`);
+    else if (r.slug_existe) sp.warn(`Casamento já estava registrado (${c.dim}ok${c.reset})`);
+    else sp.fail(`Falha ao registrar: ${r.error || "HTTP " + r.status}`);
+  }
+  const sp2 = new Spinner("Reescrevendo chamadas do front pra endpoints centrais...").start();
+  const touched = rewriteRsvpFetches(stagingDir);
+  sp2.succeed(`${touched} arquivo(s) reescritos`);
+}
+
+// ============================================================================
+// RSVP-SETUP — provisão interativa
+// ============================================================================
+async function cmdRsvpSetup(argv) {
+  const config = requireLogin();
+  if (!config.panel_url || !config.admin_api_token) {
+    err("Painel não configurado. Rode primeiro: criarte-deploy panel");
+    process.exit(1);
+  }
+  screen.phase("💌 RSVP — Configurar casamento");
+
+  // Pode rodar de dentro da pasta da base ou solto
+  const cwd = process.cwd();
+  const envMap = readEnvLocal(cwd);
+  const hasBase = Object.keys(envMap).length > 0;
+  if (hasBase) {
+    info(`${c.dim}Lendo defaults de${c.reset} ${c.cyan}${cwd}/.env.local${c.reset}`);
+  }
+
+  // 1) rsvp_admin_token (uma vez por máquina)
+  if (!config.rsvp_admin_token) {
+    boxed([
+      `${c.bold}Token admin do RSVP${c.reset}`,
+      `${c.dim}Este token autoriza o CLI a registrar casamentos no servidor.${c.reset}`,
+      `${c.dim}Pega com o Samuel (ou env MULTISITE_ADMIN_TOKEN da VPS).${c.reset}`,
+    ], { color: c.brand });
+    const tok = await ask(`Token: `, { hidden: true });
+    if (!tok || tok.length < 16) { err("Token muito curto."); process.exit(1); }
+    config.rsvp_admin_token = tok.trim();
+    saveConfig(config);
+    ok("Token guardado.");
+    console.log();
+  }
+
+  // 2) Coleta dados — sempre pergunta, mostra default do .env.local
+  section("Dados do casamento");
+  const slugDefault = argv[0] || (hasBase ? `rsvp/${basename(cwd).toLowerCase().replace(/[^a-z0-9-]/g, "-")}` : "");
+  const slug = (await ask(`Slug ${c.dim}(ex: rsvp/adelia-alvaro)${c.reset}`, { default: slugDefault })).trim();
+  if (!slug || !/^[a-z0-9][a-z0-9\/-]*[a-z0-9]$/.test(slug)) { err("Slug inválido."); process.exit(1); }
+
+  const noivos = (await ask(`Nome dos noivos ${c.dim}(ex: Adélia & Álvaro)${c.reset}`,
+    { default: envMap.NEXT_PUBLIC_NOIVOS })).trim();
+  const dataEvento = (await ask(`Data do evento ${c.dim}(ex: 19 septembre 2026)${c.reset}`,
+    { default: envMap.NEXT_PUBLIC_DATA_EVENTO })).trim();
+
+  section("📬 Email — onde caem as confirmações");
+  const emailDestino = (await ask(`Email destino das notificações`,
+    { default: envMap.EMAIL_DESTINO })).trim();
+
+  section("🔐 Login do casal");
+  const adminEmail = (await ask(`Email de login`,
+    { default: envMap.ADMIN_EMAIL || emailDestino })).trim();
+  let adminPasswordHash = envMap.ADMIN_PASSWORD_HASH || "";
+  let adminPassword = "";
+  if (adminPasswordHash) {
+    info(`Hash bcrypt já existe no .env.local — vou usar.`);
+  } else {
+    adminPassword = await ask(`Senha (texto claro — será hashada)`, { hidden: true });
+    if (!adminPassword) { err("Senha obrigatória."); process.exit(1); }
+  }
+
+  section("🪪 Outros");
+  const secretPdf = (await ask(`Secret do PDF ${c.dim}(letras/números, ex: AA2026)${c.reset}`,
+    { default: envMap.CRON_SECRET || `RSVP${Date.now().toString(36).toUpperCase()}` })).trim();
+  const useGlobalResend = config.resend_api_key && !envMap.RESEND_API_KEY;
+  const resendApiKey = (await ask(`Resend API key ${c.dim}(deixe vazio pra usar do servidor)${c.reset}`,
+    { default: envMap.RESEND_API_KEY || (useGlobalResend ? "(usar global)" : ""), hidden: true })).replace(/^\(.*\)$/, "");
+
+  // 3) Resumo + confirmação
+  section("✦ Resumo");
+  console.log(`  ${c.dim}Slug:${c.reset}            ${c.bold}${slug}${c.reset}`);
+  console.log(`  ${c.dim}Noivos:${c.reset}          ${noivos}`);
+  console.log(`  ${c.dim}Data:${c.reset}            ${dataEvento}`);
+  console.log(`  ${c.dim}Email destino:${c.reset}   ${c.brand}${emailDestino}${c.reset}`);
+  console.log(`  ${c.dim}Login do casal:${c.reset}  ${adminEmail}`);
+  console.log(`  ${c.dim}Senha:${c.reset}           ${adminPasswordHash ? c.dim + "(hash do .env.local)" + c.reset : c.dim + "•••• (será hashada)" + c.reset}`);
+  console.log(`  ${c.dim}Secret PDF:${c.reset}      ${secretPdf}`);
+  console.log(`  ${c.dim}Resend:${c.reset}          ${resendApiKey ? c.dim + "específica desse casamento" + c.reset : c.dim + "default do servidor" + c.reset}`);
+  console.log();
+  const confirm = await ask(`Confirmar registro? ${c.dim}(s/N)${c.reset} `);
+  if (confirm.toLowerCase() !== "s" && confirm.toLowerCase() !== "sim") {
+    warn("Cancelado.");
+    process.exit(0);
+  }
+
+  const sp = new Spinner("Registrando no servidor...").start();
+  const r = await provisionRsvpSite(config, slug, {}, {
+    noivos, dataEvento, emailDestino, adminEmail, adminPasswordHash, adminPassword, secretPdf, resendApiKey,
+  });
+  if (r.ok) sp.succeed("Casamento registrado");
+  else if (r.slug_existe) sp.warn("Slug já existia — nada foi alterado");
+  else { sp.fail(`Falha: ${r.error || "HTTP " + r.status}`); process.exit(1); }
+
+  console.log();
+  boxed([
+    `${c.bold}Pronto.${c.reset} Agora deploya a base:`,
+    ``,
+    `  ${c.cyan}cd ${cwd}${c.reset}`,
+    `  ${c.cyan}criarte-deploy${c.reset}`,
+    ``,
+    `${c.dim}O CLI detecta a base RSVP automaticamente e o site${c.reset}`,
+    `${c.dim}vai chamar /api/rsvp/* no servidor.${c.reset}`,
+  ], { color: c.ok });
+}
+
+// ============================================================================
+// RESEND-SETUP — guarda Resend API key default
+// ============================================================================
+async function cmdResendSetup() {
+  const config = requireLogin();
+  screen.phase("📧 Resend — API key default");
+  if (config.resend_api_key) {
+    info(`Já configurado: ${c.dim}${config.resend_api_key.slice(0, 12)}…${c.reset}`);
+  } else {
+    info(`${c.dim}A key fica salva localmente e é enviada na criação de cada RSVP.${c.reset}`);
+    info(`${c.dim}Cada casamento pode também ter a sua própria via rsvp-setup.${c.reset}`);
+  }
+  console.log();
+  const key = (await ask(`Resend API key ${c.dim}(começa com re_)${c.reset}`, { hidden: true })).trim();
+  if (!key) { warn("Cancelado."); process.exit(0); }
+  if (!key.startsWith("re_")) { err("Não parece uma key do Resend (deve começar com re_)."); process.exit(1); }
+  config.resend_api_key = key;
+  saveConfig(config);
+  ok("Resend key guardada.");
+  console.log();
+  info(`Próximas chamadas de ${c.cyan}criarte-deploy rsvp-setup${c.reset} vão usar essa key como default.`);
+}
+
+// ============================================================================
 // SSH/Rsync deploy — robusto pra conexões lentas/instáveis (Angola, etc)
 // ============================================================================
 function hasRsyncAndSsh() {
@@ -2330,7 +2591,9 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "doctor":     await cmdDoctor();    break;
       case "r2-setup":   await cmdR2Setup();   break;
       case "r2-disable": await cmdR2Disable(); break;
-      case "ssh-setup":  await cmdSshSetup();  break;
+      case "ssh-setup":   await cmdSshSetup();   break;
+      case "rsvp-setup":  await cmdRsvpSetup(rest); break;
+      case "resend-setup":await cmdResendSetup(); break;
       case "list":
       case "ls":         await cmdList();      break;
       case "rm":

@@ -2089,14 +2089,22 @@ async function cmdDirectDeploy(argv) {
         const touched = rewriteSourceForR2(stagingDir, config.r2, r2Result.remoteMap, category, slug);
         const totalMb = (r2Result.totalBytes / 1024 / 1024).toFixed(1);
         console.log();
-        ok(`R2: ${r2Result.uploaded} novo(s), ${r2Result.skipped} já existia(m) — ${totalMb}MB`);
-        ok(`Source reescrito em ${touched} arquivo(s) — assets servidos pelo R2`);
+        console.log(`  ${c.bold}${c.brand}☁${c.reset}${c.bold}  R2 Object Storage${c.reset}`);
+        console.log(`  ${c.dim}──${c.reset}`);
+        console.log(`  ${c.ok}✓${c.reset} ${r2Result.uploaded} asset(s) enviado(s)  ${c.dim}(${totalMb}MB)${c.reset}`);
+        if (r2Result.skipped > 0) console.log(`  ${c.dim}↻${c.reset} ${r2Result.skipped} já existia(m)    ${c.dim}(pulado)${c.reset}`);
+        console.log(`  ${c.ok}✓${c.reset} Source reescrito em ${touched} arquivo(s)`);
+        console.log();
+      } else {
+        console.log();
+        info(`R2 configurado mas nenhum asset >${SMALL_LIMIT_KB}KB encontrado em public/ — nada enviado.`);
       }
     } catch (e) {
       err(`Falha no upload R2: ${e.message}`);
       info("Pulando R2 — assets vão pra VPS no zip.");
     }
   } else if (!config.r2 && isNextSource) {
+    console.log();
     info(`${c.dim}R2 não configurado — assets vão pra VPS. Rode ${c.cyan}criarte-deploy r2-setup${c.reset}${c.dim} pra ativar.${c.reset}`);
   }
 

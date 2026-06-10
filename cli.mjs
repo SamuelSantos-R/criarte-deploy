@@ -13,6 +13,7 @@ import { join, basename, relative, extname } from "node:path";
 import readline from "node:readline";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { BANNER } from "./banner.mjs";
+import { detectAdapter } from "./src/adapters/registry.mjs";
 
 // ============================================================================
 // CONFIG
@@ -2048,37 +2049,31 @@ async function cmdDirectDeploy(argv) {
     try { await maybeCleanOrphans(stagingDir); } catch (e) { warn(`Skip orphan cleanup: ${e.message}`); }
   }
 
-  // ====== Detecta base RSVP e auto-provisiona + reescreve fetchs ======
-  // Bases RSVP têm src/lib/d1.ts e/ou pasta src/app/api/criar-confirmacao/.
-  // Como app/api/ não funciona em static export, reescrevemos os fetchs do
-  // front pra apontar pros aliases retrocompatíveis no servidor (que detectam
-  // slug do Referer e fazem o trabalho real).
-  const isRsvpBase = isNextSource && (
-    existsSync(join(stagingDir, "src", "lib", "d1.ts")) ||
-    existsSync(join(stagingDir, "src", "app", "api", "criar-confirmacao")) ||
-    existsSync(join(stagingDir, "app", "api", "criar-confirmacao"))
-  );
+  // ====== Detecta base (casamento, rsvp, etc) via adapter ======
+  const adapter = detectAdapter(stagingDir);
 
-  if (isRsvpBase) {
-    section("💌 Base RSVP detectada", "auto-provisão + ajuste de fetchs");
-    await handleRsvpBase(stagingDir, fullSlug, config, targetUrl);
+  // Prepara o staging conforme a base (RSVP: provisiona + reescreve fetchs)
+  if (isNextSource) {
+    const msgs = adapter.getMessages();
+    section(`${msgs.baseLabel || "💌 Base detectada"}`, msgs.autoSub || adapter.name);
+    await adapter.prepare(stagingDir, fullSlug, config, targetUrl);
   }
 
-  // ====== Remove API routes (incompatíveis com output: "export") ======
+  // Remove arquivos server-side (definidos pelo adapter)
   if (isNextSource) {
     const removed = [];
-    for (const apiDir of ["app/api", "src/app/api", "pages/api", "src/pages/api"]) {
-      const full = join(stagingDir, apiDir);
+    for (const pattern of adapter.getRemovePatterns()) {
+      const full = join(stagingDir, pattern);
       if (existsSync(full)) {
-        const subRoutes = readdirSync(full).filter(n => !n.startsWith("."));
-        rmSync(full, { recursive: true, force: true });
-        for (const r of subRoutes) removed.push(`${apiDir}/${r}`);
+        if (statSync(full).isDirectory()) {
+          const subRoutes = readdirSync(full).filter(n => !n.startsWith("."));
+          rmSync(full, { recursive: true, force: true });
+          for (const r of subRoutes) removed.push(`${pattern}/${r}`);
+        } else {
+          rmSync(full, { force: true });
+          removed.push(pattern);
+        }
       }
-    }
-    // Também remove libs server-only que ficaram órfãs
-    for (const orphan of ["src/lib/d1.ts", "src/lib/auth.ts"]) {
-      const full = join(stagingDir, orphan);
-      if (existsSync(full)) { rmSync(full, { force: true }); removed.push(orphan); }
     }
     if (removed.length > 0) {
       console.log(`  ${c.dim}removidos do staging (server-side, não rodam em export):${c.reset}`);

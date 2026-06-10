@@ -2710,16 +2710,21 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
     throw e;
   }
 
+  // Usa HTTP direto pra VPS — o rsync já provou que o host é alcançável via SSH,
+  // e a VPS só escuta HTTP (porta 80). Cloudflare faz o TLS externo.
+  const apiUrl = `http://${host}/api/sites/build-from-path`;
+  const hostHeader = new URL(targetUrl).hostname;
   const sp2 = new Spinner("Disparando build no servidor...").start();
   const MAX_ATTEMPTS = 3;
   let lastErr;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const res = await fetch(`${targetUrl}/api/sites/build-from-path`, {
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${config.admin_api_token}`,
+          Host: hostHeader,
         },
         body: JSON.stringify({ slug: fullSlug, buildId, name, category, subdomain, expires_at }),
         signal: AbortSignal.timeout(30000),

@@ -1748,18 +1748,25 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
       let content = readFileSync(full, "utf8");
       let changed = false;
 
-      for (const prefix of prefixes) {
-        // Match `/assets/<algo-sem-aspas>` precedido por aspas, parêntese, vírgula, espaço ou início
-        // Captura: precedente + caminho relativo dentro do prefixo
-        const re = new RegExp(`(["'(\`,\\s=])/${prefix}/([^"'\`)\\s]+)`, "g");
-        content = content.replace(re, (m, pre, rest) => {
-          const publicRel = `${prefix}/${rest}`;
-          if (remoteMap.has(publicRel)) {
-            changed = true;
-            return `${pre}${remoteMap.get(publicRel)}`;
-          }
-          return m;
-        });
+      // Estratégia: para cada (publicRel → URL R2), tenta replace tanto da forma
+      // crua (com espaços/acentos) quanto URL-encoded. Ordenamos por path mais
+      // longo primeiro pra evitar match parcial entre nomes que se sobrepõem.
+      // Lookup direto evita o problema do regex que truncava em espaço.
+      const replacedThisFile = new Set();
+      const entries = [...remoteMap.entries()].sort((a, b) => b[0].length - a[0].length);
+      for (const [publicRel, url] of entries) {
+        const variants = new Set([
+          `/${publicRel}`,
+          `/${publicRel.split("/").map(s => encodeURIComponent(s)).join("/")}`,
+          `/${publicRel.split("/").map(s => s.replace(/ /g, "%20")).join("/")}`,
+        ]);
+        for (const v of variants) {
+          if (!content.includes(v)) continue;
+          // Garante que não vamos substituir um path já reescrito ou path mais longo
+          content = content.split(v).join(url);
+          changed = true;
+          replacedThisFile.add(publicRel);
+        }
       }
       if (changed) {
         writeFileSync(full, content);

@@ -14,6 +14,8 @@ import readline from "node:readline";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
+import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
+import { printSummary } from "./src/lib/summary.mjs";
 
 // ============================================================================
 // CONFIG
@@ -1654,7 +1656,7 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
   }
 
   if (candidates.length === 0) {
-    return { uploaded: 0, totalBytes: 0, skipped: 0, remoteMap: new Map() };
+    return { uploaded: 0, totalBytes: 0, skipped: 0, remoteMap: new Map(), uploadedList: [], skippedList: [], failedList: [] };
   }
 
   console.log(`\n${c.bold}📤 Upload de ${candidates.length} asset(s) pro R2:${c.reset}`);
@@ -1663,6 +1665,9 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
   let uploaded = 0;
   let totalBytes = 0;
   let skipped = 0;
+  const uploadedList = [];
+  const skippedList = [];
+  const failedList = [];
 
   for (let i = 0; i < candidates.length; i++) {
     const { localPath, publicRelPath, sz } = candidates[i];
@@ -1681,6 +1686,7 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
       process.stdout.write(`  ${c.dim}↻${c.reset} ${publicRelPath} ${c.dim}(${mb}MB — já existe)${c.reset}\n`);
       remoteMap.set(publicRelPath, publicAssetUrl);
       skipped++;
+      skippedList.push({ path: publicRelPath, key, url: publicAssetUrl, sizeBytes: sz });
       continue;
     }
 
@@ -1697,13 +1703,14 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
       remoteMap.set(publicRelPath, publicAssetUrl);
       uploaded++;
       totalBytes += sz;
+      uploadedList.push({ path: publicRelPath, key, url: publicAssetUrl, sizeBytes: sz });
     } catch (e) {
       sp.fail(`Falha em ${publicRelPath}: ${e.message}`);
-      throw e;
+      failedList.push({ path: publicRelPath, key, error: e.message, sizeBytes: sz });
     }
   }
 
-  return { uploaded, totalBytes, skipped, remoteMap };
+  return { uploaded, totalBytes, skipped, remoteMap, uploadedList, skippedList, failedList };
 }
 
 /**
@@ -1999,6 +2006,9 @@ async function cmdDirectDeploy(argv) {
   const fullSlug = `${category}/${slug}`;
   const liveDomain = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
   const targetUrlSlug = `${liveDomain}/${fullSlug}`;
+
+  // Manifest local do deploy — preenchido ao longo do fluxo
+  const manifest = createManifest({ category, slug: fullSlug, base: null, action: "deploy" });
   const futureDomain = DEFAULT_PANEL_URL.replace(/\/$/, "");
   const futureUrl = futureDomain !== liveDomain ? `${futureDomain}/${fullSlug}` : null;
 
@@ -2120,6 +2130,7 @@ async function cmdDirectDeploy(argv) {
 
   // ====== Detecta base (casamento, rsvp, etc) via adapter ======
   const adapter = detectAdapter(stagingDir);
+  manifest.base = adapter.name;
 
   // Prepara o staging conforme a base (RSVP: provisiona + reescreve fetchs)
   if (isNextSource) {
@@ -2154,6 +2165,11 @@ async function cmdDirectDeploy(argv) {
   if (config.r2 && isNextSource) {
     try {
       const r2Result = await uploadAssetsToR2(stagingDir, category, slug, config.r2);
+      manifest.r2.prefix = `${category}/${slug}/`;
+      manifest.r2.uploaded = r2Result.uploadedList || [];
+      manifest.r2.skipped = r2Result.skippedList || [];
+      manifest.r2.failed = r2Result.failedList || [];
+      manifest.r2.totalBytes = r2Result.totalBytes || 0;
       if (r2Result.uploaded > 0 || r2Result.skipped > 0) {
         const touched = rewriteSourceForR2(stagingDir, config.r2, r2Result.remoteMap, category, slug);
         const totalMb = (r2Result.totalBytes / 1024 / 1024).toFixed(1);
@@ -2162,6 +2178,7 @@ async function cmdDirectDeploy(argv) {
         console.log(`  ${c.dim}──${c.reset}`);
         console.log(`  ${c.ok}✓${c.reset} ${r2Result.uploaded} asset(s) enviado(s)  ${c.dim}(${totalMb}MB)${c.reset}`);
         if (r2Result.skipped > 0) console.log(`  ${c.dim}↻${c.reset} ${r2Result.skipped} já existia(m)    ${c.dim}(pulado)${c.reset}`);
+        if ((r2Result.failedList?.length || 0) > 0) console.log(`  ${c.err}✕${c.reset} ${r2Result.failedList.length} falha(s)`);
         console.log(`  ${c.ok}✓${c.reset} Source reescrito em ${touched} arquivo(s)`);
         console.log();
       } else {
@@ -2328,6 +2345,7 @@ async function cmdDirectDeploy(argv) {
           }
           if (liveOk) liveSp.succeed(`Site respondendo 200 OK em ${Math.round((Date.now()-startLive)/1000)}s`);
           else liveSp.warn(`Site ainda não respondeu 200 (último: ${lastCode}). Pode ser cache da Cloudflare — tente em 1min.`);
+          manifest.healthChecks.push({ label: "site", url: liveUrl, status: lastCode, ok: liveOk });
         }
 
         const liveUrl = `${targetUrl}/${fullSlug}`;
@@ -2343,7 +2361,15 @@ async function cmdDirectDeploy(argv) {
         if (result.files) ok(`${result.files} arquivo(s) enviados`);
       }
     }
+
+    // ====== Manifest local + summary ======
+    finalizeManifest(manifest, { status: "success" });
+    const mPath = saveManifest(manifest);
+    printSummary(manifest, { manifestPath: mPath });
   } catch (e) {
+    finalizeManifest(manifest, { status: "failed", error: e.message });
+    const mPath = saveManifest(manifest);
+    printSummary(manifest, { manifestPath: mPath });
     err(`Erro pós-deploy: ${e.message}`);
     if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
     process.exit(1);

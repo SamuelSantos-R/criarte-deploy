@@ -1808,9 +1808,11 @@ async function cmdRemove(argv) {
   console.log();
 
   if (!force) {
-    const ans = await ask(`Confirmar remoção? ${c.red}(digite o slug pra confirmar)${c.reset} → `);
-    if (ans.trim().toLowerCase() !== slug) {
-      warn("Cancelado.");
+    const ans = await ask(`${c.red}Remover ${c.bold}${slug}${c.reset}${c.red} permanentemente?${c.reset} ${c.dim}[y/N]${c.reset} → `);
+    const yes = ["y", "yes", "s", "sim"].includes(ans.trim().toLowerCase());
+    if (!yes) {
+      warn(`Cancelado — ${c.bold}${slug}${c.reset} NÃO foi removido.`);
+      info(`${c.dim}Pra confirmar sem prompt: ${c.cyan}criarte-deploy rm ${slug} --force${c.reset}`);
       process.exit(0);
     }
   }
@@ -1845,6 +1847,73 @@ async function cmdRemove(argv) {
     err(e.message);
     process.exit(1);
   }
+}
+
+async function cmdLocks(argv) {
+  const config = requireLogin();
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  if (!targetUrl || !config.admin_api_token) {
+    err("Painel/token não configurados. Rode: criarte-deploy panel");
+    process.exit(1);
+  }
+
+  const sub = argv[0];
+  const auth = { Authorization: `Bearer ${config.admin_api_token}` };
+
+  if (!sub || sub === "list" || sub === "ls") {
+    miniHeader("🔒 Locks de deploy ativos");
+    try {
+      const res = await fetch(`${targetUrl}/api/deploys/locks`, { headers: auth, signal: AbortSignal.timeout(10000) });
+      const data = await res.json();
+      if (!res.ok) { err(data.error || `HTTP ${res.status}`); process.exit(1); }
+      if (!data.locks?.length) { ok("Nenhum lock ativo."); return; }
+      console.log();
+      for (const l of data.locks) {
+        const flag = l.is_zombie ? `${c.yellow}⚠ zumbi${c.reset}` : `${c.green}ativo${c.reset}`;
+        console.log(`  ${c.bold}${l.slug}${c.reset}`);
+        console.log(`    ${c.dim}operação:${c.reset} ${l.operation}  ${c.dim}idade:${c.reset} ${l.age_human}  ${c.dim}holder:${c.reset} ${l.holder}  ${flag}`);
+      }
+      console.log();
+      info(`Liberar um: ${c.cyan}criarte-deploy locks release <slug>${c.reset}`);
+      info(`Limpar zumbis: ${c.cyan}criarte-deploy locks cleanup${c.reset}`);
+      info(`Forçar tudo: ${c.cyan}criarte-deploy locks clear --force${c.reset}`);
+    } catch (e) { err(`Erro de rede: ${e.message}`); process.exit(1); }
+    return;
+  }
+
+  if (sub === "release") {
+    const slug = argv[1];
+    if (!slug) { err("Uso: criarte-deploy locks release <slug>"); process.exit(1); }
+    const res = await fetch(`${targetUrl}/api/deploys/locks?slug=${encodeURIComponent(slug)}`, { method: "DELETE", headers: auth });
+    const data = await res.json();
+    if (!res.ok) { err(data.error || `HTTP ${res.status}`); process.exit(1); }
+    ok(`Lock de ${c.bold}${slug}${c.reset} ${data.existed ? "liberado" : "não existia"}.`);
+    return;
+  }
+
+  if (sub === "cleanup") {
+    const res = await fetch(`${targetUrl}/api/deploys/locks?expired=1`, { method: "DELETE", headers: auth });
+    const data = await res.json();
+    if (!res.ok) { err(data.error || `HTTP ${res.status}`); process.exit(1); }
+    ok(`${data.removed} lock(s) expirado(s) removido(s).`);
+    return;
+  }
+
+  if (sub === "clear") {
+    if (!argv.includes("--force") && !argv.includes("-f")) {
+      err("Operação destrutiva. Use --force pra confirmar.");
+      process.exit(1);
+    }
+    const res = await fetch(`${targetUrl}/api/deploys/locks?all=1`, { method: "DELETE", headers: auth });
+    const data = await res.json();
+    if (!res.ok) { err(data.error || `HTTP ${res.status}`); process.exit(1); }
+    ok("Todos os locks foram liberados.");
+    return;
+  }
+
+  err(`Subcomando desconhecido: ${sub}`);
+  info("Use: list | release <slug> | cleanup | clear --force");
+  process.exit(1);
 }
 
 async function cmdDirectDeploy(argv) {
@@ -2783,6 +2852,7 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "remove":
       case "delete":     await cmdRemove(rest); break;
       case "check":      await cmdCheck();     break;
+      case "locks":      await cmdLocks(rest);  break;
       case "help":
       case "--help":
       case "-h":     cmdHelp();          break;

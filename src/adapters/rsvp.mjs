@@ -78,13 +78,38 @@ export class RsvpAdapter extends BaseAdapter {
       } else if (site === undefined) {
         info(`${c.dim}Pulando provisão RSVP devido a erro de comunicação${c.reset}`);
       } else {
+        // ===== Mostrar email DETECTADO antes de registrar =====
+        const envEmail = (envMap.EMAIL_DESTINO || envMap.RSVP_EMAIL || envMap.MAIL_TO || envMap.RECIPIENT_EMAIL || "").trim();
+        const overrideEmail = (process.env.CRIARTE_RSVP_EMAIL_OVERRIDE || "").trim();
+        const detectedEmail = overrideEmail || envEmail;
+        const detectedFromTag = overrideEmail ? "flag --rsvp-email" : envEmail ? ".env do projeto" : null;
+
+        console.log();
+        console.log(`  ${c.bold}→ E-mail destino do RSVP${c.reset}`);
+        if (detectedEmail) {
+          console.log(`    ${c.dim}Detectado em ${detectedFromTag}:${c.reset} ${c.brand}${detectedEmail}${c.reset}`);
+        } else {
+          console.log(`    ${c.dim}Nenhum e-mail detectado no projeto.${c.reset}`);
+        }
         const readline = await import("node:readline");
         const ask = createAsk(readline.default);
-        const setup = await ask(`${c.bold}Registrar RSVP no servidor agora?${c.reset} ${c.dim}(Enter=sim, N=pular)${c.reset}: `);
+        let finalEmail = detectedEmail;
+        if (!overrideEmail) {
+          const change = await ask(`    ${c.bold}Manter este e-mail?${c.reset} ${c.dim}[Y/n/novo-email]${c.reset} → `);
+          const t = change.trim();
+          if (t && t.includes("@")) finalEmail = t;
+          else if (t.toLowerCase() === "n" || t.toLowerCase() === "nao") {
+            const novo = await ask(`    Digite o novo e-mail destino: `);
+            if (novo.trim().includes("@")) finalEmail = novo.trim();
+          }
+        }
+
+        const setup = await ask(`    ${c.bold}Registrar RSVP no servidor com ${c.brand}${finalEmail || "(sem email)"}${c.reset}${c.bold}?${c.reset} ${c.dim}[Y/n]${c.reset} → `);
         if (setup.toLowerCase() !== "n" && setup.toLowerCase() !== "nao") {
           console.log();
+          const extras = finalEmail ? { emailDestino: finalEmail, adminEmail: finalEmail } : {};
           const sp2 = new Spinner("Registrando RSVP no servidor...").start();
-          const r = await provisionRsvpSite(config, fullSlug, envMap, {}, targetUrl);
+          const r = await provisionRsvpSite(config, fullSlug, envMap, extras, targetUrl);
           if (r.ok) sp2.succeed(`RSVP registrado em ${c.bold}${fullSlug}${c.reset}`);
           else if (r.slug_existe) sp2.warn(`RSVP já estava registrado (${c.dim}ok${c.reset})`);
           else sp2.fail(`Falha ao registrar: ${r.error || "HTTP " + r.status}`);
@@ -93,21 +118,51 @@ export class RsvpAdapter extends BaseAdapter {
         }
       }
     } else {
+      // ===== Site já existe — comparar e-mail cadastrado vs detectado =====
+      const envEmail = (envMap.EMAIL_DESTINO || envMap.RSVP_EMAIL || envMap.MAIL_TO || envMap.RECIPIENT_EMAIL || "").trim();
+      const overrideEmail = (process.env.CRIARTE_RSVP_EMAIL_OVERRIDE || "").trim();
+      const detectedEmail = overrideEmail || envEmail;
+      const cadastrado = site.email_destino || "";
+      const divergence = detectedEmail && cadastrado && detectedEmail !== cadastrado;
+
       console.log(`  ${c.dim}Noivos:${c.reset}          ${site.noivos}`);
       console.log(`  ${c.dim}Data:${c.reset}            ${site.data_evento}`);
-      console.log(`  ${c.dim}Email destino:${c.reset}   ${c.brand}${site.email_destino}${c.reset}`);
       console.log(`  ${c.dim}Login do casal:${c.reset}  ${site.admin_email}`);
       console.log();
+      console.log(`  ${c.bold}→ E-mail destino do RSVP${c.reset}`);
+      console.log(`    ${c.dim}E-mail no projeto (.env):${c.reset} ${detectedEmail ? c.brand + detectedEmail + c.reset : c.dim + "(não detectado)" + c.reset}${overrideEmail ? c.dim + " [via --rsvp-email]" + c.reset : ""}`);
+      console.log(`    ${c.dim}E-mail cadastrado:${c.reset}        ${c.brand}${cadastrado}${c.reset}`);
+      if (divergence) {
+        console.log(`    ${c.yellow}⚠ Divergência detectada.${c.reset}`);
+      }
+      console.log();
+
       const readline = await import("node:readline");
       const ask = createAsk(readline.default);
-      const change = await ask(`Alterar email destino? ${c.dim}(Enter=manter ${site.email_destino}, ou digite novo email)${c.reset}: `);
-      if (change.trim() && change.includes("@")) {
-        const sp3 = new Spinner("Atualizando RSVP no servidor...").start();
-        const r = await updateRsvpSite(config, fullSlug, { emailDestino: change.trim() }, targetUrl);
-        if (r.ok) sp3.succeed(`Email destino atualizado para ${c.brand}${change.trim()}${c.reset}`);
+      let escolha;
+      if (overrideEmail && overrideEmail !== cadastrado) {
+        escolha = overrideEmail;
+        info(`${c.dim}Usando ${c.brand}${overrideEmail}${c.reset}${c.dim} (forçado via --rsvp-email)${c.reset}`);
+      } else if (divergence) {
+        const ans = await ask(`    ${c.bold}Qual usar?${c.reset} ${c.dim}[C=cadastrado / P=projeto / novo-email]${c.reset} → `);
+        const t = ans.trim().toLowerCase();
+        if (t === "p" || t === "projeto") escolha = detectedEmail;
+        else if (ans.trim().includes("@")) escolha = ans.trim();
+        else escolha = cadastrado;
+      } else {
+        const ans = await ask(`    ${c.bold}Manter ${c.brand}${cadastrado}${c.reset}${c.bold}?${c.reset} ${c.dim}[Y/n/novo-email]${c.reset} → `);
+        const t = ans.trim();
+        if (t && t.includes("@")) escolha = t;
+        else escolha = cadastrado;
+      }
+
+      if (escolha !== cadastrado) {
+        const sp3 = new Spinner(`Atualizando email destino → ${escolha}...`).start();
+        const r = await updateRsvpSite(config, fullSlug, { emailDestino: escolha }, targetUrl);
+        if (r.ok) sp3.succeed(`Email destino atualizado para ${c.brand}${escolha}${c.reset}`);
         else sp3.fail(`Falha ao atualizar: ${r.error || "HTTP " + r.status}`);
       } else {
-        info(`${c.dim}Mantendo email destino: ${c.brand}${site.email_destino}${c.reset}`);
+        info(`${c.dim}Mantendo email destino: ${c.brand}${cadastrado}${c.reset}`);
       }
     }
 

@@ -1145,7 +1145,13 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy")}                          ${dim("publica o site da pasta atual")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("<categoria> <nome>")}        ${dim("sem perguntas (modo headless)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --subdomain <dom>")}     ${dim("aponta subdomínio personalizado")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --category <cat> --slug <s>")} ${dim("explícito (CI/headless)")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --dry-run")}             ${dim("simula tudo, nada vai pra VPS")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --validate-only")}       ${dim("só valida o projeto e sai")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-upload")}         ${dim("pula R2, envia tudo direto pra VPS")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --verbose")}             ${dim("mostra stack trace em erros")}`);
   console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
+  console.log(`  ${cmd("criarte-deploy locks")}                     ${dim("lista/libera locks de deploy")}`);
 
   section("💌 RSVP (casamentos com painel admin)");
   console.log(`  ${cmd("criarte-deploy rsvp-setup")} ${dim("[slug]")}            ${dim("registra um casamento no servidor")}`);
@@ -1938,16 +1944,37 @@ async function cmdDirectDeploy(argv) {
   screen.phase("📦 Publicar site (upload direto)", "VPS: " + targetUrl);
 
   let noWait = argv.includes("--no-wait");
+  const dryRun = argv.includes("--dry-run");
+  const validateOnly = argv.includes("--validate-only");
+  const skipUpload = argv.includes("--skip-upload");
+  const verbose = argv.includes("--verbose") || argv.includes("-v");
+  if (verbose) process.env.DEBUG = "1";
 
-  // Extrai flags
-  let subdomain = null;
-  const subIdx = argv.indexOf("--subdomain");
-  if (subIdx >= 0) {
-    subdomain = argv[subIdx + 1] || null;
-    if (subdomain && (subdomain.startsWith("--") || subdomain.startsWith("-"))) subdomain = null;
-    argv.splice(subIdx, subdomain ? 2 : 1);
+  // Extrai flags com valor (consomem 2 args)
+  function takeFlag(name) {
+    const i = argv.indexOf(name);
+    if (i < 0) return null;
+    const v = argv[i + 1];
+    if (!v || v.startsWith("-")) { argv.splice(i, 1); return null; }
+    argv.splice(i, 2);
+    return v;
   }
-  argv = argv.filter((a) => !a.startsWith("--"));
+  let subdomain = takeFlag("--subdomain");
+  const flagCategory = takeFlag("--category");
+  const flagSlug = takeFlag("--slug");
+  const flagDomain = takeFlag("--domain");
+  const flagRsvpEmail = takeFlag("--rsvp-email");
+
+  argv = argv.filter((a) => !a.startsWith("--") && !(a === "-v"));
+
+  if (flagCategory) argv.unshift(flagSlug ? `${flagCategory}/${flagSlug}` : flagCategory);
+  else if (flagSlug && !argv.length) argv.push(flagSlug);
+
+  if (flagDomain && flagDomain !== DEPLOY_DOMAIN) {
+    warn(`--domain ${flagDomain} ignorado — domínio fixo é ${DEPLOY_DOMAIN}.`);
+  }
+  if (flagRsvpEmail) process.env.CRIARTE_RSVP_EMAIL_OVERRIDE = flagRsvpEmail;
+  if (dryRun || validateOnly) noWait = true;
 
   const cwd = process.cwd();
   let [rawCategory, rawSlug] = argv;
@@ -2161,8 +2188,19 @@ async function cmdDirectDeploy(argv) {
     }
   }
 
+  // ====== Validate-only: para aqui, antes de qualquer side effect remoto ======
+  if (validateOnly) {
+    finalizeManifest(manifest, { status: "success" });
+    manifest.notes.push({ level: "info", message: "validate-only: nada foi enviado" });
+    const mPath = saveManifest(manifest);
+    rmSync(stagingDir, { recursive: true, force: true });
+    ok("Projeto validado. Nada enviado (--validate-only).");
+    printSummary(manifest, { manifestPath: mPath });
+    return;
+  }
+
   // ====== Upload de assets pesados pro R2 ======
-  if (config.r2 && isNextSource) {
+  if (config.r2 && isNextSource && !skipUpload) {
     try {
       const r2Result = await uploadAssetsToR2(stagingDir, category, slug, config.r2);
       manifest.r2.prefix = `${category}/${slug}/`;
@@ -2192,6 +2230,21 @@ async function cmdDirectDeploy(argv) {
   } else if (!config.r2 && isNextSource) {
     console.log();
     info(`${c.dim}R2 não configurado — assets vão pra VPS. Rode ${c.cyan}criarte-deploy r2-setup${c.reset}${c.dim} pra ativar.${c.reset}`);
+  }
+
+  // ====== Dry-run: para antes de enviar pra VPS ======
+  if (dryRun) {
+    finalizeManifest(manifest, { status: "success" });
+    manifest.notes.push({ level: "info", message: "dry-run: site não foi enviado pra VPS" });
+    const mPath = saveManifest(manifest);
+    rmSync(stagingDir, { recursive: true, force: true });
+    ok("Dry-run concluído. Nada enviado pra VPS (--dry-run).");
+    printSummary(manifest, { manifestPath: mPath });
+    return;
+  }
+
+  if (skipUpload) {
+    info("--skip-upload: enviando staging direto sem passar pelo R2.");
   }
 
   // ====== Envio: rsync (preferido se configurado) ou zip+HTTP ======

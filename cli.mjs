@@ -25,7 +25,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.9.0";
+const VERSION = "3.10.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -156,6 +156,41 @@ function section(label, sub) {
 function linkify(url, color = c.cyan) {
   if (!process.stdout.isTTY) return url;
   return `\x1b]8;;${url}\x1b\\${color}${url}${c.reset}\x1b]8;;\x1b\\`;
+}
+
+// Abre URL no navegador padrão do SO. Best-effort; silenciosa se falhar.
+function openInBrowser(url) {
+  const cmd = process.platform === "darwin" ? "open"
+            : process.platform === "win32" ? "start \"\""
+            : "xdg-open";
+  try {
+    execSync(`${cmd} "${url.replace(/"/g, "\\\"")}"`, { stdio: "ignore", timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Espera Enter (sem precisar digitar nada). Ctrl+C ou outro char = cancela.
+// Resolve true se Enter, false caso contrário. Não bloqueia em non-TTY.
+function waitForEnter(promptText) {
+  if (!process.stdin.isTTY) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    process.stdout.write(promptText);
+    const stdin = process.stdin;
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+    const onData = (key) => {
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdin.removeListener("data", onData);
+      process.stdout.write("\n");
+      if (key === "\r" || key === "\n") resolve(true);
+      else resolve(false); // Ctrl+C (\u0003), Esc, qualquer outra tecla
+    };
+    stdin.on("data", onData);
+  });
 }
 
 function showBanner() {
@@ -388,6 +423,48 @@ function walkSource(dir, cb, base = dir) {
     if (st.isDirectory()) walkSource(p, cb, base);
     else cb(p, relative(base, p));
   }
+}
+
+// ============================================================================
+// TYPECHECK — roda `tsc --noEmit` localmente pra pegar typos/erros de tipo
+// ANTES de mandar o zip pra VPS. Evita round-trip de ~4min pra descobrir
+// um className="x"m> ou import errado.
+// ============================================================================
+function runTypecheck(cwd, { timeoutMs = 90_000 } = {}) {
+  const tsconfig = join(cwd, "tsconfig.json");
+  if (!existsSync(tsconfig)) {
+    return { skipped: true, reason: "sem tsconfig.json (projeto sem TypeScript)" };
+  }
+  const tscBin = join(cwd, "node_modules", ".bin", "tsc");
+  if (!existsSync(tscBin)) {
+    return {
+      skipped: true,
+      reason: "node_modules não instalado",
+      hint: "rode `npm install` na pasta do site pra ativar o typecheck",
+    };
+  }
+  try {
+    execSync(`"${tscBin}" --noEmit --pretty false`, {
+      cwd, stdio: "pipe", timeout: timeoutMs,
+    });
+    return { ok: true };
+  } catch (e) {
+    if (e.code === "ETIMEDOUT" || /timeout/i.test(String(e.message))) {
+      return { ok: false, timedOut: true, output: `tsc demorou mais que ${timeoutMs/1000}s` };
+    }
+    const stdout = e.stdout ? e.stdout.toString() : "";
+    const stderr = e.stderr ? e.stderr.toString() : "";
+    const output = (stdout + stderr).trim() || e.message;
+    return { ok: false, output };
+  }
+}
+
+function printTypecheckErrors(output) {
+  // Mostra só as primeiras ~20 linhas com erro pra não inundar o terminal
+  const lines = output.split(/\r?\n/).filter(Boolean);
+  const head = lines.slice(0, 25);
+  for (const ln of head) console.log(`  ${c.dim}│${c.reset} ${ln}`);
+  if (lines.length > 25) console.log(`  ${c.dim}│ … (+${lines.length - 25} linhas)${c.reset}`);
 }
 
 async function preflightChecks(cwd, category, slug) {
@@ -1124,7 +1201,25 @@ async function cmdCheck() {
   const issues = await preflightChecks(cwd, "categoria", "slug");
   sp.succeed("Análise concluída");
   const result = await renderIssues(issues, cwd, "categoria", "slug");
+
+  // Typecheck só faz sentido se a estrutura do site tá OK
   if (result.canDeploy) {
+    const spTc = new Spinner("Verificando tipos (tsc --noEmit)…").start();
+    const tc = runTypecheck(cwd);
+    if (tc.skipped) {
+      spTc.clear();
+      warn(`Typecheck pulado: ${tc.reason}`);
+      if (tc.hint) info(`${c.dim}${tc.hint}${c.reset}`);
+    } else if (tc.ok) {
+      spTc.succeed("Tipos OK");
+    } else {
+      spTc.fail(tc.timedOut ? "Typecheck demorou demais" : "Tipos inválidos — build vai falhar na VPS");
+      console.log();
+      printTypecheckErrors(tc.output);
+      console.log();
+      err("Corrija os erros acima antes de rodar `criarte-deploy`.");
+      process.exit(1);
+    }
     ok("Site tá pronto pra publicar.");
     info(`Rode ${c.cyan}criarte-deploy${c.reset} pra subir.`);
   } else {
@@ -1149,6 +1244,7 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --dry-run")}             ${dim("simula tudo, nada vai pra VPS")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --validate-only")}       ${dim("só valida o projeto e sai")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-upload")}         ${dim("pula R2, envia tudo direto pra VPS")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-typecheck")}      ${dim("ignora erros de tipo (não recomendado)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --verbose")}             ${dim("mostra stack trace em erros")}`);
   console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
   console.log(`  ${cmd("criarte-deploy locks")}                     ${dim("lista/libera locks de deploy")}`);
@@ -1954,6 +2050,7 @@ async function cmdDirectDeploy(argv) {
   const dryRun = argv.includes("--dry-run");
   const validateOnly = argv.includes("--validate-only");
   const skipUpload = argv.includes("--skip-upload");
+  const skipTypecheck = argv.includes("--skip-typecheck");
   const verbose = argv.includes("--verbose") || argv.includes("-v");
   if (verbose) process.env.DEBUG = "1";
 
@@ -2081,6 +2178,29 @@ async function cmdDirectDeploy(argv) {
     console.log("[debug] package.json não encontrado em:", pkgPath);
   }
   if (isNextSource) info("Projeto Next.js detectado — build será feito na VPS");
+
+  // Typecheck local — pega typos/erros de tipo ANTES de subir pra VPS
+  if (isNextSource && !skipTypecheck && !dryRun) {
+    const spTc = new Spinner("Verificando tipos (tsc --noEmit)…").start();
+    const tc = runTypecheck(cwd);
+    if (tc.skipped) {
+      spTc.update(`Typecheck pulado: ${tc.reason}`);
+      spTc.clear();
+      warn(`Typecheck pulado: ${tc.reason}`);
+      if (tc.hint) info(`${c.dim}${tc.hint}${c.reset}`);
+    } else if (tc.ok) {
+      spTc.succeed("Tipos OK");
+    } else {
+      spTc.fail(tc.timedOut ? "Typecheck demorou demais" : "Tipos inválidos — build vai falhar na VPS");
+      console.log();
+      printTypecheckErrors(tc.output);
+      console.log();
+      err("Corrija os erros acima e rode de novo.");
+      info(`${c.dim}Pra forçar deploy mesmo assim: ${c.cyan}--skip-typecheck${c.reset}`);
+      process.exit(1);
+    }
+  }
+
   const publicDir = join(cwd, "public");
   const outDir = join(cwd, "out");
   const buildDir = isNextSource ? cwd : (existsSync(outDir) ? outDir : (existsSync(publicDir) ? publicDir : cwd));
@@ -2351,7 +2471,7 @@ async function cmdDirectDeploy(argv) {
 
     // Mostra resultado
     if (!noWait) {
-      screen.phase("🎉 Site no ar!", fullSlug);
+      screen.phase("⏳ Falta bem pouco", fullSlug);
       if (isNextSource && result.buildId) {
         // Poll build status
         const statusUrl = `${targetUrl}/api/builds/status?buildId=${result.buildId}`;
@@ -2403,8 +2523,21 @@ async function cmdDirectDeploy(argv) {
             liveSp.update(`Aguardando 200 OK ${c.dim}(último: ${lastCode || "-"}, ${Math.round((Date.now()-startLive)/1000)}s)${c.reset}`);
             await new Promise(r => setTimeout(r, 2000));
           }
-          if (liveOk) liveSp.succeed(`Site respondendo 200 OK em ${Math.round((Date.now()-startLive)/1000)}s`);
-          else liveSp.warn(`Site ainda não respondeu 200 (último: ${lastCode}). Pode ser cache da Cloudflare — tente em 1min.`);
+          if (liveOk) {
+            liveSp.succeed(`Site respondendo 200 OK em ${Math.round((Date.now()-startLive)/1000)}s`);
+            screen.phase("🎉 Site no ar!", fullSlug);
+            const openUrl = subdomainUrl || liveUrl;
+            console.log(`🌐 ${linkify(openUrl, c.bold + c.cyan)}`);
+            const open = await waitForEnter(
+              `${c.dim}Enter pra abrir no navegador · qualquer outra tecla pra pular${c.reset} `
+            );
+            if (open) {
+              const ok = openInBrowser(openUrl);
+              if (!ok) warn("Não consegui abrir o navegador automaticamente — copia o link acima.");
+            }
+          } else {
+            liveSp.warn(`Site ainda não respondeu 200 (último: ${lastCode}). Pode ser cache da Cloudflare — tente em 1min.`);
+          }
           manifest.healthChecks.push({ label: "site", url: liveUrl, status: lastCode, ok: liveOk });
         }
 

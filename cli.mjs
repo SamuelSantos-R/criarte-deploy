@@ -8,6 +8,7 @@ import {
   existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync,
   rmSync, cpSync, readdirSync, statSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { join, basename, relative, extname } from "node:path";
 import readline from "node:readline";
@@ -1777,27 +1778,31 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
     const publicAssetUrl = `${r2Config.publicUrl}/${key}`;
     const mb = (sz / 1024 / 1024).toFixed(2);
 
-    // Verifica se já está lá (skip pra ser idempotente)
-    let exists = false;
+    // Idempotência por conteúdo: compara ETag (MD5) do R2 com hash local.
+    // Se o arquivo mudou (mesmo nome), reupa. Se for idêntico, pula.
+    const body = readFileSync(localPath);
+    const localMd5 = createHash("md5").update(body).digest("hex");
+    let remoteEtag = null;
     try {
-      await s3.send(new HeadObjectCommand({ Bucket: r2Config.bucket, Key: key }));
-      exists = true;
+      const head = await s3.send(new HeadObjectCommand({ Bucket: r2Config.bucket, Key: key }));
+      remoteEtag = (head.ETag || "").replace(/^"|"$/g, "");
     } catch {}
 
-    if (exists) {
-      process.stdout.write(`  ${c.dim}↻${c.reset} ${publicRelPath} ${c.dim}(${mb}MB — já existe)${c.reset}\n`);
+    if (remoteEtag && remoteEtag === localMd5) {
+      process.stdout.write(`  ${c.dim}↻${c.reset} ${publicRelPath} ${c.dim}(${mb}MB — idêntico)${c.reset}\n`);
       remoteMap.set(publicRelPath, publicAssetUrl);
       skipped++;
       skippedList.push({ path: publicRelPath, key, url: publicAssetUrl, sizeBytes: sz });
       continue;
     }
 
-    const sp = new Spinner(`Subindo ${publicRelPath} (${mb}MB) ${c.dim}[${i + 1}/${candidates.length}]${c.reset}`).start();
+    const action = remoteEtag ? "Substituindo" : "Subindo";
+    const sp = new Spinner(`${action} ${publicRelPath} (${mb}MB) ${c.dim}[${i + 1}/${candidates.length}]${c.reset}`).start();
     try {
       await s3.send(new PutObjectCommand({
         Bucket: r2Config.bucket,
         Key: key,
-        Body: readFileSync(localPath),
+        Body: body,
         ContentType: getMimeType(localPath),
         CacheControl: "public, max-age=31536000, immutable",
       }));

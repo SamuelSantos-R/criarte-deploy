@@ -26,7 +26,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.10.1";
+const VERSION = "3.10.2";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1778,26 +1778,10 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
     const publicAssetUrl = `${r2Config.publicUrl}/${key}`;
     const mb = (sz / 1024 / 1024).toFixed(2);
 
-    // Idempotência por conteúdo: compara ETag (MD5) do R2 com hash local.
-    // Se o arquivo mudou (mesmo nome), reupa. Se for idêntico, pula.
+    // Sempre reupa: PUT sobrescreve. Garante que o R2 sempre reflete o local,
+    // sem depender de comparação de hash (que falhava se algo cacheasse o ETag).
     const body = readFileSync(localPath);
-    const localMd5 = createHash("md5").update(body).digest("hex");
-    let remoteEtag = null;
-    try {
-      const head = await s3.send(new HeadObjectCommand({ Bucket: r2Config.bucket, Key: key }));
-      remoteEtag = (head.ETag || "").replace(/^"|"$/g, "");
-    } catch {}
-
-    if (remoteEtag && remoteEtag === localMd5) {
-      process.stdout.write(`  ${c.dim}↻${c.reset} ${publicRelPath} ${c.dim}(${mb}MB — idêntico)${c.reset}\n`);
-      remoteMap.set(publicRelPath, publicAssetUrl);
-      skipped++;
-      skippedList.push({ path: publicRelPath, key, url: publicAssetUrl, sizeBytes: sz });
-      continue;
-    }
-
-    const action = remoteEtag ? "Substituindo" : "Subindo";
-    const sp = new Spinner(`${action} ${publicRelPath} (${mb}MB) ${c.dim}[${i + 1}/${candidates.length}]${c.reset}`).start();
+    const sp = new Spinner(`Subindo ${publicRelPath} (${mb}MB) ${c.dim}[${i + 1}/${candidates.length}]${c.reset}`).start();
     try {
       await s3.send(new PutObjectCommand({
         Bucket: r2Config.bucket,

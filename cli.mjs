@@ -26,7 +26,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.10.2";
+const VERSION = "3.10.3";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1778,9 +1778,13 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
     const publicAssetUrl = `${r2Config.publicUrl}/${key}`;
     const mb = (sz / 1024 / 1024).toFixed(2);
 
-    // Sempre reupa: PUT sobrescreve. Garante que o R2 sempre reflete o local,
-    // sem depender de comparação de hash (que falhava se algo cacheasse o ETag).
+    // Sempre reupa: PUT sobrescreve. Garante que o R2 sempre reflete o local.
+    // Cache-bust por hash: a URL pública carrega ?v=<md5_curto> — quando o
+    // arquivo muda, a query muda e a CDN/browser baixa a versão nova
+    // automaticamente, sem precisar de purge.
     const body = readFileSync(localPath);
+    const versionHash = createHash("md5").update(body).digest("hex").slice(0, 8);
+    const versionedUrl = `${publicAssetUrl}?v=${versionHash}`;
     const sp = new Spinner(`Subindo ${publicRelPath} (${mb}MB) ${c.dim}[${i + 1}/${candidates.length}]${c.reset}`).start();
     try {
       await s3.send(new PutObjectCommand({
@@ -1791,10 +1795,10 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
         CacheControl: "public, max-age=31536000, immutable",
       }));
       sp.succeed(`${publicRelPath} ${c.dim}(${mb}MB)${c.reset}`);
-      remoteMap.set(publicRelPath, publicAssetUrl);
+      remoteMap.set(publicRelPath, versionedUrl);
       uploaded++;
       totalBytes += sz;
-      uploadedList.push({ path: publicRelPath, key, url: publicAssetUrl, sizeBytes: sz });
+      uploadedList.push({ path: publicRelPath, key, url: versionedUrl, sizeBytes: sz });
     } catch (e) {
       sp.fail(`Falha em ${publicRelPath}: ${e.message}`);
       failedList.push({ path: publicRelPath, key, error: e.message, sizeBytes: sz });

@@ -26,7 +26,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.10.0";
+const VERSION = "3.10.1";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.

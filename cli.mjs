@@ -26,7 +26,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.10.3";
+const VERSION = "3.11.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1245,6 +1245,7 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --dry-run")}             ${dim("simula tudo, nada vai pra VPS")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --validate-only")}       ${dim("só valida o projeto e sai")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-upload")}         ${dim("pula R2, envia tudo direto pra VPS")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --guests-file <t.txt>")}  ${dim("convite-token: gera tokens da lista de convidados")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-typecheck")}      ${dim("ignora erros de tipo (não recomendado)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --verbose")}             ${dim("mostra stack trace em erros")}`);
   console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
@@ -2061,6 +2062,7 @@ async function cmdDirectDeploy(argv) {
   const flagSlug = takeFlag("--slug");
   const flagDomain = takeFlag("--domain");
   const flagRsvpEmail = takeFlag("--rsvp-email");
+  const flagGuestsFile = takeFlag("--guests-file");
 
   argv = argv.filter((a) => !a.startsWith("--") && !(a === "-v"));
 
@@ -2071,6 +2073,7 @@ async function cmdDirectDeploy(argv) {
     warn(`--domain ${flagDomain} ignorado — domínio fixo é ${DEPLOY_DOMAIN}.`);
   }
   if (flagRsvpEmail) process.env.CRIARTE_RSVP_EMAIL_OVERRIDE = flagRsvpEmail;
+  if (flagGuestsFile) process.env.CRIARTE_GUESTS_FILE = flagGuestsFile;
   if (dryRun || validateOnly) noWait = true;
 
   const cwd = process.cwd();
@@ -2718,10 +2721,25 @@ async function handleRsvpBase(stagingDir, fullSlug, config, _targetUrl) {
     } else {
       const setup = await ask(`${c.bold}Registrar RSVP no servidor agora?${c.reset} ${c.dim}(Enter=sim, N=pular)${c.reset}: `);
       if (setup.toLowerCase() !== "n" && setup.toLowerCase() !== "nao") {
+        // Mostra dados detectados do .env.local e deixa o usuário ajustar antes de provisionar.
+        const defaultEmail = process.env.CRIARTE_RSVP_EMAIL_OVERRIDE || envMap.EMAIL_DESTINO || "";
+        const defaultNoivos = envMap.NEXT_PUBLIC_NOIVOS || "";
+        const defaultData = envMap.NEXT_PUBLIC_DATA_EVENTO || "";
+        console.log();
+        console.log(`  ${c.dim}Detectado no .env.local:${c.reset}`);
+        console.log(`  ${c.dim}Noivos:${c.reset}        ${defaultNoivos || c.dim + "(vazio)" + c.reset}`);
+        console.log(`  ${c.dim}Data:${c.reset}          ${defaultData || c.dim + "(vazio)" + c.reset}`);
+        console.log(`  ${c.dim}Email destino:${c.reset} ${defaultEmail ? c.brand + defaultEmail + c.reset : c.dim + "(vazio)" + c.reset}`);
+        console.log();
+        const emailInput = await ask(`Email destino ${c.dim}(Enter=${defaultEmail || "deixar vazio"}, ou digite outro)${c.reset}: `);
+        const emailDestino = emailInput.trim() && emailInput.includes("@") ? emailInput.trim() : defaultEmail;
+        if (!emailDestino) {
+          warn("Email destino vazio — o casal não vai receber notificações de confirmação. Configure depois com rsvp-setup.");
+        }
         console.log();
         const sp2 = new Spinner("Registrando casamento no servidor...").start();
-        const r = await provisionRsvpSite(config, fullSlug, envMap);
-        if (r.ok) sp2.succeed(`Casamento registrado em ${c.bold}${fullSlug}${c.reset}`);
+        const r = await provisionRsvpSite(config, fullSlug, envMap, { emailDestino });
+        if (r.ok) sp2.succeed(`Casamento registrado em ${c.bold}${fullSlug}${c.reset} ${c.dim}(email: ${emailDestino || "vazio"})${c.reset}`);
         else if (r.slug_existe) sp2.warn(`Casamento já estava registrado (${c.dim}ok${c.reset})`);
         else sp2.fail(`Falha ao registrar: ${r.error || "HTTP " + r.status}`);
       } else {

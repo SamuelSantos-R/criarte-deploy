@@ -1,6 +1,7 @@
 // ============================================================================
 // ADAPTER REGISTRY — Detecta qual base está sendo usada e retorna o adapter
 // ============================================================================
+import { ConviteTokenAdapter } from "./convite-token.mjs";
 import { CasamentoAdapter } from "./casamento.mjs";
 import { RsvpAdapter } from "./rsvp.mjs";
 import { GenericoAdapter } from "./generico.mjs";
@@ -8,8 +9,10 @@ import { BaseAdapter } from "./base.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// Ordem de detecção: configuração explícita primeiro, depois heurísticas
+// Ordem de detecção: configuração explícita primeiro, depois heurísticas.
+// convite-token ANTES de casamento — casamento captura qualquer projeto Next.
 const adapters = [
+  new ConviteTokenAdapter(),
   new RsvpAdapter(),
   new CasamentoAdapter(),
   new GenericoAdapter(),
@@ -44,5 +47,5 @@ export function detectAdapter(stagingDir) {
   return new BaseAdapter();
 }
 
-export { BaseAdapter, CasamentoAdapter, RsvpAdapter, GenericoAdapter };
+export { BaseAdapter, ConviteTokenAdapter, CasamentoAdapter, RsvpAdapter, GenericoAdapter };
 export default adapters;

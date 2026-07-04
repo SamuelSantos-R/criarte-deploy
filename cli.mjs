@@ -26,7 +26,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.11.0";
+const VERSION = "3.11.1";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1906,8 +1906,13 @@ async function cmdRemove(argv) {
     process.exit(1);
   }
   const slug = argSlug.toLowerCase().replace(/^\/+|\/+$/g, "");
-  if (!/^[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(slug)) {
+  // Exige categoria/nome (≥2 segmentos). Slug de segmento único (ex.: "casamento")
+  // apagaria a categoria inteira no servidor — footgun, recusa aqui também.
+  if (!/^[a-z0-9-]+\/[a-z0-9-]+(\/[a-z0-9-]+)*$/.test(slug)) {
     err(`Slug inválido: ${slug}`);
+    if (!slug.includes("/")) {
+      err(`Use ${c.bold}categoria/nome${c.reset} (ex.: casamento/joao-maria). Segmento único apagaria a categoria toda.`);
+    }
     process.exit(1);
   }
 

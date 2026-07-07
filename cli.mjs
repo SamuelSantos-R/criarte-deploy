@@ -26,7 +26,7 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.11.1";
+const VERSION = "3.12.0";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.
@@ -1245,7 +1245,8 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --dry-run")}             ${dim("simula tudo, nada vai pra VPS")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --validate-only")}       ${dim("só valida o projeto e sai")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-upload")}         ${dim("pula R2, envia tudo direto pra VPS")}`);
-  console.log(`  ${cmd("criarte-deploy")} ${dim("... --guests-file <t.txt>")}  ${dim("convite-token: gera tokens da lista de convidados")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --guests-file <t.txt>")}  ${dim("convite-token: merge da lista (mantém tokens já enviados)")}`);
+  console.log(`  ${cmd("criarte-deploy")} ${dim("... --guests-reset")}         ${dim("convite-token: regenera TODOS os tokens (quebra links antigos)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-typecheck")}      ${dim("ignora erros de tipo (não recomendado)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --verbose")}             ${dim("mostra stack trace em erros")}`);
   console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
@@ -2049,6 +2050,7 @@ async function cmdDirectDeploy(argv) {
   const dryRun = argv.includes("--dry-run");
   const validateOnly = argv.includes("--validate-only");
   const skipUpload = argv.includes("--skip-upload");
+  const guestsReset = argv.includes("--guests-reset");
   const skipTypecheck = argv.includes("--skip-typecheck");
   const verbose = argv.includes("--verbose") || argv.includes("-v");
   if (verbose) process.env.DEBUG = "1";
@@ -2079,6 +2081,7 @@ async function cmdDirectDeploy(argv) {
   }
   if (flagRsvpEmail) process.env.CRIARTE_RSVP_EMAIL_OVERRIDE = flagRsvpEmail;
   if (flagGuestsFile) process.env.CRIARTE_GUESTS_FILE = flagGuestsFile;
+  if (guestsReset) process.env.CRIARTE_GUESTS_RESET = "1";
   if (dryRun || validateOnly) noWait = true;
 
   const cwd = process.cwd();

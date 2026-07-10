@@ -2,14 +2,18 @@
 // CONFIG — Constantes, cores e helpers globais do Criarte Deploy CLI
 // ============================================================================
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 export const REPO = "SamuelSantos-R/multisite-system";
 export const DEPLOY_DOMAIN = "https://criartedesing.ao";
 export const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 export const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 export const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-export const VERSION = "3.9.0";
+// Fonte única de versão: package.json
+const PKG_PATH = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
+export const VERSION = JSON.parse(readFileSync(PKG_PATH, "utf8")).version;
 
 export const c = {
   reset: "\x1b[0m",      bold: "\x1b[1m",      dim: "\x1b[2m",

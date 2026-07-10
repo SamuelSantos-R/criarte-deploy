@@ -15,6 +15,7 @@ import readline from "node:readline";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
+import { VERSION } from "./src/lib/config.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -26,7 +27,6 @@ const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
-const VERSION = "3.12.1";
 
 // Best-effort: registra o deploy no painel pra alimentar a aba Fila do app iOS.
 // Não bloqueia o fluxo se falhar — é só telemetria pro app.

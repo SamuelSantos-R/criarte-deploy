@@ -94,12 +94,22 @@ export class ConviteTokenAdapter extends BaseAdapter {
     }
 
     // 2) Lê o .txt: nomes soltos (add) + diretivas `Antigo => Novo` (rename)
-    let adds, renames;
+    let adds, renames, linkLines;
     try {
-      ({ adds, renames } = parseGuestList(readFileSync(guestFile, "utf8")));
+      ({ adds, renames, linkLines } = parseGuestList(readFileSync(guestFile, "utf8")));
     } catch (e) {
       err(`Falha ao ler ${guestFile}: ${e.message}`);
       return false;
+    }
+    // Guarda-corpo: se o arquivo apontado é na real um `-links.txt` (ou similar),
+    // aborta em vez de gerar tokens novos com URLs no lugar dos nomes.
+    if (linkLines.length > 0 && linkLines.length >= adds.length) {
+      err(`${guestFile} parece ser um arquivo de LINKS, não uma lista de convidados (${linkLines.length} linha(s) com URL/token).`);
+      info(`A lista de convidados é um .txt com ${c.bold}um nome por linha${c.reset} (ex.: "João e Maria"). Os links (convidados-<slug>-links.txt) são a SAÍDA, não a entrada.`);
+      return false;
+    }
+    if (linkLines.length > 0) {
+      warn(`${linkLines.length} linha(s) com URL/token ignorada(s) em ${guestFile} — não são nomes de convidado.`);
     }
     if (adds.length === 0 && renames.length === 0 && existingCount === 0) {
       err(`Lista de convidados vazia em ${guestFile}.`);
@@ -212,12 +222,21 @@ function normName(s) {
 }
 
 // Separa nomes soltos (add) de diretivas de rename `Antigo => Novo`.
+// Uma linha é "link" (URL de convite) e não um nome de convidado. Guardar isso
+// como convidado geraria um token novo com a URL inteira no lugar do nome — a
+// corrupção que aconteceu quando um `-links.txt` foi usado como lista.
+function isLinkLine(line) {
+  return /\?t=[A-Za-z0-9]/.test(line) || /^https?:\/\//i.test(line);
+}
+
 function parseGuestList(txt) {
   const adds = [];
   const renames = [];
+  const linkLines = [];
   for (const raw of txt.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
+    if (isLinkLine(line)) { linkLines.push(line); continue; }
     const arrow = line.indexOf("=>");
     if (arrow >= 0) {
       const from = line.slice(0, arrow).trim();
@@ -226,7 +245,7 @@ function parseGuestList(txt) {
     }
     adds.push(line);
   }
-  return { adds, renames };
+  return { adds, renames, linkLines };
 }
 
 // Fonte do estado atual: local primeiro (registro do que foi enviado desta

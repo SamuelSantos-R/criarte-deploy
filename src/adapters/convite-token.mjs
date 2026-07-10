@@ -66,10 +66,18 @@ export class ConviteTokenAdapter extends BaseAdapter {
     const projectDir = process.cwd();
     const reset = /^(1|true|yes)$/i.test(process.env.CRIARTE_GUESTS_RESET || "");
 
-    // Estado atual (token→nome): o registro local `convidados-<slug>-links.txt`
-    // é a fonte primária (o que foi gerado/enviado nesta máquina), com o
-    // guests.json do site no ar como fallback. Em reset, ignora e começa do zero.
-    const existing = reset ? {} : await loadExistingGuests(projectDir, targetUrl, fullSlug);
+    // Estado atual (token→nome): o guests.json PUBLICADO é a fonte da verdade
+    // (é o que os links já enviados usam). Local é só fallback offline.
+    // Em reset, ignora e começa do zero.
+    let existing = {};
+    if (!reset) {
+      const state = await loadExistingGuests(projectDir, targetUrl, fullSlug);
+      existing = state.guests;
+      if (!state.liveOk) {
+        const proceed = await guardLiveUnreachable(_config, fullSlug, Object.keys(existing).length);
+        if (!proceed) return false;
+      }
+    }
     const existingCount = Object.keys(existing).length;
 
     // 1) Resolve o arquivo de convidados (flag → auto-detect → prompt)
@@ -179,16 +187,18 @@ export class ConviteTokenAdapter extends BaseAdapter {
       ));
     }
 
-    // 6) Resumo
+    // 6) Resumo compacto — só contagens + amostra; a lista completa vive nos .txt.
     okLog(`${allRows.length} convidado(s) no total → ${c.bold}public/guests.json${c.reset}`);
     if (reset) {
       warn(`--guests-reset: TODOS os ${allRows.length} tokens foram regenerados — os links antigos deixaram de funcionar.`);
     } else {
       const kept = allRows.length - newRows.length;
-      info(`Merge: ${c.bold}${newRows.length}${c.reset} novo(s), ${c.bold}${renamed.length}${c.reset} renomeado(s), ${c.bold}${kept}${c.reset} preservado(s) (token intacto).`);
+      info(`Merge: ${c.bold}${newRows.length}${c.reset} novo(s) · ${c.bold}${renamed.length}${c.reset} renomeado(s) · ${c.bold}${kept}${c.reset} preservado(s) (token intacto).`);
     }
-    for (const r of renamed) info(`  renomeado: ${c.dim}${r.from}${c.reset} → ${c.bold}${r.to}${c.reset} ${c.dim}(mesmo link)${c.reset}`);
-    for (const m of renameMisses) warn(`  rename "${m} => ..." ignorado: "${m}" não existe no site — o novo nome virou convidado novo (link novo).`);
+    printSample("Novos", newRows.map((r) => r.name));
+    printSample("Renomeados", renamed.map((r) => `${r.from} → ${r.to}`));
+    for (const m of renameMisses.slice(0, 5)) warn(`  rename "${m} => ..." ignorado: "${m}" não existe no site — o novo nome virou convidado novo (link novo).`);
+    if (renameMisses.length > 5) warn(`  … + ${renameMisses.length - 5} rename(s) ignorado(s).`);
     if (rewritten > 0) info(`fetch do guests.json reescrito em ${rewritten} arquivo(s) pro basePath /${fullSlug}/`);
     info(`Lista completa: ${c.brand}${fullPath}${c.reset}`);
     if (novosPath) info(`Só os novos (pra mandar no WhatsApp): ${c.brand}${novosPath}${c.reset}`);
@@ -200,6 +210,15 @@ export class ConviteTokenAdapter extends BaseAdapter {
 // ============================================================================
 // Utilitários
 // ============================================================================
+
+// Amostra compacta: até 8 itens numa linha, resto vira "… + X mais".
+const SAMPLE_MAX = 8;
+function printSample(label, items) {
+  if (items.length === 0) return;
+  const shown = items.slice(0, SAMPLE_MAX).join(" · ");
+  const more = items.length > SAMPLE_MAX ? ` ${c.dim}… + ${items.length - SAMPLE_MAX} mais${c.reset}` : "";
+  info(`  ${label}: ${shown}${more}`);
+}
 
 function genToken() {
   let s = "";
@@ -248,20 +267,80 @@ function parseGuestList(txt) {
   return { adds, renames, linkLines };
 }
 
-// Fonte do estado atual: local primeiro (registro do que foi enviado desta
-// máquina), site no ar como fallback. {} = primeiro deploy → gera do zero.
-async function loadExistingGuests(projectDir, targetUrl, fullSlug) {
+// Fonte do estado atual: SERVIDOR primeiro (guests.json publicado é a verdade —
+// é o que os links já enviados usam). O arquivo local convidados-<slug>-links.txt
+// é só fallback offline: ele fica desatualizado quando outro computador deploya,
+// e confiar nele foi a causa do incidente de convidados duplicados (85→167).
+// Retorna { guests, source: "live"|"local"|"none", liveOk }.
+export async function loadExistingGuests(projectDir, targetUrl, fullSlug) {
   const slug = fullSlug.split("/").pop();
-  const local = loadLocalLinks(projectDir, slug);
-  if (Object.keys(local).length > 0) {
-    info(`Estado atual lido de ${c.brand}convidados-${slug}-links.txt${c.reset} (${Object.keys(local).length} convidado(s)).`);
-    return local;
-  }
   const live = await loadLiveGuests(targetUrl, fullSlug);
-  if (Object.keys(live).length > 0) {
-    info(`Estado atual lido do site no ar (${Object.keys(live).length} convidado(s)).`);
+
+  if (live.ok) {
+    const count = Object.keys(live.guests).length;
+    if (count > 0) {
+      info(`Estado atual lido do ${c.bold}site no ar${c.reset} (${count} convidado(s) com token ativo).`);
+      return { guests: live.guests, source: "live", liveOk: true };
+    }
+    // 404/vazio no servidor = primeiro deploy legítimo (ou prévia sem tokens).
+    const local = loadLocalLinks(projectDir, slug);
+    if (Object.keys(local).length > 0) {
+      warn(`Site no ar não tem guests.json, mas existe ${c.brand}convidados-${slug}-links.txt${c.reset} local (${Object.keys(local).length}). Usando o local.`);
+      return { guests: local, source: "local", liveOk: true };
+    }
+    return { guests: {}, source: "none", liveOk: true };
   }
-  return live;
+
+  // Servidor inacessível (rede/5xx): NÃO dá pra saber o estado real dos tokens.
+  return { guests: loadLocalLinks(projectDir, slug), source: "local", liveOk: false };
+}
+
+// Guard rail do incidente 85→167: se o site JÁ EXISTE no registry mas não deu
+// pra ler o guests.json publicado, prosseguir às cegas pode regenerar tokens já
+// enviados. Interativo → exige confirmação explícita; não-interativo → aborta.
+async function guardLiveUnreachable(config, fullSlug, localCount) {
+  const exists = await slugExistsInRegistry(config, fullSlug);
+  if (exists === false) return true; // site novo confirmado → seguro
+
+  const why = exists === true
+    ? `O site ${c.bold}${fullSlug}${c.reset} JÁ EXISTE no servidor, mas não consegui ler os tokens publicados (guests.json).`
+    : `Não consegui falar com o servidor pra saber se ${c.bold}${fullSlug}${c.reset} já tem tokens publicados.`;
+  err(why);
+  warn(`Prosseguir sem esse estado pode ${c.bold}regenerar tokens já enviados${c.reset} (links em PDFs quebram) — foi assim que convidados duplicaram num deploy passado.`);
+  if (localCount > 0) info(`Estado local disponível: ${localCount} convidado(s) em convidados-*-links.txt (pode estar desatualizado).`);
+
+  if (!process.stdin.isTTY) {
+    err("Modo não-interativo: abortando por segurança. Tente de novo com rede OK ou confirme manualmente num terminal.");
+    return false;
+  }
+  const readline = await import("node:readline");
+  const ask = createAsk(readline.default);
+  const answer = (await ask(`  Digite ${c.bold}CONTINUAR${c.reset} pra prosseguir mesmo assim (qualquer outra coisa aborta) → `)).trim();
+  if (answer !== "CONTINUAR") {
+    err("Deploy abortado — estado dos convidados não confirmado.");
+    return false;
+  }
+  warn("Prosseguindo por sua conta e risco com o estado local.");
+  return true;
+}
+
+// Consulta o registry público do painel. true/false = resposta confiável;
+// null = não deu pra saber (offline).
+export async function slugExistsInRegistry(config, fullSlug) {
+  const base = (config?.panel_url || "").replace(/\/$/, "");
+  if (!base) return null;
+  try {
+    const r = await fetch(`${base}/api/sites/registry?slug=${encodeURIComponent(fullSlug)}`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (typeof data?.exists === "boolean") return data.exists;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // Lê convidados-<slug>-links.txt (linhas "URL?t=TOKEN — Nome") → {token: nome}.
@@ -280,11 +359,12 @@ function loadLocalLinks(projectDir, slug) {
   return out;
 }
 
-// Puxa o guests.json publicado (token→nome). Retorna {} se não houver/erro —
-// primeiro deploy ou site fora do ar caem em geração do zero, sem quebrar.
-async function loadLiveGuests(targetUrl, fullSlug) {
+// Puxa o guests.json publicado (token→nome). Distingue "não existe" (404 =
+// primeiro deploy legítimo, ok:true) de "não deu pra saber" (rede/5xx, ok:false)
+// — colapsar os dois em {} foi o que permitiu regenerar tokens sem querer.
+export async function loadLiveGuests(targetUrl, fullSlug) {
   const domain = (targetUrl || "").replace(/\/$/, "");
-  if (!domain) return {};
+  if (!domain) return { ok: false, guests: {} };
   const base = domain.endsWith(`/${fullSlug}`) ? domain : `${domain}/${fullSlug}`;
   const url = `${base}/guests.json?_=${Date.now()}`;
   try {
@@ -292,12 +372,15 @@ async function loadLiveGuests(targetUrl, fullSlug) {
       signal: AbortSignal.timeout(8000),
       headers: { "Cache-Control": "no-cache" },
     });
-    if (!r.ok) return {};
+    if (r.status === 404) return { ok: true, guests: {} };
+    if (!r.ok) return { ok: false, guests: {} };
     const data = await r.json();
-    if (data && data.guests && typeof data.guests === "object") return { ...data.guests };
-    return {};
+    if (data && data.guests && typeof data.guests === "object") {
+      return { ok: true, guests: { ...data.guests } };
+    }
+    return { ok: true, guests: {} };
   } catch {
-    return {};
+    return { ok: false, guests: {} };
   }
 }
 

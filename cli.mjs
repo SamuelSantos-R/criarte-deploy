@@ -1171,24 +1171,47 @@ async function cmdList() {
   miniHeader("📂 Sites publicados");
   const config = requireLogin();
 
+  // Fonte da verdade é o servidor (mesma do resto do CLI). O antigo
+  // config/sites.json no GitHub ficou pra trás na migração p/ Hetzner.
+  const base = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
   const sp = new Spinner("Buscando lista de sites...").start();
-  const res = await fetch(
-    `https://api.github.com/repos/${REPO}/contents/config/sites.json?ref=main`,
-    { headers: { Authorization: `Bearer ${config.token}`, Accept: "application/vnd.github.v3.raw" } },
-  );
-  if (!res.ok) { sp.fail("Erro ao buscar lista"); process.exit(1); }
-  const sites = await res.json();
+  let sites;
+  try {
+    const res = await fetch(`${base}/api/sites/registry`, {
+      signal: AbortSignal.timeout(15000),
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!res.ok) { sp.fail(`Erro ao buscar lista (HTTP ${res.status})`); process.exit(1); }
+    const data = await res.json();
+    sites = Array.isArray(data?.sites) ? data.sites : [];
+  } catch (e) {
+    sp.fail(`Erro ao buscar lista: ${e.message}`);
+    process.exit(1);
+  }
   sp.succeed(`${sites.length} site(s) publicado(s)`);
 
   if (!sites.length) { info("Nenhum site publicado ainda."); return; }
 
+  // Datas muito no futuro (sentinela 2195-…) = sem expiração real.
+  const now = Date.now();
+  const fmtExpiry = (iso) => {
+    if (!iso) return "";
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) return "";
+    const days = Math.ceil((t - now) / 86400000);
+    if (days > 3650) return "";
+    if (days < 0) return `${c.errFg}expirado${c.reset}`;
+    const label = days === 0 ? "expira hoje" : days === 1 ? "expira amanhã" : `expira em ${days}d`;
+    return `${days < 15 ? c.errFg : c.dim}${label}${c.reset}`;
+  };
+
   const byCat = {};
   for (const s of sites) (byCat[s.category] ||= []).push(s);
-  for (const [cat, items] of Object.entries(byCat)) {
+  for (const [cat, items] of Object.entries(byCat).sort((a, b) => a[0].localeCompare(b[0]))) {
     console.log(`\n${c.bold}${cat}${c.reset} ${c.dim}(${items.length})${c.reset}`);
-    for (const s of items) {
-      const sub = s.subdomain ? ` ${c.green}→${c.reset} ${c.bold}https://${s.subdomain}${c.reset}` : "";
-      console.log(`  ${c.green}●${c.reset} ${s.name.padEnd(28)} ${c.dim}${DEPLOY_DOMAIN}/${s.slug}${c.reset}${sub}`);
+    for (const s of items.sort((a, b) => (a.name || "").localeCompare(b.name || ""))) {
+      const exp = fmtExpiry(s.expires_at);
+      console.log(`  ${c.green}●${c.reset} ${(s.name || s.slug).padEnd(26)} ${c.dim}${DEPLOY_DOMAIN}/${s.slug}${c.reset}${exp ? `  ${exp}` : ""}`);
     }
   }
   console.log();

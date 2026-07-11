@@ -3087,15 +3087,20 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
 // Menu interativo (setinha) — despacha pros comandos já existentes
 // ============================================================================
 async function runMenu() {
-  const action = await mainMenu();
-  switch (action) {
-    case "deploy":  await cmdDirectDeploy([]); break;
-    case "list":    await cmdList();           break;
-    case "remove":  await cmdRemove([]);       break;
-    case "doctor":  await cmdDoctor();         break;
-    case "config":  await runConfigMenu();     break;
-    case "exit":
-    default:        outro("Até já 👋");        break;
+  // Loop: depois de cada ação volta ao menu. Só sai no "Sair" (ou Ctrl+C).
+  // Deploy/remove terminam o processo por conta própria (ações de escrita);
+  // list/doctor/config retornam e caem de volta aqui.
+  while (true) {
+    const action = await mainMenu();
+    switch (action) {
+      case "deploy":  await cmdDirectDeploy([]); break;
+      case "list":    await cmdList();           break;
+      case "remove":  await cmdRemove([]);       break;
+      case "doctor":  await cmdDoctor();         break;
+      case "config":  await runConfigMenu();     break;
+      case "exit":
+      default:        outro("Até já 👋");        return;
+    }
   }
 }
 
@@ -3108,8 +3113,9 @@ async function runConfigMenu() {
     case "resend-setup": await cmdResendSetup();  break;
     case "doctor":       await cmdDoctor();       break;
     case "back":
-    default:             await runMenu();         break;
+    default:             break;
   }
+  // Volta pro menu principal (o loop de runMenu reassume).
 }
 
 // ============================================================================

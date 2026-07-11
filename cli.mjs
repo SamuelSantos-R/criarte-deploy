@@ -17,7 +17,7 @@ import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
 import { VERSION } from "./src/lib/config.mjs";
 import { mainMenu, configMenu } from "./src/ui/menu.mjs";
-import { isInteractive, outro } from "./src/ui/prompts.mjs";
+import { isInteractive, outro, pause } from "./src/ui/prompts.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -3094,9 +3094,9 @@ async function runMenu() {
     const action = await mainMenu();
     switch (action) {
       case "deploy":  await cmdDirectDeploy([]); break;
-      case "list":    await cmdList();           break;
+      case "list":    await cmdList();   await pause(); break;
       case "remove":  await cmdRemove([]);       break;
-      case "doctor":  await cmdDoctor();         break;
+      case "doctor":  await cmdDoctor(); await pause(); break;
       case "config":  await runConfigMenu();     break;
       case "exit":
       default:        outro("Até já 👋");        return;

@@ -64,3 +64,17 @@ export const log = clackLog;
 export function spinner() {
   return clackSpinner();
 }
+
+// Segura o resultado na tela até o usuário apertar Enter, pra não redesenhar o
+// menu por cima da saída (ex: lista de sites) e dar a impressão de que "voltou
+// direto pro menu". Fora de TTY não faz nada.
+export async function pause(message = "Pressione ↵ pra voltar ao menu…") {
+  if (!isInteractive()) return;
+  const { createInterface } = await import("node:readline");
+  process.stdout.write(`\n${c.muted}${message}${c.reset}`);
+  await new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question("", () => { rl.close(); resolve(); });
+  });
+  process.stdout.write("\n");
+}

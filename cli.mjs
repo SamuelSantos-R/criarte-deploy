@@ -16,6 +16,8 @@ import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s
 import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
 import { VERSION } from "./src/lib/config.mjs";
+import { mainMenu, configMenu } from "./src/ui/menu.mjs";
+import { isInteractive, outro } from "./src/ui/prompts.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -3059,6 +3061,35 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
 }
 
 // ============================================================================
+// Menu interativo (setinha) — despacha pros comandos já existentes
+// ============================================================================
+async function runMenu() {
+  const action = await mainMenu();
+  switch (action) {
+    case "deploy":  await cmdDirectDeploy([]); break;
+    case "list":    await cmdList();           break;
+    case "remove":  await cmdRemove([]);       break;
+    case "doctor":  await cmdDoctor();         break;
+    case "config":  await runConfigMenu();     break;
+    case "exit":
+    default:        outro("Até já 👋");        break;
+  }
+}
+
+async function runConfigMenu() {
+  const action = await configMenu();
+  switch (action) {
+    case "login":        await cmdLogin();       break;
+    case "r2-setup":     await cmdR2Setup();      break;
+    case "ssh-setup":    await cmdSshSetup();     break;
+    case "resend-setup": await cmdResendSetup();  break;
+    case "doctor":       await cmdDoctor();       break;
+    case "back":
+    default:             await runMenu();         break;
+  }
+}
+
+// ============================================================================
 // Router
 // ============================================================================
 const [, , cmd, ...rest] = process.argv;
@@ -3094,7 +3125,12 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "help":
       case "--help":
       case "-h":     cmdHelp();          break;
-      case undefined: await cmdDirectDeploy([]); break;
+      case undefined:
+        // Sem comando: em terminal interativo abre o menu de setinha; fora de
+        // TTY (CI/pipe) cai no deploy direto, como antes.
+        if (isInteractive()) { await runMenu(); }
+        else { await cmdDirectDeploy([]); }
+        break;
       default:
         if (cmd && cmd.startsWith("-")) {
           err(`Comando desconhecido: ${cmd}`);

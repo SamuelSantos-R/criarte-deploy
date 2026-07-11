@@ -48,6 +48,14 @@ export async function select(opts) {
   return guard(await clackSelect(opts));
 }
 
+// Igual ao select, mas ESC/cancel NÃO mata o processo: devolve `cancelValue`.
+// Serve pros menus, onde ESC deve "voltar", não "abortar tudo".
+export async function selectBack(opts, cancelValue) {
+  const v = await clackSelect(opts);
+  if (isCancel(v)) return cancelValue;
+  return v;
+}
+
 export async function confirm(message, initialValue = true) {
   return guard(await clackConfirm({ message, initialValue }));
 }
@@ -68,13 +76,13 @@ export function spinner() {
 // Segura o resultado na tela até o usuário apertar Enter, pra não redesenhar o
 // menu por cima da saída (ex: lista de sites) e dar a impressão de que "voltou
 // direto pro menu". Fora de TTY não faz nada.
-export async function pause(message = "Pressione ↵ pra voltar ao menu…") {
+// Reaproveita o mesmo caminho de input do clack (confiável), em vez de readline
+// solto depois do clack (que trava nesse fluxo). Enter OU ESC voltam pro menu.
+export async function pause(message = "Pronto — dá uma olhada acima") {
   if (!isInteractive()) return;
-  const { createInterface } = await import("node:readline");
-  process.stdout.write(`\n${c.muted}${message}${c.reset}`);
-  await new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question("", () => { rl.close(); resolve(); });
+  await clackSelect({
+    message,
+    options: [{ value: "ok", label: "↵ Voltar ao menu" }],
+    initialValue: "ok",
   });
-  process.stdout.write("\n");
 }

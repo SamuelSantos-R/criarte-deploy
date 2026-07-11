@@ -7,14 +7,15 @@
 // "config" | "exit".
 // ============================================================================
 import { basename } from "node:path";
-import { intro, select } from "./prompts.mjs";
+import { intro, selectBack } from "./prompts.mjs";
 import { c } from "../lib/config.mjs";
 
 export async function mainMenu() {
   intro();
   const folder = basename(process.cwd());
-  const action = await select({
-    message: "O que vamos fazer?",
+  // ESC no menu principal = sair limpo (mesmo que escolher "Sair").
+  const action = await selectBack({
+    message: `O que vamos fazer? ${c.dim}(ESC pra sair)${c.reset}`,
     options: [
       { value: "deploy", label: "Fazer deploy desta pasta", hint: folder },
       { value: "list", label: "Listar sites no ar" },
@@ -24,14 +25,15 @@ export async function mainMenu() {
       { value: "exit", label: "Sair" },
     ],
     initialValue: "deploy",
-  });
+  }, "exit");
   return action;
 }
 
 // Submenu de configurações — retorna a ação de setup escolhida.
 export async function configMenu() {
-  const action = await select({
-    message: "Configurações",
+  // ESC aqui = voltar pro menu principal, não abortar o CLI.
+  const action = await selectBack({
+    message: `Configurações ${c.dim}(ESC pra voltar)${c.reset}`,
     options: [
       { value: "login", label: "Login / painel", hint: "GitHub token + URL/token do painel" },
       { value: "r2-setup", label: "Cloudflare R2", hint: "storage de assets pesados" },
@@ -41,6 +43,6 @@ export async function configMenu() {
       { value: "back", label: "← Voltar" },
     ],
     initialValue: "login",
-  });
+  }, "back");
   return action;
 }

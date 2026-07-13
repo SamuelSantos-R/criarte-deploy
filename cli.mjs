@@ -27,6 +27,18 @@ import { printSummary } from "./src/lib/summary.mjs";
 const REPO = "SamuelSantos-R/multisite-system";
 const DEPLOY_DOMAIN = "https://criartedesing.ao";
 const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
+const BASE_DOMAIN = DEPLOY_DOMAIN.replace(/^https?:\/\//, ""); // criartedesing.ao
+
+// Normaliza o subdomínio informado (flag ou prompt).
+// Se vier só o nome do casal (sem ponto), completa com .criartedesing.ao —
+// senão o hostname não bate com o subdomain-map e o site não abre.
+function normalizeSubdomain(input) {
+  if (!input) return null;
+  let s = String(input).trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  if (!s) return null;
+  if (!s.includes(".")) s = `${s}.${BASE_DOMAIN}`;
+  return s;
+}
 const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
 
@@ -817,13 +829,12 @@ async function cmdDeploy(argv) {
   if (!subdomain) {
     console.log();
     console.log(`${c.bold}Subdomínio personalizado${c.reset} ${c.dim}(opcional)${c.reset}`);
-    console.log(`${c.dim}Se o site já tinha um subdomínio na Discloud (ex: mariaepaulo.criartedesing.ao),${c.reset}`);
-    console.log(`${c.dim}informe aqui pra manter o mesmo endereço. Deixe vazio pra pular.${c.reset}`);
-    const raw = await ask(`Subdomínio ${c.dim}(ex: mariaepaulo.criartedesing.ao)${c.reset}: `);
-    if (raw.trim()) {
-      subdomain = raw.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
-    }
+    console.log(`${c.dim}Pra manter o mesmo endereço de um site legado. Pode digitar só o nome${c.reset}`);
+    console.log(`${c.dim}(ex: mariaepaulo) que completamos com .${BASE_DOMAIN}. Deixe vazio pra pular.${c.reset}`);
+    const raw = await ask(`Subdomínio ${c.dim}(ex: mariaepaulo ou mariaepaulo.${BASE_DOMAIN})${c.reset}: `);
+    if (raw.trim()) subdomain = raw.trim();
   }
+  subdomain = normalizeSubdomain(subdomain);
   const subdomainUrl = subdomain ? `https://${subdomain}` : null;
 
   // ====== Preflight remoto (valida slug + lock check no painel) ======

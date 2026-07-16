@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { join, basename, relative, extname, dirname } from "node:path";
+import { join, basename, relative, extname, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
@@ -21,7 +21,6 @@ import { mainMenu, configMenu } from "./src/ui/menu.mjs";
 import { confirm, isInteractive, multiselect, outro, pause, select, text } from "./src/ui/prompts.mjs";
 import { detectBaseInfo } from "./src/lib/detect.mjs";
 import { findPageFile, listSections, applyDisableToFile } from "./src/lib/sections.mjs";
-import { buildRsvpWiring, relativeImport } from "./src/lib/rsvp-wire.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -2252,75 +2251,41 @@ async function cmdTokenizar(argv) {
   writeFileSync(configDst, JSON.stringify(cfg, null, 2) + "\n");
   ok(`criarte.config.json → base "convite-token".`);
 
-  // 3) Fiar o RSVP no useGuest — tenta automático (conservador + prova por tsc),
-  //    e só cai no passo manual se não reconhecer a estrutura ou o tsc reprovar.
+  // 3) Ligar o RSVP ao useGuest é passo MANUAL, feito na IDE por quem escreveu o
+  //    convite. O CLI NÃO edita o código do RSVP: mexer num componente que ele não
+  //    escreveu quebra convites (gera guest.json errado, clobber de estado, etc).
+  //    Aqui só mostra exatamente o que colar.
   const rsvpPath = findRsvpComponent(dir);
   const importPath = rsvpPath
-    ? relativeImport(dirname(rsvpPath), join(libDir, "guest"))
+    ? relativeImportPath(dirname(rsvpPath), join(libDir, "guest"))
     : (hasSrc ? "@/lib/guest" : "../lib/guest");
 
-  let wired = false;
+  console.log();
+  console.log(`${c.brand}❖${c.reset} ${c.bold}Passo manual (na IDE): ligar o RSVP ao token${c.reset}`);
   if (rsvpPath) {
-    const original = readFileSync(rsvpPath, "utf8");
-    const res = buildRsvpWiring(original, importPath);
-    if (res?.already) {
-      ok(`RSVP já estava ligado ao token (${relative(dir, rsvpPath)}).`);
-      wired = true;
-    } else if (res?.text) {
-      const relRsvp = relative(dir, rsvpPath);
-      const countRsvpErrors = (out) =>
-        (out || "").split(/\r?\n/).filter((l) => l.includes(relRsvp)).length;
-
-      writeFileSync(rsvpPath, res.text);
-      const sp = new Spinner("Ligando o RSVP e verificando os tipos (tsc)…").start();
-      const tc = runTypecheck(dir);
-      if (tc.ok) {
-        sp.succeed(`RSVP ligado ao token em ${relRsvp} (typecheck OK).`);
-        wired = true;
-      } else if (tc.skipped) {
-        sp.warn(`RSVP ligado em ${relRsvp}, mas não deu pra verificar: ${tc.reason}.`);
-        info(`${c.dim}Rode ${c.cyan}npm install${c.reset}${c.dim} na pasta e depois ${c.cyan}criarte-deploy --dry-run${c.reset}${c.dim} pra confirmar.${c.reset}`);
-        wired = true;
-      } else {
-        // O tsc reprovou. Pode ser culpa da minha edição OU erro pré-existente
-        // em OUTRO arquivo. Compara os erros DO RSVP antes/depois pra decidir.
-        writeFileSync(rsvpPath, original);
-        const baseline = runTypecheck(dir);
-        const addedRsvpErrors = countRsvpErrors(tc.output) > countRsvpErrors(baseline.output);
-        if (addedRsvpErrors) {
-          sp.fail("A ligação automática quebraria o RSVP — revertido. Vou te mostrar o passo manual.");
-        } else {
-          // Minha edição não adicionou erro no RSVP; a falha é de outro arquivo.
-          writeFileSync(rsvpPath, res.text);
-          sp.warn(`RSVP ligado em ${relRsvp}, mas o projeto tem erros de tipo em OUTROS arquivos.`);
-          info(`${c.dim}Não são da tokenização — provavelmente de uma versão anterior de "guest". Rode ${c.cyan}criarte-deploy --dry-run${c.reset}${c.dim} pra ver os detalhes.${c.reset}`);
-          wired = true;
-        }
-      }
-    }
+    console.log(`${c.dim}No seu ${c.reset}${c.brand}${relative(dir, rsvpPath)}${c.reset}${c.dim}, no topo do componente:${c.reset}`);
+  } else {
+    console.log(`${c.dim}No componente do seu formulário de confirmação (RSVP), no topo:${c.reset}`);
   }
-
-  if (!wired) {
-    console.log();
-    console.log(`${c.brand}❖${c.reset} ${c.bold}Falta 1 passo manual: ligar o RSVP ao token${c.reset}`);
-    if (rsvpPath) {
-      console.log(`${c.dim}No seu ${c.reset}${c.brand}${relative(dir, rsvpPath)}${c.reset}${c.dim}, no topo do componente:${c.reset}`);
-    } else {
-      console.log(`${c.dim}No componente do seu formulário de confirmação (RSVP), no topo:${c.reset}`);
-    }
-    console.log();
-    console.log(`  ${c.cyan}import { useGuest } from "${importPath}";${c.reset}`);
-    console.log();
-    console.log(`  ${c.dim}// dentro do componente:${c.reset}`);
-    console.log(`  ${c.cyan}const guest = useGuest();${c.reset}`);
-    console.log(`  ${c.dim}// guest.valid  → só habilita o form se o token existir${c.reset}`);
-    console.log(`  ${c.dim}// guest.name   → nome do convidado (preencha e TRAVE o campo)${c.reset}`);
-    console.log(`  ${c.dim}// guest.loading→ enquanto carrega o guests.json${c.reset}`);
-    console.log();
-  }
+  console.log();
+  console.log(`  ${c.cyan}import { useGuest } from "${importPath}";${c.reset}`);
+  console.log();
+  console.log(`  ${c.dim}// dentro do componente:${c.reset}`);
+  console.log(`  ${c.cyan}const guest = useGuest();${c.reset}`);
+  console.log(`  ${c.dim}// guest.valid  → só habilita o form se o token existir${c.reset}`);
+  console.log(`  ${c.dim}// guest.name   → nome do convidado (preencha e TRAVE o campo)${c.reset}`);
+  console.log(`  ${c.dim}// guest.loading→ enquanto carrega o guests.json${c.reset}`);
+  console.log();
 
   info(`Depois é só rodar ${c.cyan}criarte-deploy${c.reset} com seu .txt de convidados na pasta — o CLI gera os tokens.`);
   ok("Scaffold de tokenização concluído.");
+}
+
+// Caminho de import relativo (posix, sem extensão) de `fromDir` até `toFileNoExt`.
+function relativeImportPath(fromDir, toFileNoExt) {
+  let rel = relative(fromDir, toFileNoExt).split(sep).join("/");
+  if (!rel.startsWith(".")) rel = "./" + rel;
+  return rel;
 }
 
 

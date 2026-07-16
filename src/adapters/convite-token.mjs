@@ -97,8 +97,9 @@ export class ConviteTokenAdapter extends BaseAdapter {
       // base) pra NÃO vazar tokens de teste — site sobe em prévia.
       const stale = join(stagingDir, "public", "guests.json");
       if (existsSync(stale)) { rmSync(stale, { force: true }); }
-      warn("Nenhuma lista de convidados e nada publicado — guests.json NÃO foi gerado.");
-      info(`O convite vai subir só em modo prévia. Rode de novo com ${c.cyan}--guests-file <arquivo.txt>${c.reset} pra ativar os tokens.`);
+      warn("Este convite JÁ tem o sistema de tokenização, mas falta a lista de convidados.");
+      info(`Crie um arquivo ${c.bold}.txt${c.reset} com ${c.bold}um nome por linha${c.reset} (ex.: "João e Maria") na pasta do convite e rode o deploy de novo pra gerar os links.`);
+      info(`Sem a lista, o convite sobe só em ${c.cyan}modo prévia${c.reset} (sem tokens por convidado).`);
       return true;
     }
 

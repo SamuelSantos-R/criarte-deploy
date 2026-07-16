@@ -20,7 +20,6 @@ criarte-deploy/
 │       ├── config.mjs       # Constantes, cores, helpers (ok, info, warn, err, boxed, section, ask, screenPhase)
 │       ├── detect.mjs       # detectBaseInfo() — base estrutural + dica de categoria por conteúdo
 │       ├── sections.mjs     # listSections()/disableSections() — toggle de seções pré-deploy
-│       ├── rsvp-wire.mjs    # buildRsvpWiring() — liga o RSVP ao useGuest (auto-wire + prova tsc)
 │       └── spinner.mjs      # Classe Spinner (animação terminal)
 ├── templates/
 │   └── convite-token/       # Scaffold do comando `tokenizar` (guest.tsx + guests.example.json)
@@ -94,15 +93,14 @@ grava/mescla `criarte.config.json` com `base: convite-token`. Recusa se já é
 personalizado (sem `--force`) ou se a base é rsvp/generico. Depois, o deploy normal
 com o `.txt` de convidados gera os tokens.
 
-**Auto-wire do RSVP** (`src/lib/rsvp-wire.mjs`, `buildRsvpWiring`): liga o form ao
-`useGuest` sozinho, de forma conservadora — só age se reconhecer as âncoras
-canônicas (estado `useState` com nome `*nome*/*name*` + `<input value={nome}>`).
-Aplica: import do `useGuest` (caminho relativo via `relativeImport`), `const guest =
-useGuest()`, `useEffect` que preenche o nome quando o token resolve, e
-`readOnly={guest.valid}` pra travar o campo. **Prova por `tsc --noEmit`**: se o
-typecheck reprovar, reverte o RSVP ao original byte-a-byte e cai no passo manual
-impresso. Se não houver `node_modules`/`tsconfig`, aplica e avisa que não deu pra
-verificar. Estrutura fora do padrão → passo manual (nunca edita no chute).
+**Ligação do RSVP é MANUAL (o CLI NÃO edita código do convite).** Decisão firme:
+um CLI externo mexendo num componente RSVP que ele não escreveu quebra convites
+(gera `guests.json` errado, clobber de estado, API de `useGuest` divergente). O
+`cmdTokenizar` só copia o scaffold determinístico e **imprime** o passo manual (2
+linhas: `import { useGuest }` + `const guest = useGuest()`), calculando o caminho de
+import relativo (`relativeImportPath`) e apontando o componente RSVP encontrado
+(`findRsvpComponent`). Quem embute a tokenização é a IDE (VS Code) na hora de
+construir o convite, não o CLI.
 
 ### Fluxo de deploy (`cmdDirectDeploy`)
 1. Parse de args (categoria/slug, --no-wait, --subdomain); categoria/slug interativos usam setinha

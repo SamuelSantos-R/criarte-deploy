@@ -21,6 +21,7 @@ import { mainMenu, configMenu } from "./src/ui/menu.mjs";
 import { confirm, isInteractive, multiselect, outro, pause, select, text } from "./src/ui/prompts.mjs";
 import { detectBaseInfo } from "./src/lib/detect.mjs";
 import { findPageFile, listSections, applyDisableToFile } from "./src/lib/sections.mjs";
+import { buildRsvpWiring, relativeImport } from "./src/lib/rsvp-wire.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -2251,27 +2252,61 @@ async function cmdTokenizar(argv) {
   writeFileSync(configDst, JSON.stringify(cfg, null, 2) + "\n");
   ok(`criarte.config.json → base "convite-token".`);
 
-  // 3) O único passo manual: fiar o RSVP no useGuest. Mostra o trecho exato.
+  // 3) Fiar o RSVP no useGuest — tenta automático (conservador + prova por tsc),
+  //    e só cai no passo manual se não reconhecer a estrutura ou o tsc reprovar.
   const rsvpPath = findRsvpComponent(dir);
-  console.log();
-  console.log(`${c.brand}❖${c.reset} ${c.bold}Falta 1 passo manual: ligar o RSVP ao token${c.reset}`);
+  const importPath = rsvpPath
+    ? relativeImport(dirname(rsvpPath), join(libDir, "guest"))
+    : (hasSrc ? "@/lib/guest" : "../lib/guest");
+
+  let wired = false;
   if (rsvpPath) {
-    console.log(`${c.dim}No seu ${c.reset}${c.brand}${relative(dir, rsvpPath)}${c.reset}${c.dim}, no topo do componente:${c.reset}`);
-  } else {
-    console.log(`${c.dim}No componente do seu formulário de confirmação (RSVP), no topo:${c.reset}`);
+    const original = readFileSync(rsvpPath, "utf8");
+    const res = buildRsvpWiring(original, importPath);
+    if (res?.already) {
+      ok(`RSVP já estava ligado ao token (${relative(dir, rsvpPath)}).`);
+      wired = true;
+    } else if (res?.text) {
+      writeFileSync(rsvpPath, res.text);
+      const sp = new Spinner("Ligando o RSVP e verificando os tipos (tsc)…").start();
+      const tc = runTypecheck(dir);
+      if (tc.ok) {
+        sp.succeed(`RSVP ligado ao token em ${relative(dir, rsvpPath)} (typecheck OK).`);
+        wired = true;
+      } else if (tc.skipped) {
+        sp.warn(`RSVP ligado em ${relative(dir, rsvpPath)}, mas não deu pra verificar: ${tc.reason}.`);
+        info(`${c.dim}Rode ${c.cyan}npm install${c.reset}${c.dim} na pasta e depois ${c.cyan}criarte-deploy --dry-run${c.reset}${c.dim} pra confirmar.${c.reset}`);
+        wired = true;
+      } else {
+        writeFileSync(rsvpPath, original); // reverte: convite fica intacto
+        sp.fail("A ligação automática quebraria o typecheck — revertido. Vou te mostrar o passo manual.");
+      }
+    }
   }
-  console.log();
-  console.log(`  ${c.cyan}import { useGuest } from "${hasSrc ? "@/lib/guest" : "../lib/guest"}";${c.reset}`);
-  console.log();
-  console.log(`  ${c.dim}// dentro do componente:${c.reset}`);
-  console.log(`  ${c.cyan}const guest = useGuest();${c.reset}`);
-  console.log(`  ${c.dim}// guest.valid  → só habilita o form se o token existir${c.reset}`);
-  console.log(`  ${c.dim}// guest.name   → nome do convidado (preencha e TRAVE o campo)${c.reset}`);
-  console.log(`  ${c.dim}// guest.loading→ enquanto carrega o guests.json${c.reset}`);
-  console.log();
+
+  if (!wired) {
+    console.log();
+    console.log(`${c.brand}❖${c.reset} ${c.bold}Falta 1 passo manual: ligar o RSVP ao token${c.reset}`);
+    if (rsvpPath) {
+      console.log(`${c.dim}No seu ${c.reset}${c.brand}${relative(dir, rsvpPath)}${c.reset}${c.dim}, no topo do componente:${c.reset}`);
+    } else {
+      console.log(`${c.dim}No componente do seu formulário de confirmação (RSVP), no topo:${c.reset}`);
+    }
+    console.log();
+    console.log(`  ${c.cyan}import { useGuest } from "${importPath}";${c.reset}`);
+    console.log();
+    console.log(`  ${c.dim}// dentro do componente:${c.reset}`);
+    console.log(`  ${c.cyan}const guest = useGuest();${c.reset}`);
+    console.log(`  ${c.dim}// guest.valid  → só habilita o form se o token existir${c.reset}`);
+    console.log(`  ${c.dim}// guest.name   → nome do convidado (preencha e TRAVE o campo)${c.reset}`);
+    console.log(`  ${c.dim}// guest.loading→ enquanto carrega o guests.json${c.reset}`);
+    console.log();
+  }
+
   info(`Depois é só rodar ${c.cyan}criarte-deploy${c.reset} com seu .txt de convidados na pasta — o CLI gera os tokens.`);
   ok("Scaffold de tokenização concluído.");
 }
+
 
 // Acha o componente de RSVP/confirmação pra apontar onde fiar o useGuest.
 function findRsvpComponent(dir) {

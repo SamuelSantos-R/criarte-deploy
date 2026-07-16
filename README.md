@@ -57,8 +57,11 @@ criarte-deploy tokenizar
 ```
 
 Ele injeta o scaffold (`guest.tsx` + `guests.example.json` + `criarte.config.json`)
-e mostra o único passo manual de fiação do RSVP. Depois é só rodar `criarte-deploy`
-normal com o `.txt` de convidados na pasta pra gerar os tokens.
+e **liga o RSVP ao token sozinho**: preenche o nome do convidado e trava o campo.
+Antes de dar certo, roda o typecheck (`tsc`) — se a ligação automática fosse
+quebrar algo, ele **reverte** e mostra o passo manual, então o convite nunca fica
+quebrado. Depois é só rodar `criarte-deploy` normal com o `.txt` de convidados na
+pasta pra gerar os tokens.
 
 ### Convites com token por convidado (base `convite-token`)
 

@@ -2267,19 +2267,35 @@ async function cmdTokenizar(argv) {
       ok(`RSVP já estava ligado ao token (${relative(dir, rsvpPath)}).`);
       wired = true;
     } else if (res?.text) {
+      const relRsvp = relative(dir, rsvpPath);
+      const countRsvpErrors = (out) =>
+        (out || "").split(/\r?\n/).filter((l) => l.includes(relRsvp)).length;
+
       writeFileSync(rsvpPath, res.text);
       const sp = new Spinner("Ligando o RSVP e verificando os tipos (tsc)…").start();
       const tc = runTypecheck(dir);
       if (tc.ok) {
-        sp.succeed(`RSVP ligado ao token em ${relative(dir, rsvpPath)} (typecheck OK).`);
+        sp.succeed(`RSVP ligado ao token em ${relRsvp} (typecheck OK).`);
         wired = true;
       } else if (tc.skipped) {
-        sp.warn(`RSVP ligado em ${relative(dir, rsvpPath)}, mas não deu pra verificar: ${tc.reason}.`);
+        sp.warn(`RSVP ligado em ${relRsvp}, mas não deu pra verificar: ${tc.reason}.`);
         info(`${c.dim}Rode ${c.cyan}npm install${c.reset}${c.dim} na pasta e depois ${c.cyan}criarte-deploy --dry-run${c.reset}${c.dim} pra confirmar.${c.reset}`);
         wired = true;
       } else {
-        writeFileSync(rsvpPath, original); // reverte: convite fica intacto
-        sp.fail("A ligação automática quebraria o typecheck — revertido. Vou te mostrar o passo manual.");
+        // O tsc reprovou. Pode ser culpa da minha edição OU erro pré-existente
+        // em OUTRO arquivo. Compara os erros DO RSVP antes/depois pra decidir.
+        writeFileSync(rsvpPath, original);
+        const baseline = runTypecheck(dir);
+        const addedRsvpErrors = countRsvpErrors(tc.output) > countRsvpErrors(baseline.output);
+        if (addedRsvpErrors) {
+          sp.fail("A ligação automática quebraria o RSVP — revertido. Vou te mostrar o passo manual.");
+        } else {
+          // Minha edição não adicionou erro no RSVP; a falha é de outro arquivo.
+          writeFileSync(rsvpPath, res.text);
+          sp.warn(`RSVP ligado em ${relRsvp}, mas o projeto tem erros de tipo em OUTROS arquivos.`);
+          info(`${c.dim}Não são da tokenização — provavelmente de uma versão anterior de "guest". Rode ${c.cyan}criarte-deploy --dry-run${c.reset}${c.dim} pra ver os detalhes.${c.reset}`);
+          wired = true;
+        }
       }
     }
   }

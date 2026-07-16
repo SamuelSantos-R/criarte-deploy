@@ -5,11 +5,14 @@
 // "por convidado" quando o RSVP lê o token: preenche o nome do convidado e
 // TRAVA o campo. Fazer isso na mão é o passo que quebrava as coisas.
 //
-// Aqui a gente faz de forma CONSERVADORA: só mexe se reconhecer as âncoras
-// canônicas (estado do nome via useState + <input value={nome}>). Se não bater
-// o padrão, devolve null e o chamador cai no passo manual. Depois de aplicar, o
-// CLI roda `tsc --noEmit` e reverte se quebrar — o convite nunca fica num estado
-// que não compila.
+// A gente reconhece o campo do nome pelo BINDING do input — value={<algo>} —
+// e cobre os dois padrões que os convites usam de verdade:
+//   escalar:  value={nome}            + const [nome, setNome] = useState("")
+//   objeto:   value={formData.nome}   + const [formData, setFormData] = useState({...})
+// A partir daí liga: import + const guest = useGuest() + useEffect que preenche
+// o nome quando o token resolve + readOnly no input. Se não bater nenhum padrão,
+// devolve null e o chamador cai no passo manual (nunca edita no chute). Depois de
+// aplicar, o CLI roda `tsc --noEmit` e reverte se quebrar.
 // ============================================================================
 import { relative, sep } from "node:path";
 
@@ -20,28 +23,40 @@ import { relative, sep } from "node:path";
 export function buildRsvpWiring(src, importPath) {
   if (/\buseGuest\b/.test(src)) return { already: true };
 
-  // Âncora 1: linha do estado do nome, com a indentação — captura tudo (m[0]).
-  //   ^<indent>const [<nome>, set<Nome>] = useState(...)$
-  const stateRe = /^([^\S\n]*)const\s*\[\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\]\s*=\s*useState\b[^\n]*$/gm;
-  let nameMatch = null;
-  let m;
-  while ((m = stateRe.exec(src))) {
-    if (/nome|name/i.test(m[2])) { nameMatch = m; break; }
+  // Âncora 1: o input do nome — value={<var>} ou value={<obj>.<campo>} cujo
+  // "leaf" case-insensível bate nome/name. Guarda a substring EXATA pro replace.
+  const valueRe = /value=\{\s*([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))?\s*\}/g;
+  let bind = null;
+  let vm;
+  while ((vm = valueRe.exec(src))) {
+    const leaf = vm[2] || vm[1];
+    if (/nome|name/i.test(leaf)) {
+      bind = { full: vm[0], base: vm[1], field: vm[2] || null };
+      break;
+    }
   }
-  if (!nameMatch) return null;
-  const nameLine = nameMatch[0];
-  const indent = nameMatch[1];
-  const nameVar = nameMatch[2];
-  const setter = nameMatch[3];
+  if (!bind) return null;
 
-  // Âncora 2: o input do nome usa value={<nome>} — pra travar o campo.
-  const valueBind = new RegExp(`value=\\{\\s*${nameVar}\\s*\\}`);
-  if (!valueBind.test(src)) return null;
+  // Âncora 2: o setter do estado que segura esse input.
+  //   const [<base>, <setter>] = useState(...)
+  const setterRe = new RegExp(
+    `const\\s*\\[\\s*${bind.base}\\s*,\\s*([A-Za-z_$][\\w$]*)\\s*\\]\\s*=\\s*useState`,
+  );
+  const sm = src.match(setterRe);
+  if (!sm) return null;
+  const setter = sm[1];
 
-  // Âncora 3: import do react reconhecível — senão não arrisca.
+  // Âncora 3: import do react reconhecível (pra garantir useEffect).
   const reactImp = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+(['"])react\2;?/;
   const rm = src.match(reactImp);
   if (!rm) return null;
+
+  // Âncora 4: primeira linha de estado single-line — ponto de inserção do hook.
+  const anchorRe = /^([^\S\n]*)const\s*\[[^\]\n]*\]\s*=\s*useState\b[^\n]*$/m;
+  const am = src.match(anchorRe);
+  if (!am) return null;
+  const anchorLine = am[0];
+  const indent = am[1];
 
   let out = src;
 
@@ -53,15 +68,19 @@ export function buildRsvpWiring(src, importPath) {
     `import { ${names.join(", ")} } from "react";\nimport { useGuest } from "${importPath}";`,
   );
 
-  // 3) hook + sync do nome, em volta da linha de estado (mesma indentação).
+  // 3) hook + sync do nome. Escalar troca o valor; objeto faz merge do campo.
+  //    guest.name é string|null → ?? "" pra casar com o tipo string do estado.
+  const syncCall = bind.field
+    ? `${setter}((prev) => ({ ...prev, ${bind.field}: guest.name ?? "" }));`
+    : `${setter}(guest.name ?? "");`;
   const block =
     `${indent}const guest = useGuest();\n` +
-    `${nameLine}\n` +
-    `${indent}useEffect(() => { if (guest.name) ${setter}(guest.name); }, [guest.name]);`;
-  out = out.replace(nameLine, block);
+    `${anchorLine}\n` +
+    `${indent}useEffect(() => { if (guest.name) ${syncCall} }, [guest.name]);`;
+  out = out.replace(anchorLine, block);
 
-  // 4) Trava o input do nome quando o token é válido.
-  out = out.replace(valueBind, (full) => `${full} readOnly={guest.valid}`);
+  // 4) Trava o input do nome quando o token é válido (substring exata do binding).
+  out = out.replace(bind.full, `${bind.full} readOnly={guest.valid}`);
 
   return { text: out };
 }

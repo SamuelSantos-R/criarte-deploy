@@ -9,6 +9,7 @@ import {
   intro as clackIntro,
   outro as clackOutro,
   select as clackSelect,
+  multiselect as clackMultiselect,
   confirm as clackConfirm,
   text as clackText,
   isCancel,
@@ -46,6 +47,11 @@ export function outro(msg) {
 // select({ message, options: [{ value, label, hint }], initialValue }) → value
 export async function select(opts) {
   return guard(await clackSelect(opts));
+}
+
+// multiselect({ message, options:[{value,label,hint}], initialValues, required }) → value[]
+export async function multiselect(opts) {
+  return guard(await clackMultiselect({ required: false, ...opts }));
 }
 
 // Igual ao select, mas ESC/cancel NÃO mata o processo: devolve `cancelValue`.

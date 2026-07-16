@@ -10,14 +10,17 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { join, basename, relative, extname } from "node:path";
+import { join, basename, relative, extname, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
 import { VERSION } from "./src/lib/config.mjs";
 import { mainMenu, configMenu } from "./src/ui/menu.mjs";
-import { isInteractive, outro, pause, select, text } from "./src/ui/prompts.mjs";
+import { confirm, isInteractive, multiselect, outro, pause, select, text } from "./src/ui/prompts.mjs";
+import { detectBaseInfo } from "./src/lib/detect.mjs";
+import { findPageFile, listSections, applyDisableToFile } from "./src/lib/sections.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -340,26 +343,42 @@ async function fetchCategories(config) {
 
 const CAT_RE = /^[a-z0-9][a-z0-9-]*$/;
 
-// Pergunta a categoria por setinha (categorias existentes + "nova"). Fora de TTY
-// ou sem categorias no painel, volta pro texto cru — nada trava o fluxo por CI.
-async function promptCategory(config) {
+// Pergunta a categoria por setinha (sugestão da base detectada + categorias
+// existentes + "personalizado"). `suggestion` = { category, label } do detect.
+// Fora de TTY ou sem categorias no painel, volta pro texto cru — nada trava CI.
+async function promptCategory(config, suggestion = null) {
   const NEW = "__new__";
   if (isInteractive()) {
     const sp = new Spinner("Buscando categorias...").start();
     const cats = await fetchCategories(config);
     sp.clear();
-    if (cats.length > 0) {
+
+    const suggested = suggestion?.category && CAT_RE.test(suggestion.category)
+      ? suggestion.category
+      : null;
+
+    if (cats.length > 0 || suggested) {
+      // Header da base detectada (ex: "base de chá personalizada detectada").
+      if (suggestion?.label) {
+        console.log(`${c.brand}❖${c.reset} ${c.bold}${suggestion.label}${c.reset}`);
+        console.log();
+      }
+      // Sugerida primeiro (pré-selecionada), depois as demais, sem duplicar.
+      const rest = cats.filter((cat) => cat !== suggested);
+      const options = [];
+      if (suggested) options.push({ value: suggested, label: suggested, hint: "sugerida pela base" });
+      for (const cat of rest) options.push({ value: cat, label: cat });
+      options.push({ value: NEW, label: "✏️  Personalizado — digitar outra…" });
+
       const picked = await select({
         message: "Qual a categoria do site?",
-        options: [
-          ...cats.map((cat) => ({ value: cat, label: cat })),
-          { value: NEW, label: "➕ Nova categoria…" },
-        ],
+        options,
+        initialValue: suggested || options[0]?.value,
       });
       if (picked !== NEW) return picked;
       const nv = await text({
-        message: "Nome da nova categoria",
-        placeholder: "casamento, aniversario, cha…",
+        message: "Nome da categoria",
+        placeholder: "casamento, aniversario, cha-de-panela…",
         validate: (v) =>
           CAT_RE.test(String(v).trim()) ? undefined : "minúsculas, números e hífen (ex: cha-de-panela)",
       });
@@ -367,9 +386,48 @@ async function promptCategory(config) {
     }
   }
   // Fallback: sem TTY ou sem categorias — texto cru.
+  if (suggestion?.label) console.log(`${c.brand}❖${c.reset} ${suggestion.label}`);
   console.log(`Qual a ${c.bold}categoria${c.reset} do site?`);
-  console.log(`${c.dim}Exemplos: casamento, aniversario, evento, debutante${c.reset}`);
-  return await ask("→ ");
+  const ex = suggestion?.category ? `${suggestion.category}, casamento, aniversario` : "casamento, aniversario, evento, debutante";
+  console.log(`${c.dim}Exemplos: ${ex}${c.reset}`);
+  return (await ask("→ ")) || suggestion?.category || "";
+}
+
+// Lista as seções do convite e deixa desabilitar as que o usuário não quer no ar.
+// Aplica no page.tsx do STAGING (não no source). Opt-in por confirm (default Não)
+// pra não atrapalhar o fluxo comum — quem só quer publicar aperta Enter e segue.
+async function maybeToggleSections(stagingDir) {
+  if (!isInteractive()) return;
+  if (process.env.CRIARTE_SKIP_SECTIONS === "1") return;
+  const pageFile = findPageFile(stagingDir);
+  if (!pageFile) return;
+  const secs = listSections(pageFile);
+  if (secs.length < 2) return;
+
+  screen.phase("🧩 Seções do convite");
+  console.log(`${c.dim}O convite tem ${secs.length} seções: ${secs.map((s) => s.name).join(", ")}${c.reset}`);
+  console.log();
+  const review = await confirm("Quer desabilitar alguma seção antes de publicar?", false);
+  if (!review) return;
+
+  const keep = await multiselect({
+    message: "Marque as seções que vão AO AR (espaço marca/desmarca · Enter confirma)",
+    options: secs.map((s) => ({ value: s.name, label: s.name })),
+    initialValues: secs.map((s) => s.name),
+    required: false,
+  });
+  const keepSet = new Set(Array.isArray(keep) ? keep : secs.map((s) => s.name));
+  const disable = secs.filter((s) => !keepSet.has(s.name)).map((s) => s.name);
+
+  if (disable.length === 0) { info("Todas as seções mantidas."); return; }
+  // Trava: nunca comentar 100% das seções (viraria página vazia).
+  if (disable.length >= secs.length) {
+    warn("Você desmarcou todas — mantendo o convite inteiro pra não subir uma página vazia.");
+    return;
+  }
+  const disabled = applyDisableToFile(pageFile, disable);
+  ok(`${disabled.length} seção(ões) desativada(s) neste deploy: ${c.bold}${disabled.join(", ")}${c.reset}`);
+  info(`${c.dim}O source original não foi tocado — isso vale só pra esta publicação.${c.reset}`);
 }
 
 // ============================================================================
@@ -1340,6 +1398,10 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
   console.log(`  ${cmd("criarte-deploy locks")}                     ${dim("lista/libera locks de deploy")}`);
 
+  section("🎟️ Convite-token (link único por convidado)");
+  console.log(`  ${cmd("criarte-deploy tokenizar")} ${dim("[pasta]")}             ${dim("injeta a tokenização num convite normal (scaffold)")}`);
+  console.log(`  ${dim("depois: criarte-deploy com o .txt de convidados na pasta gera os tokens")}`);
+
   section("💌 RSVP (casamentos com painel admin)");
   console.log(`  ${cmd("criarte-deploy rsvp-setup")} ${dim("[slug]")}            ${dim("registra um casamento no servidor")}`);
   console.log(`  ${cmd("criarte-deploy resend-setup")}              ${dim("guarda a Resend key default")}`);
@@ -2120,6 +2182,121 @@ async function cmdLocks(argv) {
   process.exit(1);
 }
 
+// ============================================================================
+// TOKENIZAR — Injeta a base convite-token num convite de casamento normal
+// ============================================================================
+// Em vez de pedir pro Claude "adaptar tudo" (que quebra a estrutura), este
+// comando faz o scaffold DETERMINÍSTICO: copia o guest.tsx canônico + o
+// guests.example.json, grava criarte.config.json com base=convite-token e mostra
+// o ÚNICO trecho manual (fiar o RSVP no useGuest). Nada de reescrever o convite
+// inteiro — a superfície de erro fica mínima.
+const TEMPLATES_DIR = join(dirname(fileURLToPath(import.meta.url)), "templates");
+
+async function cmdTokenizar(argv) {
+  const dir = argv.find((a) => !a.startsWith("-")) ? join(process.cwd(), argv.find((a) => !a.startsWith("-"))) : process.cwd();
+  const force = argv.includes("--force");
+
+  screen.phase("🎟️  Tokenizar convite", basename(dir));
+
+  const info0 = detectBaseInfo(dir);
+  if (info0.personalizado && !force) {
+    ok("Este convite JÁ tem tokenização por convidado (base convite-token).");
+    info(`${c.dim}Nada a fazer. Use ${c.cyan}--force${c.reset}${c.dim} pra sobrescrever o guest.tsx/guests.example.json.${c.reset}`);
+    return;
+  }
+  if (info0.base === "rsvp") {
+    warn("Este projeto é base RSVP (painel central), não um convite estático. Tokenização não se aplica.");
+    return;
+  }
+  if (info0.base === "generico") {
+    warn("Não parece um convite Next (sem package.json com next). Rode dentro da pasta do convite.");
+    return;
+  }
+
+  // Onde colocar o guest lib: segue a estrutura do projeto (src/ ou raiz).
+  const hasSrc = existsSync(join(dir, "src"));
+  const libDir = hasSrc ? join(dir, "src", "lib") : join(dir, "lib");
+  const guestDst = join(libDir, "guest.tsx");
+  const publicDir = join(dir, "public");
+  const exampleDst = join(publicDir, "guests.example.json");
+  const configDst = join(dir, "criarte.config.json");
+
+  console.log(`${c.brand}❖${c.reset} ${c.bold}${info0.label}${c.reset}`);
+  console.log(`${c.dim}Vou adicionar a tokenização por convidado a este convite:${c.reset}`);
+  console.log(`  ${c.dim}·${c.reset} ${relative(dir, guestDst)}`);
+  console.log(`  ${c.dim}·${c.reset} ${relative(dir, exampleDst)}`);
+  console.log(`  ${c.dim}·${c.reset} criarte.config.json ${c.dim}(base: convite-token)${c.reset}`);
+  console.log();
+
+  const overwrites = [guestDst, exampleDst].filter(existsSync);
+  if (overwrites.length > 0 && !force) {
+    warn(`Já existem: ${overwrites.map((p) => relative(dir, p)).join(", ")}`);
+  }
+  const go = isInteractive() ? await confirm("Aplicar a tokenização agora?", true) : true;
+  if (!go) { info("Cancelado — nada foi alterado."); return; }
+
+  // 1) Copia os templates canônicos
+  mkdirSync(libDir, { recursive: true });
+  mkdirSync(publicDir, { recursive: true });
+  cpSync(join(TEMPLATES_DIR, "convite-token", "guest.tsx"), guestDst);
+  cpSync(join(TEMPLATES_DIR, "convite-token", "guests.example.json"), exampleDst);
+  ok(`guest.tsx + guests.example.json instalados.`);
+
+  // 2) Grava/mescla criarte.config.json com base convite-token
+  let cfg = {};
+  if (existsSync(configDst)) {
+    try { cfg = JSON.parse(readFileSync(configDst, "utf8")); } catch { cfg = {}; }
+  }
+  cfg.base = "convite-token";
+  writeFileSync(configDst, JSON.stringify(cfg, null, 2) + "\n");
+  ok(`criarte.config.json → base "convite-token".`);
+
+  // 3) O único passo manual: fiar o RSVP no useGuest. Mostra o trecho exato.
+  const rsvpPath = findRsvpComponent(dir);
+  console.log();
+  console.log(`${c.brand}❖${c.reset} ${c.bold}Falta 1 passo manual: ligar o RSVP ao token${c.reset}`);
+  if (rsvpPath) {
+    console.log(`${c.dim}No seu ${c.reset}${c.brand}${relative(dir, rsvpPath)}${c.reset}${c.dim}, no topo do componente:${c.reset}`);
+  } else {
+    console.log(`${c.dim}No componente do seu formulário de confirmação (RSVP), no topo:${c.reset}`);
+  }
+  console.log();
+  console.log(`  ${c.cyan}import { useGuest } from "${hasSrc ? "@/lib/guest" : "../lib/guest"}";${c.reset}`);
+  console.log();
+  console.log(`  ${c.dim}// dentro do componente:${c.reset}`);
+  console.log(`  ${c.cyan}const guest = useGuest();${c.reset}`);
+  console.log(`  ${c.dim}// guest.valid  → só habilita o form se o token existir${c.reset}`);
+  console.log(`  ${c.dim}// guest.name   → nome do convidado (preencha e TRAVE o campo)${c.reset}`);
+  console.log(`  ${c.dim}// guest.loading→ enquanto carrega o guests.json${c.reset}`);
+  console.log();
+  info(`Depois é só rodar ${c.cyan}criarte-deploy${c.reset} com seu .txt de convidados na pasta — o CLI gera os tokens.`);
+  ok("Scaffold de tokenização concluído.");
+}
+
+// Acha o componente de RSVP/confirmação pra apontar onde fiar o useGuest.
+function findRsvpComponent(dir) {
+  const roots = [join(dir, "src", "components"), join(dir, "components"), join(dir, "src", "app"), join(dir, "app")];
+  const NAMES = /^(rsvp|confirmacao|confirmação|presenca|presença|formulario|form)\.(tsx|jsx)$/i;
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    let found = null;
+    (function walk(d, depth) {
+      if (found || depth > 3) return;
+      let entries;
+      try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (found) return;
+        if (e.name.startsWith(".") || e.name === "node_modules") continue;
+        const full = join(d, e.name);
+        if (e.isDirectory()) { walk(full, depth + 1); continue; }
+        if (NAMES.test(e.name)) { found = full; return; }
+      }
+    })(root, 0);
+    if (found) return found;
+  }
+  return null;
+}
+
 async function cmdDirectDeploy(argv) {
   const config = requireLogin();
   const targetUrl = (config.panel_url || "").replace(/\/$/, "");
@@ -2204,13 +2381,15 @@ async function cmdDirectDeploy(argv) {
     }
   }
 
-  // Pergunta categoria se ainda não detectada
-  while (!category || !/^[a-z0-9-]+$/.test(category)) {
-    const raw = await ask(`Categoria ${c.dim}(ex: casamento, rsvp, cha-de-panela)${c.reset}: `);
-    if (raw && /^[a-z0-9-]+$/.test(raw.trim().toLowerCase())) {
-      category = raw.trim().toLowerCase();
-    } else {
-      warn("Apenas letras minúsculas, números e hífens.");
+  // Detecta a base (estrutural) + sugere a categoria (por conteúdo). Só pergunta
+  // quando a categoria ainda não veio por flag/arg.
+  const baseInfo = detectBaseInfo(cwd);
+  if (!category || !/^[a-z0-9-]+$/.test(category)) {
+    screen.phase("🏷️  Categoria");
+    category = (await promptCategory(config, baseInfo) || "").trim().toLowerCase();
+    while (!category || !/^[a-z0-9-]+$/.test(category)) {
+      warn("Categoria inválida — só minúsculas, números e hífens.");
+      category = (await promptCategory(config, baseInfo) || "").trim().toLowerCase();
     }
   }
 
@@ -2381,8 +2560,10 @@ async function cmdDirectDeploy(argv) {
   // Prepara o staging conforme a base (RSVP: provisiona + reescreve fetchs)
   if (isNextSource) {
     const msgs = adapter.getMessages();
-    section(`${msgs.baseLabel || "💌 Base detectada"}`, msgs.autoSub || adapter.name);
+    const baseLabel = msgs.baseLabel || `🎯 ${baseInfo.label.charAt(0).toUpperCase()}${baseInfo.label.slice(1)}`;
+    section(baseLabel, msgs.autoSub || adapter.name);
     await adapter.prepare(stagingDir, fullSlug, config, targetUrl);
+    await maybeToggleSections(stagingDir);
   }
 
   // Remove arquivos server-side (definidos pelo adapter)
@@ -3207,6 +3388,8 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "ssh-setup":   await cmdSshSetup();   break;
       case "rsvp-setup":  await cmdRsvpSetup(rest); break;
       case "resend-setup":await cmdResendSetup(); break;
+      case "tokenizar":
+      case "tokenize":   await cmdTokenizar(rest); break;
       case "list":
       case "ls":         await cmdList();      break;
       case "rm":

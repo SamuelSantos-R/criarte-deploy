@@ -40,11 +40,25 @@ criarte-deploy
 ```
 
 O CLI vai:
-1. Perguntar a **categoria** — mostra as que já existem numa lista de **setinha** (↑↓ + Enter), ou escolha "➕ Nova categoria…" pra digitar uma nova
+1. **Detectar a base** do site e mostrar um header (ex: "🎯 Base de casamento personalizada detectada") — já **sugere a categoria** na lista de setinha, mas você pode escolher outra ou "✏️ Personalizado" pra digitar
 2. Perguntar o **nome** do site (ex: `joao-maria`)
-3. Mostrar um resumo e pedir confirmação
-4. Subir tudo pro GitHub automaticamente
-5. Mostrar o link onde o site vai aparecer em ~5min
+3. Deixar você **desativar seções** do convite antes de subir (opcional — ex: tirar o "Versículo" só neste site)
+4. Mostrar um resumo e pedir confirmação
+5. Subir tudo pro GitHub automaticamente
+6. Mostrar o link onde o site vai aparecer em ~5min
+
+### Transformar um convite normal em convite-token
+
+Se você quer que cada convidado tenha um link único (base `convite-token`), rode
+na pasta do convite:
+
+```bash
+criarte-deploy tokenizar
+```
+
+Ele injeta o scaffold (`guest.tsx` + `guests.example.json` + `criarte.config.json`)
+e mostra o único passo manual de fiação do RSVP. Depois é só rodar `criarte-deploy`
+normal com o `.txt` de convidados na pasta pra gerar os tokens.
 
 ### Convites com token por convidado (base `convite-token`)
 
@@ -67,6 +81,7 @@ Os arquivos de saída (`convidados-<slug>-links.txt` / `-novos.txt`) e ruído co
 | `criarte-deploy login` | Configura o token (só 1ª vez) |
 | `criarte-deploy` | Publica o site da pasta atual (interativo) |
 | `criarte-deploy <cat> <nome>` | Publica direto sem perguntar |
+| `criarte-deploy tokenizar [pasta]` | Injeta a base convite-token num convite normal |
 | `criarte-deploy list` | Mostra todos os sites publicados |
 | `criarte-deploy help` | Mostra ajuda |
 

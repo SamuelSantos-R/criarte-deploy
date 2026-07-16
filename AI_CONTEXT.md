@@ -18,7 +18,11 @@ criarte-deploy/
 │   │   └── prompts.mjs      # Wrapper @clack/prompts (select/text/confirm por setinha)
 │   └── lib/
 │       ├── config.mjs       # Constantes, cores, helpers (ok, info, warn, err, boxed, section, ask, screenPhase)
+│       ├── detect.mjs       # detectBaseInfo() — base estrutural + dica de categoria por conteúdo
+│       ├── sections.mjs     # listSections()/disableSections() — toggle de seções pré-deploy
 │       └── spinner.mjs      # Classe Spinner (animação terminal)
+├── templates/
+│   └── convite-token/       # Scaffold do comando `tokenizar` (guest.tsx + guests.example.json)
 ├── banner.mjs               # ASCII banner
 └── package.json
 ```
@@ -62,12 +66,40 @@ class BaseAdapter {
   com contagem de linhas; nenhum → prompt de caminho. Ordem: canônicos primeiro,
   depois pela lista com mais linhas. Flag `--guests-file` continua tendo prioridade.
 
+### Detecção de base + sugestão de categoria (`src/lib/detect.mjs`)
+`detectBaseInfo(dir)` combina duas camadas antes do deploy:
+- **Base estrutural**: `rsvp` (markers d1/api criar-confirmacao) → `convite-token`
+  (`guest.tsx` + `guests.example.json` ou `config.base`) → `casamento` (Next) →
+  `generico`. `criarte.config.json` com `base` explícito tem prioridade.
+- **Categoria por conteúdo** (`guessCategory`): varre até 120 arquivos de texto
+  (≤200KB) procurando keywords (chá/chá-de-bebê/debutante/noivado/aniversário/
+  casamento — chá antes de casamento). Os sites na VPS são build estático, sem
+  markers de src, então a categoria é adivinhada por conteúdo, não por estrutura.
+- Compõe `label` tipo "base de chá personalizada detectada". No deploy vira o
+  header e `promptCategory(config, baseInfo)` pré-seleciona a sugestão (hint
+  "sugerida pela base"), sempre permitindo escolher outra ou "✏️ Personalizado".
+
+### Toggle de seções (`src/lib/sections.mjs`)
+`maybeToggleSections(stagingDir)` (opt-in, só em TTY, pula com `CRIARTE_SKIP_SECTIONS`):
+extrai os `<Componente/>` self-closing top-level do primeiro `return(...)` da home
+(exclui infra: BackgroundParticles, EnvelopeLoader, MuteButton, etc), mostra num
+multiselect e comenta no STAGING os desmarcados (`{/* <X/> — desativado… */}`).
+Nunca mexe no source original; guard anti-nuke não deixa desativar todas.
+
+### Comando `tokenizar` (Feature A — `cmdTokenizar`)
+Injeta a base `convite-token` num convite normal (scaffold determinístico):
+copia `templates/convite-token/guest.tsx`→`src/lib`, `guests.example.json`→`public/`,
+grava/mescla `criarte.config.json` com `base: convite-token`, e imprime o snippet
+exato de fiação do RSVP (via `findRsvpComponent`). Recusa se já é personalizado
+(sem `--force`) ou se a base é rsvp/generico. Depois, o deploy normal com o `.txt`
+de convidados gera os tokens.
+
 ### Fluxo de deploy (`cmdDirectDeploy`)
 1. Parse de args (categoria/slug, --no-wait, --subdomain); categoria/slug interativos usam setinha
-2. Detecção de projeto Next.js
+2. Detecção de projeto Next.js + `detectBaseInfo` (header + sugestão de categoria)
 3. Análise de arquivos (contagem, tamanho)
 4. Expiração
-5. Confirmação
+5. Toggle de seções (opt-in) + Confirmação
 6. **Staging**: cópia pro temp dir
 7. **Orphan cleanup**: detecta e remove assets não referenciados
 8. **Adapter prepare**: detecta base, provisiona RSVP se necessário, reescreve paths
@@ -103,8 +135,9 @@ Opcional no diretório do site:
 ### Comandos
 | Comando | Função |
 |---------|--------|
-| `criarte-deploy` | Deploy direto (detecta categoria/slug) |
+| `criarte-deploy` | Deploy direto (detecta base, sugere categoria, toggle de seções) |
 | `criarte-deploy rsvp/adelia-alvaro` | Deploy com slug explícito |
+| `criarte-deploy tokenizar [pasta]` | Injeta a base convite-token num convite normal |
 | `criarte-deploy rsvp-setup [slug]` | Configurar RSVP (cria/atualiza no servidor) |
 | `criarte-deploy resend-setup` | Configurar Resend API key |
 | `criarte-deploy panel` | Configurar URL/token do painel |

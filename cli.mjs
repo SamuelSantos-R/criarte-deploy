@@ -17,7 +17,7 @@ import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
 import { VERSION } from "./src/lib/config.mjs";
 import { mainMenu, configMenu } from "./src/ui/menu.mjs";
-import { isInteractive, outro, pause } from "./src/ui/prompts.mjs";
+import { isInteractive, outro, pause, select, text } from "./src/ui/prompts.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
 
@@ -316,6 +316,60 @@ function ask(question, { hidden = false, default: def } = {}) {
       resolve((answer.trim()) || def || "");
     });
   });
+}
+
+// Busca as categorias já usadas no painel (registry), pra oferecer por setinha
+// em vez de exigir digitação. Offline/erro → [] (o prompt cai no texto cru).
+async function fetchCategories(config) {
+  const base = (config?.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/api/sites/registry`, {
+      signal: AbortSignal.timeout(8000),
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const sites = Array.isArray(data?.sites) ? data.sites : [];
+    return [...new Set(sites.map((s) => s.category).filter(Boolean))].sort((a, b) =>
+      a.localeCompare(b)
+    );
+  } catch {
+    return [];
+  }
+}
+
+const CAT_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+// Pergunta a categoria por setinha (categorias existentes + "nova"). Fora de TTY
+// ou sem categorias no painel, volta pro texto cru — nada trava o fluxo por CI.
+async function promptCategory(config) {
+  const NEW = "__new__";
+  if (isInteractive()) {
+    const sp = new Spinner("Buscando categorias...").start();
+    const cats = await fetchCategories(config);
+    sp.clear();
+    if (cats.length > 0) {
+      const picked = await select({
+        message: "Qual a categoria do site?",
+        options: [
+          ...cats.map((cat) => ({ value: cat, label: cat })),
+          { value: NEW, label: "➕ Nova categoria…" },
+        ],
+      });
+      if (picked !== NEW) return picked;
+      const nv = await text({
+        message: "Nome da nova categoria",
+        placeholder: "casamento, aniversario, cha…",
+        validate: (v) =>
+          CAT_RE.test(String(v).trim()) ? undefined : "minúsculas, números e hífen (ex: cha-de-panela)",
+      });
+      return String(nv).trim();
+    }
+  }
+  // Fallback: sem TTY ou sem categorias — texto cru.
+  console.log(`Qual a ${c.bold}categoria${c.reset} do site?`);
+  console.log(`${c.dim}Exemplos: casamento, aniversario, evento, debutante${c.reset}`);
+  return await ask("→ ");
 }
 
 // ============================================================================
@@ -802,9 +856,7 @@ async function cmdDeploy(argv) {
   let slug = argv[1];
 
   if (!category) {
-    console.log(`Qual a ${c.bold}categoria${c.reset} do site?`);
-    console.log(`${c.dim}Exemplos: casamento, aniversario, evento, debutante${c.reset}`);
-    category = await ask("→ ");
+    category = await promptCategory(config);
   }
   if (!slug) {
     console.log(`\nQual o ${c.bold}nome${c.reset} (slug) do site? Minúsculas com hífen.`);

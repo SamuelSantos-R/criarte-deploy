@@ -18,6 +18,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync
 import { join, extname, isAbsolute, resolve } from "node:path";
 import { randomInt } from "node:crypto";
 import { info, warn, err, c, ok as okLog } from "../lib/config.mjs";
+import { select, isInteractive } from "../ui/prompts.mjs";
 
 const TOKEN_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -405,6 +406,56 @@ function renderLinks(header, generatedAt, base, rows) {
   ].join("\n");
 }
 
+// Nomes de saída/ruído que nunca são a lista de entrada de convidados.
+const GUEST_TXT_EXCLUDE_RE =
+  /^(convidados-.*-(links|novos)|robots|sitemap|license|licence|changelog|readme|notes?)\.txt$/i;
+
+// Escaneia a raiz do projeto procurando .txt que pareçam lista de convidados.
+// Ignora os .txt de SAÍDA (convidados-<slug>-links/novos) e arquivos que já são
+// de links (linhas com ?t=/URL) — usar um -links.txt como entrada foi o que
+// corrompeu tokens no passado. Devolve [{ name, abs, lines }] ordenado: nomes
+// canônicos primeiro, depois pela lista com mais linhas (a real costuma ser maior).
+function listGuestTxtCandidates(projectDir) {
+  let entries = [];
+  try {
+    entries = readdirSync(projectDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const e of entries) {
+    if (!e.isFile() || !/\.txt$/i.test(e.name)) continue;
+    if (GUEST_TXT_EXCLUDE_RE.test(e.name)) continue;
+    const abs = join(projectDir, e.name);
+    let lines = 0;
+    let looksLikeLinks = false;
+    try {
+      const dataLines = readFileSync(abs, "utf8")
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .filter((s) => s && !s.startsWith("#"));
+      lines = dataLines.length;
+      const linkCount = dataLines.filter(isLinkLine).length;
+      looksLikeLinks = dataLines.length > 0 && linkCount >= dataLines.length;
+    } catch {
+      continue;
+    }
+    if (looksLikeLinks) continue; // arquivo de LINKS (saída), não lista de entrada
+    out.push({ name: e.name, abs, lines });
+  }
+  const canonRank = (name) => {
+    const i = GUEST_FILE_CANDIDATES.indexOf(name.toLowerCase());
+    return i === -1 ? Infinity : i;
+  };
+  out.sort((a, b) => {
+    const ra = canonRank(a.name);
+    const rb = canonRank(b.name);
+    if (ra !== rb) return ra - rb;
+    return b.lines - a.lines;
+  });
+  return out;
+}
+
 async function resolveGuestFile(projectDir) {
   // a) flag --guests-file <path> (repassada via env pelo cmdDirectDeploy)
   const fromFlag = (process.env.CRIARTE_GUESTS_FILE || "").trim();
@@ -415,16 +466,48 @@ async function resolveGuestFile(projectDir) {
     return null;
   }
 
-  // b) auto-detect na pasta do projeto
-  for (const cand of GUEST_FILE_CANDIDATES) {
-    const abs = join(projectDir, cand);
-    if (existsSync(abs)) {
-      info(`Lista de convidados encontrada: ${c.brand}${cand}${c.reset}`);
-      return abs;
-    }
+  // b) escaneia TODOS os .txt do projeto (não só os 4 nomes canônicos)
+  const candidates = listGuestTxtCandidates(projectDir);
+
+  // Um só candidato → usa direto (o caso comum, mesmo com nome fora do padrão).
+  if (candidates.length === 1) {
+    info(`Lista de convidados: ${c.brand}${candidates[0].name}${c.reset} ${c.dim}(${candidates[0].lines} linha(s))${c.reset}`);
+    return candidates[0].abs;
   }
 
-  // c) prompt interativo
+  // Mais de um → pergunta por setinha (evita escolher o arquivo errado em silêncio).
+  if (candidates.length > 1) {
+    if (isInteractive()) {
+      const NONE = "__none__";
+      const TYPE = "__type__";
+      const picked = await select({
+        message: "Qual arquivo é a lista de convidados?",
+        options: [
+          ...candidates.map((t) => ({
+            value: t.abs,
+            label: t.name,
+            hint: `${t.lines} linha(s)`,
+          })),
+          { value: TYPE, label: "Digitar outro caminho…" },
+          { value: NONE, label: "Nenhum — subir só em prévia (sem tokens)" },
+        ],
+      });
+      if (picked === NONE) return null;
+      if (picked === TYPE) return promptGuestPath(projectDir);
+      return picked;
+    }
+    // Sem TTY (CI): escolhe o topo (canônico ou maior) pra não travar.
+    warn(`${candidates.length} arquivos .txt candidatos — usando ${c.brand}${candidates[0].name}${c.reset} (sem TTY). Passe ${c.cyan}--guests-file${c.reset} pra ser explícito.`);
+    return candidates[0].abs;
+  }
+
+  // c) nenhum .txt encontrado → prompt de caminho (ou prévia)
+  return promptGuestPath(projectDir);
+}
+
+// Prompt de caminho manual do .txt (fallback quando não há candidato ou o
+// usuário escolhe "digitar outro caminho"). Vazio = subir em prévia.
+async function promptGuestPath(projectDir) {
   const readline = await import("node:readline");
   const ask = createAsk(readline.default);
   console.log();

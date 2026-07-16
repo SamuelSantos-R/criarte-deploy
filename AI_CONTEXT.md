@@ -11,8 +11,11 @@ criarte-deploy/
 │   │   ├── base.mjs         # Classe abstrata BaseAdapter
 │   │   ├── casamento.mjs    # Adapter base casamento
 │   │   ├── rsvp.mjs         # Adapter base RSVP
+│   │   ├── convite-token.mjs# Convite com token único por convidado (guests.json)
 │   │   ├── generico.mjs     # Fallback Next.js genérico
 │   │   └── registry.mjs     # detectAdapter() + ordem de detecção
+│   ├── ui/
+│   │   └── prompts.mjs      # Wrapper @clack/prompts (select/text/confirm por setinha)
 │   └── lib/
 │       ├── config.mjs       # Constantes, cores, helpers (ok, info, warn, err, boxed, section, ask, screenPhase)
 │       └── spinner.mjs      # Classe Spinner (animação terminal)
@@ -46,8 +49,21 @@ class BaseAdapter {
 3. Registrar em `registry.mjs` no array `adapters`
 4. Se a base precisa de preparação especial, implementar `prepare()`
 
+### Seleção por setinha (@clack via `src/ui/prompts.mjs`)
+- **Categoria** (`promptCategory` em `cli.mjs`): busca as categorias já usadas no
+  registry (`/api/sites/registry`) e mostra num `select` (↑↓). Opção "➕ Nova
+  categoria…" cai num `text` validado por `^[a-z0-9][a-z0-9-]*$`. Fora de TTY ou
+  offline → volta pro texto cru (`ask`). Nada trava CI.
+- **Lista de convidados** (`resolveGuestFile`/`listGuestTxtCandidates` no adapter
+  `convite-token`): escaneia TODOS os `.txt` da raiz do projeto (não só os 4 nomes
+  canônicos). Ignora arquivos de saída (`convidados-<slug>-links/novos.txt`) e
+  qualquer `.txt` que já seja de links (`?t=`/URL — usar um `-links.txt` como
+  entrada corrompeu tokens no passado). 1 candidato → usa direto; vários → `select`
+  com contagem de linhas; nenhum → prompt de caminho. Ordem: canônicos primeiro,
+  depois pela lista com mais linhas. Flag `--guests-file` continua tendo prioridade.
+
 ### Fluxo de deploy (`cmdDirectDeploy`)
-1. Parse de args (categoria/slug, --no-wait, --subdomain)
+1. Parse de args (categoria/slug, --no-wait, --subdomain); categoria/slug interativos usam setinha
 2. Detecção de projeto Next.js
 3. Análise de arquivos (contagem, tamanho)
 4. Expiração

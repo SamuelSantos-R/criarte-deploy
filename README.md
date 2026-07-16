@@ -40,11 +40,25 @@ criarte-deploy
 ```
 
 O CLI vai:
-1. Perguntar a **categoria** (ex: `casamento`)
+1. Perguntar a **categoria** — mostra as que já existem numa lista de **setinha** (↑↓ + Enter), ou escolha "➕ Nova categoria…" pra digitar uma nova
 2. Perguntar o **nome** do site (ex: `joao-maria`)
 3. Mostrar um resumo e pedir confirmação
 4. Subir tudo pro GitHub automaticamente
 5. Mostrar o link onde o site vai aparecer em ~5min
+
+### Convites com token por convidado (base `convite-token`)
+
+Se o projeto usa tokenização por convidado, o CLI procura sozinho os arquivos
+`.txt` da pasta (não só nomes fixos como `convidados.txt`):
+
+- **1 arquivo `.txt`** → usa ele direto.
+- **Vários `.txt`** → mostra uma lista de **setinha** pra escolher qual é a lista
+  de convidados (com a contagem de linhas de cada um pra não errar). Também dá pra
+  escolher "Digitar outro caminho…" ou "Nenhum — subir só em prévia".
+- **Nenhum `.txt`** → pede o caminho na mão (vazio = prévia sem tokens).
+
+Os arquivos de saída (`convidados-<slug>-links.txt` / `-novos.txt`) e ruído como
+`robots.txt` são ignorados automaticamente — não aparecem na lista.
 
 ### Comandos disponíveis
 

@@ -306,6 +306,10 @@ function progressBar(current, total, label = "") {
 // Input
 // ============================================================================
 function ask(question, { hidden = false, default: def } = {}) {
+  // Fora de TTY (CI/automação) não dá pra ler input: cada readline novo descarta
+  // o buffer do stdin, então só o 1º prompt receberia resposta. Devolve o default
+  // na hora pra o fluxo seguir não-interativo com valores sensatos.
+  if (!process.stdin.isTTY) return Promise.resolve(def || "");
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const prompt = def ? `${question} ${c.dim}(${def})${c.reset} ` : question;
@@ -825,8 +829,8 @@ async function askExpiration(siteJsonPath) {
   console.log(`  ${c.dim}3${c.reset}   3 meses`);
   console.log(`  ${c.dim}6${c.reset}   6 meses`);
   console.log(`  ${c.dim}12${c.reset}  1 ano`);
-  console.log(`  ${c.dim}D${c.reset}   Data específica (YYYY-MM-DD)`);
-  if (current) console.log(`  ${c.dim}M${c.reset}   Manter atual (${current.slice(0, 10)})`);
+  console.log(`  ${c.dim}D${c.reset}   Data específica (DD/MM/AAAA)`);
+  if (current) console.log(`  ${c.dim}M${c.reset}   Manter atual (${fmtDateBR(current)})`);
 
   const def = current ? "M" : "3";
   const raw = (await ask(`→ `, { default: def })).trim().toLowerCase();
@@ -839,9 +843,12 @@ async function askExpiration(siteJsonPath) {
   if (raw === "m" && current) return current;
   if (raw === "d") {
     while (true) {
-      const date = (await ask(`Data ${c.dim}(YYYY-MM-DD)${c.reset} → `)).trim();
-      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date + "T00:00:00Z"))) return date;
-      err("Formato inválido. Use YYYY-MM-DD (ex: 2027-12-31).");
+      const date = (await ask(`Data ${c.dim}(DD/MM/AAAA)${c.reset} → `)).trim();
+      // Aceita DD/MM/AAAA (padrão) e YYYY-MM-DD (fallback); guarda sempre em ISO.
+      const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(date);
+      const iso = br ? `${br[3]}-${br[2]}-${br[1]}` : date;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && !isNaN(Date.parse(iso + "T00:00:00Z"))) return iso;
+      err("Formato inválido. Use DD/MM/AAAA (ex: 31/12/2027).");
     }
   }
   const months = parseInt(raw, 10);
@@ -856,6 +863,14 @@ function monthsFromNow(months) {
   const d = new Date();
   d.setUTCMonth(d.getUTCMonth() + months);
   return d.toISOString().slice(0, 10);
+}
+
+// Exibe data ISO (YYYY-MM-DD) no padrão dia/mês/ano. Só apresentação — o valor
+// gravado em site.json/registry continua ISO, que é o que a VPS espera.
+function fmtDateBR(iso) {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
 }
 
 function writeSiteMeta(cwd, category, slug, expires_at, subdomain) {
@@ -999,7 +1014,7 @@ async function cmdDeploy(argv) {
   if (futureUrl) {
     console.log(`  ${c.dim}Futuro:${c.reset}   ${c.dim}${futureUrl}${c.reset} ${c.dim}(quando o DNS migrar)${c.reset}`);
   }
-  console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${expires_at}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
+  console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${fmtDateBR(expires_at)}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
   console.log();
 
   const confirm = await ask(`Confirma o envio? ${c.dim}(s/N)${c.reset} → `);
@@ -2331,6 +2346,7 @@ async function cmdDirectDeploy(argv) {
   const dryRun = argv.includes("--dry-run");
   const validateOnly = argv.includes("--validate-only");
   const skipUpload = argv.includes("--skip-upload");
+  const assumeYes = argv.includes("--yes") || argv.includes("-y");
   const guestsReset = argv.includes("--guests-reset");
   const skipTypecheck = argv.includes("--skip-typecheck");
   const verbose = argv.includes("--verbose") || argv.includes("-v");
@@ -2528,13 +2544,17 @@ async function cmdDirectDeploy(argv) {
   } else {
     console.log(`  ${c.dim}URL:${c.reset}      ${c.cyan}${targetUrl}/${fullSlug}${c.reset}`);
   }
-  console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${expires_at}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
+  console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${fmtDateBR(expires_at)}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
   console.log();
 
-  const confirm = await ask(`Confirmar envio? ${c.dim}(s/N)${c.reset} → `);
-  if (confirm.toLowerCase() !== "s" && confirm.toLowerCase() !== "sim") {
-    warn("Cancelado.");
-    process.exit(0);
+  if (assumeYes) {
+    info("--yes: confirmação automática.");
+  } else {
+    const confirm = await ask(`Confirmar envio? ${c.dim}(s/N)${c.reset} → `);
+    if (confirm.toLowerCase() !== "s" && confirm.toLowerCase() !== "sim") {
+      warn("Cancelado.");
+      process.exit(0);
+    }
   }
 
   // ====== Staging: copia cwd pra temp dir antes de zipar ======

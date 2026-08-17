@@ -7,7 +7,7 @@
 // intruso com o link não consegue inserir outro nome nem se passar por convidado.
 //
 // Papel do CLI (aqui):
-//   1. Ler um .txt com 1 convidado por linha.
+//   1. Ler um .txt com 1 convidado por linha (opcionalmente "Nome|N" pra N pessoas).
 //   2. Gerar um token curto e aleatório pra cada um.
 //   3. Escrever public/guests.json no staging (antes do build).
 //   4. Reescrever o fetch("/guests.json") pra respeitar o basePath do site.
@@ -99,14 +99,15 @@ export class ConviteTokenAdapter extends BaseAdapter {
       if (existsSync(stale)) { rmSync(stale, { force: true }); }
       warn("Este convite JÁ tem o sistema de tokenização, mas falta a lista de convidados.");
       info(`Crie um arquivo ${c.bold}.txt${c.reset} com ${c.bold}um nome por linha${c.reset} (ex.: "João e Maria") na pasta do convite e rode o deploy de novo pra gerar os links.`);
+      info(`Pra convite com acompanhantes, use ${c.bold}Nome|N${c.reset} (ex.: "Família Gabo|4") — sem o ${c.bold}|${c.reset} assume 1 pessoa.`);
       info(`Sem a lista, o convite sobe só em ${c.cyan}modo prévia${c.reset} (sem tokens por convidado).`);
       return true;
     }
 
     // 2) Lê o .txt: nomes soltos (add) + diretivas `Antigo => Novo` (rename)
-    let adds, renames, linkLines;
+    let adds, renames, linkLines, badPax;
     try {
-      ({ adds, renames, linkLines } = parseGuestList(readFileSync(guestFile, "utf8")));
+      ({ adds, renames, linkLines, badPax } = parseGuestList(readFileSync(guestFile, "utf8")));
     } catch (e) {
       err(`Falha ao ler ${guestFile}: ${e.message}`);
       return false;
@@ -121,44 +122,59 @@ export class ConviteTokenAdapter extends BaseAdapter {
     if (linkLines.length > 0) {
       warn(`${linkLines.length} linha(s) com URL/token ignorada(s) em ${guestFile} — não são nomes de convidado.`);
     }
+    for (const b of badPax.slice(0, 5)) {
+      warn(`  "${b}": depois do ${c.bold}|${c.reset} tem que vir um número (ex.: "Família Gabo|4") — assumindo 1 pessoa.`);
+    }
     if (adds.length === 0 && renames.length === 0 && existingCount === 0) {
       err(`Lista de convidados vazia em ${guestFile}.`);
       return false;
     }
 
     // 3) Merge. Parte do estado atual e aplica renomes + adições.
-    const guests = { ...existing }; // token → nome
+    const guests = { ...existing }; // token → nome | { name, pax }
     const seen = new Set(Object.keys(guests));
     const nameToToken = new Map();
-    for (const [tok, nm] of Object.entries(guests)) nameToToken.set(normName(nm), tok);
+    for (const [tok, v] of Object.entries(guests)) nameToToken.set(normName(guestName(v)), tok);
 
-    const newRows = [];   // { name, token } — só os novos, pra o .txt de novos
+    const newRows = [];   // { name, token, pax } — só os novos, pra o .txt de novos
     const renamed = [];   // { from, to }
+    const paxChanged = []; // { name, from, to }
     const renameMisses = [];
 
-    for (const { from, to } of renames) {
+    for (const { from, to, pax, hadPax } of renames) {
       const tok = nameToToken.get(normName(from));
       if (tok) {
-        guests[tok] = to;
+        // Sem |N na linha de rename, mantém o pax que o convidado já tinha.
+        guests[tok] = makeGuest(to, hadPax ? pax : guestPax(guests[tok]));
         nameToToken.delete(normName(from));
         nameToToken.set(normName(to), tok);
         renamed.push({ from, to });
       } else {
         // Antigo não encontrado no site: trata o "novo" como convidado novo.
         const t = genUniqueToken(seen);
-        guests[t] = to;
+        guests[t] = makeGuest(to, pax);
         nameToToken.set(normName(to), t);
-        newRows.push({ name: to, token: t });
+        newRows.push({ name: to, token: t, pax });
         renameMisses.push(from);
       }
     }
 
-    for (const name of adds) {
-      if (nameToToken.has(normName(name))) continue; // já existe → mantém token
+    for (const { name, pax, hadPax } of adds) {
+      const tok = nameToToken.get(normName(name));
+      if (tok) {
+        // Já existe → mantém o token (o link já enviado continua valendo) e só
+        // ajusta o pax se o .txt trouxe um |N diferente do que está no ar.
+        const current = guestPax(guests[tok]);
+        if (hadPax && pax !== current) {
+          guests[tok] = makeGuest(guestName(guests[tok]), pax);
+          paxChanged.push({ name, from: current, to: pax });
+        }
+        continue;
+      }
       const t = genUniqueToken(seen);
-      guests[t] = name;
+      guests[t] = makeGuest(name, pax);
       nameToToken.set(normName(name), t);
-      newRows.push({ name, token: t });
+      newRows.push({ name, token: t, pax });
     }
 
     // 4) Escreve public/guests.json + reescreve o fetch pro basePath
@@ -171,7 +187,11 @@ export class ConviteTokenAdapter extends BaseAdapter {
     const domain = targetUrl.replace(/\/$/, "");
     const base = domain.endsWith(`/${fullSlug}`) ? domain : `${domain}/${fullSlug}`;
     const slug = fullSlug.split("/").pop();
-    const allRows = Object.entries(guests).map(([token, name]) => ({ name, token }));
+    const allRows = Object.entries(guests).map(([token, v]) => ({
+      name: guestName(v),
+      token,
+      pax: guestPax(v),
+    }));
 
     const fullPath = join(projectDir, `convidados-${slug}-links.txt`);
     writeFileSync(fullPath, renderLinks(
@@ -197,8 +217,14 @@ export class ConviteTokenAdapter extends BaseAdapter {
       const kept = allRows.length - newRows.length;
       info(`Merge: ${c.bold}${newRows.length}${c.reset} novo(s) · ${c.bold}${renamed.length}${c.reset} renomeado(s) · ${c.bold}${kept}${c.reset} preservado(s) (token intacto).`);
     }
-    printSample("Novos", newRows.map((r) => r.name));
+    printSample("Novos", newRows.map((r) => (r.pax > 1 ? `${r.name} (${r.pax}p)` : r.name)));
     printSample("Renomeados", renamed.map((r) => `${r.from} → ${r.to}`));
+    printSample("Nº de pessoas alterado", paxChanged.map((r) => `${r.name}: ${r.from} → ${r.to}`));
+    const multiPax = allRows.filter((r) => r.pax > 1);
+    if (multiPax.length > 0) {
+      const total = allRows.reduce((s, r) => s + r.pax, 0);
+      info(`Convites com acompanhante: ${c.bold}${multiPax.length}${c.reset} · total de ${c.bold}${total}${c.reset} pessoa(s).`);
+    }
     for (const m of renameMisses.slice(0, 5)) warn(`  rename "${m} => ..." ignorado: "${m}" não existe no site — o novo nome virou convidado novo (link novo).`);
     if (renameMisses.length > 5) warn(`  … + ${renameMisses.length - 5} rename(s) ignorado(s).`);
     if (rewritten > 0) info(`fetch do guests.json reescrito em ${rewritten} arquivo(s) pro basePath /${fullSlug}/`);
@@ -242,6 +268,38 @@ function normName(s) {
   return String(s).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+// ---------------------------------------------------------------------------
+// Formato do valor de um convidado no guests.json
+// ---------------------------------------------------------------------------
+// Convite pra 1 pessoa fica como string (`"Prima Ana"`), convite pra N vira
+// objeto (`{ name, pax }`). Os dois formatos coexistem: guests.json publicado
+// antes do pax continua válido e o guest.tsx entende ambos.
+export function guestName(v) {
+  return typeof v === "string" ? v : String(v?.name ?? "");
+}
+
+export function guestPax(v) {
+  const n = typeof v === "string" ? 1 : Number(v?.pax);
+  return Number.isFinite(n) && n > 1 ? Math.floor(n) : 1;
+}
+
+function makeGuest(name, pax) {
+  return pax > 1 ? { name, pax } : name;
+}
+
+// "Família Gabo|4" → { name: "Família Gabo", pax: 4, hadPax: true }
+// hadPax distingue "não falou de pax" (preserva o que está no ar) de "pediu 1".
+function parseNamePax(raw) {
+  const s = String(raw);
+  const i = s.indexOf("|");
+  if (i < 0) return { name: s.trim(), pax: 1, hadPax: false, bad: false };
+  const name = s.slice(0, i).trim();
+  const rest = s.slice(i + 1).trim();
+  if (!/^\d+$/.test(rest)) return { name, pax: 1, hadPax: false, bad: true };
+  const pax = Math.max(1, parseInt(rest, 10));
+  return { name, pax, hadPax: true, bad: false };
+}
+
 // Separa nomes soltos (add) de diretivas de rename `Antigo => Novo`.
 // Uma linha é "link" (URL de convite) e não um nome de convidado. Guardar isso
 // como convidado geraria um token novo com a URL inteira no lugar do nome — a
@@ -254,19 +312,27 @@ function parseGuestList(txt) {
   const adds = [];
   const renames = [];
   const linkLines = [];
+  const badPax = [];
   for (const raw of txt.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#")) continue;
     if (isLinkLine(line)) { linkLines.push(line); continue; }
     const arrow = line.indexOf("=>");
     if (arrow >= 0) {
-      const from = line.slice(0, arrow).trim();
-      const to = line.slice(arrow + 2).trim();
-      if (from && to) { renames.push({ from, to }); continue; }
+      const from = parseNamePax(line.slice(0, arrow));
+      const to = parseNamePax(line.slice(arrow + 2));
+      if (from.name && to.name) {
+        if (to.bad) badPax.push(line);
+        renames.push({ from: from.name, to: to.name, pax: to.pax, hadPax: to.hadPax });
+        continue;
+      }
     }
-    adds.push(line);
+    const { name, pax, hadPax, bad } = parseNamePax(line);
+    if (!name) continue;
+    if (bad) badPax.push(line);
+    adds.push({ name, pax, hadPax });
   }
-  return { adds, renames, linkLines };
+  return { adds, renames, linkLines, badPax };
 }
 
 // Fonte do estado atual: SERVIDOR primeiro (guests.json publicado é a verdade —
@@ -345,7 +411,8 @@ export async function slugExistsInRegistry(config, fullSlug) {
   }
 }
 
-// Lê convidados-<slug>-links.txt (linhas "URL?t=TOKEN — Nome") → {token: nome}.
+// Lê convidados-<slug>-links.txt (linhas "URL?t=TOKEN — Nome (N pessoas)")
+// → { token: nome | { name, pax } }.
 function loadLocalLinks(projectDir, slug) {
   const out = {};
   const file = join(projectDir, `convidados-${slug}-links.txt`);
@@ -355,7 +422,10 @@ function loadLocalLinks(projectDir, slug) {
       const line = raw.trim();
       if (!line || line.startsWith("#")) continue;
       const m = line.match(/\?t=([A-Za-z0-9]+)\s*[—-]\s*(.+?)\s*$/);
-      if (m) out[m[1]] = m[2].trim();
+      if (!m) continue;
+      const pax = m[2].match(/\((\d+) pessoas\)$/);
+      const name = pax ? m[2].slice(0, pax.index).trim() : m[2].trim();
+      out[m[1]] = makeGuest(name, pax ? parseInt(pax[1], 10) : 1);
     }
   } catch {}
   return out;
@@ -391,7 +461,11 @@ function writeGuestsJson(stagingDir, fullSlug, guests) {
   const publicDir = join(stagingDir, "public");
   mkdirSync(publicDir, { recursive: true });
   const generatedAt = new Date().toISOString();
-  const payload = { version: 1, generatedAt, site: fullSlug, guests };
+  const normalized = {};
+  for (const [tok, v] of Object.entries(guests)) {
+    normalized[tok] = makeGuest(guestName(v), guestPax(v));
+  }
+  const payload = { version: 1, generatedAt, site: fullSlug, guests: normalized };
   writeFileSync(join(publicDir, "guests.json"), JSON.stringify(payload, null, 2) + "\n");
   return generatedAt;
 }
@@ -402,7 +476,7 @@ function renderLinks(header, generatedAt, base, rows) {
     `# Gerado em ${generatedAt}`,
     `# ${rows.length} convidado(s). Um link por convidado, único e intransferível.`,
     "",
-    ...rows.map((r) => `${base}?t=${r.token} — ${r.name}`),
+    ...rows.map((r) => `${base}?t=${r.token} — ${r.name}${r.pax > 1 ? ` (${r.pax} pessoas)` : ""}`),
     "",
   ].join("\n");
 }

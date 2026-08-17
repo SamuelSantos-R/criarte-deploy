@@ -2289,10 +2289,12 @@ async function cmdTokenizar(argv) {
   console.log(`  ${c.cyan}const guest = useGuest();${c.reset}`);
   console.log(`  ${c.dim}// guest.valid  → só habilita o form se o token existir${c.reset}`);
   console.log(`  ${c.dim}// guest.name   → nome do convidado (preencha e TRAVE o campo)${c.reset}`);
+  console.log(`  ${c.dim}// guest.pax    → nº de pessoas do convite (limite o seletor de acompanhantes)${c.reset}`);
   console.log(`  ${c.dim}// guest.loading→ enquanto carrega o guests.json${c.reset}`);
   console.log();
 
   info(`Depois é só rodar ${c.cyan}criarte-deploy${c.reset} com seu .txt de convidados na pasta — o CLI gera os tokens.`);
+  info(`No .txt, ${c.bold}Nome|N${c.reset} define o nº de pessoas (ex.: "Família Gabo|4"); sem ${c.bold}|${c.reset} assume 1.`);
   ok("Scaffold de tokenização concluído.");
 }
 

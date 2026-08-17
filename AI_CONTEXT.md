@@ -66,6 +66,18 @@ class BaseAdapter {
   com contagem de linhas; nenhum → prompt de caminho. Ordem: canônicos primeiro,
   depois pela lista com mais linhas. Flag `--guests-file` continua tendo prioridade.
 
+### Nº de pessoas por convite (`pax`)
+Linha do `.txt` aceita `Nome|N` (`parseNamePax` no adapter `convite-token`): o
+convite passa a valer pra N pessoas. No `guests.json`, pax 1 fica string
+(`"Prima Ana"`) e pax > 1 vira `{ name, pax }` — `guestName`/`guestPax` leem os
+dois formatos, então listas geradas antes do pax continuam válidas (e o
+`guest.tsx` do template expõe `guest.pax`). Regras do merge: linha **sem** `|N`
+preserva o pax publicado (não zera), `|N` diferente do que está no ar só atualiza
+o número (token intacto), `Antigo => Novo|N` renomeia e ajusta o pax de uma vez.
+`|` seguido de não-número vira aviso e cai pra 1. O `-links.txt` marca `(N pessoas)`
+no fim da linha e o fallback offline (`loadLocalLinks`) lê isso de volta.
+Testes: `tests/convite-token-pax.test.mjs` (`npm test`).
+
 ### Detecção de base + sugestão de categoria (`src/lib/detect.mjs`)
 `detectBaseInfo(dir)` combina duas camadas antes do deploy:
 - **Base estrutural**: `rsvp` (markers d1/api criar-confirmacao) → `convite-token`

@@ -81,6 +81,27 @@ Se o projeto usa tokenização por convidado, o CLI procura sozinho os arquivos
 Os arquivos de saída (`convidados-<slug>-links.txt` / `-novos.txt`) e ruído como
 `robots.txt` são ignorados automaticamente — não aparecem na lista.
 
+#### Sintaxe do `.txt` de convidados
+
+```
+Família Gabo|4
+Família Ferreira|4
+Tio Danito e esposa|2
+Prima Ana
+Nome Antigo => Nome Novo
+# linha comentada
+```
+
+- `Nome|N` → o convite vale pra **N pessoas** (`guest.pax` no front). Sem `|`, é 1.
+- `Antigo => Novo` → **renomeia sem trocar o token** (o link já enviado continua
+  valendo). Pode levar pax junto: `Antigo => Novo|2`.
+- Repetir um nome que já está no ar com outro `|N` só **atualiza o nº de pessoas**,
+  o token fica igual.
+
+No `guests.json` o convite pra 1 pessoa vira string (`"Prima Ana"`) e o de N vira
+objeto (`{ "name": "Família Gabo", "pax": 4 }`). O `guest.tsx` entende os dois, então
+listas geradas antes do `pax` continuam válidas.
+
 ### Comandos disponíveis
 
 | Comando | O que faz |

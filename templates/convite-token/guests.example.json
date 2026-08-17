@@ -4,6 +4,7 @@
   "site": "categoria/slug",
   "guests": {
     "EXEMPLOTOKEN1": "Fulano e Acompanhante",
-    "EXEMPLOTOKEN2": "Beltrano da Silva"
+    "EXEMPLOTOKEN2": "Beltrano da Silva",
+    "EXEMPLOTOKEN3": { "name": "Família Gabo", "pax": 4 }
   }
 }

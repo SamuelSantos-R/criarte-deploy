@@ -16,14 +16,29 @@ import { useEffect, useState } from "react";
 export interface Guest {
   token: string | null;
   name: string | null;
+  /** Quantas pessoas esse convite cobre (1 quando o .txt não traz "|N"). */
+  pax: number;
   valid: boolean;
   loading: boolean;
+}
+
+// O valor de cada token no guests.json vem em dois formatos: string simples
+// (convite pra 1) ou { name, pax } (convite pra N). Os dois convivem — listas
+// geradas antes do pax continuam válidas.
+type GuestEntry = string | { name?: string; pax?: number };
+
+function parseEntry(entry: GuestEntry | undefined | null): { name: string | null; pax: number } {
+  if (typeof entry === "string") return { name: entry, pax: 1 };
+  const name = typeof entry?.name === "string" ? entry.name : null;
+  const pax = Number(entry?.pax);
+  return { name, pax: Number.isFinite(pax) && pax > 1 ? Math.floor(pax) : 1 };
 }
 
 export function useGuest(): Guest {
   const [state, setState] = useState<Guest>({
     token: null,
     name: null,
+    pax: 1,
     valid: false,
     loading: true,
   });
@@ -31,7 +46,7 @@ export function useGuest(): Guest {
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get("t");
     if (!token) {
-      setState({ token: null, name: null, valid: false, loading: false });
+      setState({ token: null, name: null, pax: 1, valid: false, loading: false });
       return;
     }
     let alive = true;
@@ -39,11 +54,11 @@ export function useGuest(): Guest {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!alive) return;
-        const name: string | null = data?.guests?.[token] ?? null;
-        setState({ token, name, valid: Boolean(name), loading: false });
+        const { name, pax } = parseEntry(data?.guests?.[token]);
+        setState({ token, name, pax, valid: Boolean(name), loading: false });
       })
       .catch(() => {
-        if (alive) setState({ token, name: null, valid: false, loading: false });
+        if (alive) setState({ token, name: null, pax: 1, valid: false, loading: false });
       });
     return () => {
       alive = false;

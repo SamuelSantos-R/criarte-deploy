@@ -7,13 +7,15 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const REPO = "SamuelSantos-R/multisite-system";
+export const CLI_REPO = "SamuelSantos-R/criarte-deploy";
 export const DEPLOY_DOMAIN = "https://criartedesing.ao";
 export const DEFAULT_PANEL_URL = DEPLOY_DOMAIN;
 export const CONFIG_DIR = join(homedir(), ".criarte-deploy");
 export const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+// Raiz do pacote — usada pra achar o package.json e detectar instalação via git.
+export const CLI_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // Fonte única de versão: package.json
-const PKG_PATH = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "package.json");
-export const VERSION = JSON.parse(readFileSync(PKG_PATH, "utf8")).version;
+export const VERSION = JSON.parse(readFileSync(join(CLI_ROOT, "package.json"), "utf8")).version;
 
 export const c = {
   reset: "\x1b[0m",      bold: "\x1b[1m",      dim: "\x1b[2m",

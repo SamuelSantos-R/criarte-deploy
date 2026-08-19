@@ -19,6 +19,7 @@ export async function mainMenu() {
     options: [
       { value: "deploy", label: "Fazer deploy desta pasta", hint: folder },
       { value: "list", label: "Listar sites no ar" },
+      { value: "convidados", label: "Corrigir nome de convidado", hint: "sem trocar o link já enviado" },
       { value: "remove", label: "Remover um site" },
       { value: "doctor", label: `Diagnóstico ${c.dim}(doctor)${c.reset}` },
       { value: "config", label: "Configurações" },

@@ -17,6 +17,7 @@ import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s
 import { BANNER } from "./banner.mjs";
 import { detectAdapter } from "./src/adapters/registry.mjs";
 import { VERSION } from "./src/lib/config.mjs";
+import { autoUpdate } from "./src/lib/update.mjs";
 import { mainMenu, configMenu } from "./src/ui/menu.mjs";
 import { confirm, isInteractive, multiselect, outro, pause, select, text } from "./src/ui/prompts.mjs";
 import { detectBaseInfo } from "./src/lib/detect.mjs";
@@ -1303,23 +1304,27 @@ function sleep(ms) {
 // ============================================================================
 // LIST
 // ============================================================================
+// Fonte da verdade é o servidor (mesma do resto do CLI). O antigo
+// config/sites.json no GitHub ficou pra trás na migração p/ Hetzner.
+async function fetchSites(config) {
+  const base = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
+  const res = await fetch(`${base}/api/sites/registry`, {
+    signal: AbortSignal.timeout(15000),
+    headers: { "Cache-Control": "no-cache" },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data?.sites) ? data.sites : [];
+}
+
 async function cmdList() {
   miniHeader("📂 Sites publicados");
   const config = requireLogin();
 
-  // Fonte da verdade é o servidor (mesma do resto do CLI). O antigo
-  // config/sites.json no GitHub ficou pra trás na migração p/ Hetzner.
-  const base = (config.panel_url || DEPLOY_DOMAIN).replace(/\/$/, "");
   const sp = new Spinner("Buscando lista de sites...").start();
   let sites;
   try {
-    const res = await fetch(`${base}/api/sites/registry`, {
-      signal: AbortSignal.timeout(15000),
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!res.ok) { sp.fail(`Erro ao buscar lista (HTTP ${res.status})`); process.exit(1); }
-    const data = await res.json();
-    sites = Array.isArray(data?.sites) ? data.sites : [];
+    sites = await fetchSites(config);
   } catch (e) {
     sp.fail(`Erro ao buscar lista: ${e.message}`);
     process.exit(1);
@@ -1410,12 +1415,13 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --guests-reset")}         ${dim("convite-token: regenera TODOS os tokens (quebra links antigos)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --skip-typecheck")}      ${dim("ignora erros de tipo (não recomendado)")}`);
   console.log(`  ${cmd("criarte-deploy")} ${dim("... --verbose")}             ${dim("mostra stack trace em erros")}`);
-  console.log(`  ${cmd("criarte-deploy rm")} ${dim("<categoria>/<nome>")}      ${dim("apaga site (VPS + R2 + registry)")}`);
+  console.log(`  ${cmd("criarte-deploy rm")} ${dim("[categoria/nome]")}        ${dim("apaga site (sem argumento, escolhe na setinha)")}`);
   console.log(`  ${cmd("criarte-deploy locks")}                     ${dim("lista/libera locks de deploy")}`);
 
   section("🎟️ Convite-token (link único por convidado)");
   console.log(`  ${cmd("criarte-deploy tokenizar")} ${dim("[pasta]")}             ${dim("injeta a tokenização num convite normal (scaffold)")}`);
   console.log(`  ${dim("depois: criarte-deploy com o .txt de convidados na pasta gera os tokens")}`);
+  console.log(`  ${cmd("criarte-deploy convidados")} ${dim("[cat/nome]")}       ${dim("corrige nome errado sem trocar o link nem refazer o deploy")}`);
 
   section("💌 RSVP (casamentos com painel admin)");
   console.log(`  ${cmd("criarte-deploy rsvp-setup")} ${dim("[slug]")}            ${dim("registra um casamento no servidor")}`);
@@ -2057,6 +2063,64 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
 // ============================================================================
 // DIRECT DEPLOY (upload direto pra VPS via API — sem git, sem rebuild)
 // ============================================================================
+// Janela da setinha: acima disso o clack rola em vez de despejar tudo na tela.
+const MAX_ITEMS = 12;
+// Acima disso, pergunta a categoria antes pra encurtar a lista.
+const MAX_FLAT_SITES = 15;
+
+// Escolhe um site publicado pela setinha (evita digitar categoria/nome na mão).
+// Retorna o slug escolhido, ou null se cancelar / não houver site.
+async function pickSite(config, message) {
+  const sp = new Spinner("Buscando sites publicados...").start();
+  let sites;
+  try {
+    sites = await fetchSites(config);
+  } catch (e) {
+    sp.fail(`Erro ao buscar lista: ${e.message}`);
+    return null;
+  }
+  sp.succeed(`${sites.length} site(s) publicado(s)`);
+  if (!sites.length) { info("Nenhum site publicado ainda."); return null; }
+
+  const CANCEL = "__cancel__";
+  const byName = (a, b) => (a.name || a.slug).localeCompare(b.name || b.slug);
+
+  // Com dezenas de sites, uma lista única vira rolagem infinita na setinha.
+  // Filtra por categoria primeiro pra chegar no site em 2 escolhas.
+  let pool = sites;
+  if (sites.length > MAX_FLAT_SITES) {
+    const cats = [...new Set(sites.map((s) => s.category || "geral"))].sort();
+    const cat = await select({
+      message: "Qual categoria?",
+      options: [
+        ...cats.map((k) => ({
+          value: k,
+          label: k,
+          hint: `${sites.filter((s) => (s.category || "geral") === k).length} site(s)`,
+        })),
+        { value: CANCEL, label: "← Cancelar" },
+      ],
+      maxItems: MAX_ITEMS,
+    });
+    if (cat === CANCEL) return null;
+    pool = sites.filter((s) => (s.category || "geral") === cat);
+  }
+
+  const picked = await select({
+    message,
+    options: [
+      ...pool.slice().sort(byName).map((s) => ({
+        value: s.slug,
+        label: s.name || s.slug,
+        hint: s.slug,
+      })),
+      { value: CANCEL, label: "← Cancelar" },
+    ],
+    maxItems: MAX_ITEMS,
+  });
+  return picked === CANCEL ? null : picked;
+}
+
 async function cmdRemove(argv) {
   const config = requireLogin();
   const targetUrl = (config.panel_url || "").replace(/\/$/, "");
@@ -2068,8 +2132,13 @@ async function cmdRemove(argv) {
   let argSlug = argv.find(a => !a.startsWith("-"));
   let force = argv.includes("--force") || argv.includes("-f");
   if (!argSlug) {
-    err("Uso: criarte-deploy rm <categoria>/<nome> [--force]");
-    process.exit(1);
+    if (!isInteractive()) {
+      err("Uso: criarte-deploy rm <categoria>/<nome> [--force]");
+      process.exit(1);
+    }
+    miniHeader("🗑  Remover site");
+    argSlug = await pickSite(config, `Qual site remover? ${c.dim}(ESC cancela)${c.reset}`);
+    if (!argSlug) { info("Nada foi removido."); return; }
   }
   const slug = argSlug.toLowerCase().replace(/^\/+|\/+$/g, "");
   // Exige categoria/nome (≥2 segmentos). Slug de segmento único (ex.: "casamento")
@@ -2089,12 +2158,18 @@ async function cmdRemove(argv) {
   console.log();
 
   if (!force) {
-    const ans = await ask(`${c.red}Remover ${c.bold}${slug}${c.reset}${c.red} permanentemente?${c.reset} ${c.dim}[y/N]${c.reset} → `);
-    const yes = ["y", "yes", "s", "sim"].includes(ans.trim().toLowerCase());
+    // No terminal usa a setinha do clack; fora de TTY o ask() devolve vazio e cancela.
+    let yes;
+    if (isInteractive()) {
+      yes = await confirm(`Remover ${c.bold}${slug}${c.reset} permanentemente?`, false);
+    } else {
+      const ans = await ask(`${c.red}Remover ${c.bold}${slug}${c.reset}${c.red} permanentemente?${c.reset} ${c.dim}[y/N]${c.reset} → `);
+      yes = ["y", "yes", "s", "sim"].includes(ans.trim().toLowerCase());
+    }
     if (!yes) {
       warn(`Cancelado — ${c.bold}${slug}${c.reset} NÃO foi removido.`);
       info(`${c.dim}Pra confirmar sem prompt: ${c.cyan}criarte-deploy rm ${slug} --force${c.reset}`);
-      process.exit(0);
+      return;
     }
   }
 
@@ -2127,6 +2202,153 @@ async function cmdRemove(argv) {
     sp.fail("Erro de rede");
     err(e.message);
     process.exit(1);
+  }
+}
+
+// ============================================================================
+// CONVIDADOS (editar nome sem refazer o deploy)
+// ============================================================================
+// Corrigir um nome errado ("Larissa" → "Laíssa") exigia editar o .txt com a
+// diretiva `Antigo => Novo` e refazer o deploy inteiro. Aqui é setinha: escolhe
+// o convite, escolhe o convidado, digita o nome certo. O token não muda, então
+// o link que já foi pro WhatsApp continua valendo.
+// ============================================================================
+
+// Escolhe um convidado da lista. Acima de MAX_FLAT_SITES oferece filtro por
+// nome — rolar 80 convidados na setinha é pior do que digitar 3 letras.
+async function pickGuest(guests, message) {
+  const CANCEL = "__cancel__";
+  const FILTER = "__filter__";
+  let filtro = "";
+  while (true) {
+    const lista = filtro ? guests.filter((g) => g.name.toLowerCase().includes(filtro)) : guests;
+    if (filtro && lista.length === 0) {
+      warn(`Nenhum convidado com "${filtro}" no nome.`);
+      filtro = "";
+      continue;
+    }
+    const podeFiltrar = guests.length > MAX_FLAT_SITES || !!filtro;
+    const picked = await select({
+      message: filtro ? `${message} ${c.dim}(filtro: ${filtro})${c.reset}` : message,
+      options: [
+        ...(podeFiltrar ? [{ value: FILTER, label: filtro ? `🔎 Trocar filtro ${c.dim}(${filtro})${c.reset}` : "🔎 Filtrar por nome…" }] : []),
+        ...lista.map((g) => ({
+          value: g.token,
+          label: g.name,
+          hint: g.pax > 1 ? `${g.pax} pessoas · ${g.token}` : g.token,
+        })),
+        { value: CANCEL, label: "← Voltar" },
+      ],
+      maxItems: MAX_ITEMS,
+    });
+    if (picked === CANCEL) return null;
+    if (picked === FILTER) {
+      filtro = String(await text({ message: "Parte do nome:", placeholder: "ex.: mateus" }) || "").trim().toLowerCase();
+      continue;
+    }
+    return picked;
+  }
+}
+
+async function fetchGuests(config, targetUrl, slug) {
+  const res = await fetch(`${targetUrl}/api/sites/guests?slug=${encodeURIComponent(slug)}`, {
+    headers: { Authorization: `Bearer ${config.admin_api_token}`, "Cache-Control": "no-cache" },
+    signal: AbortSignal.timeout(15000),
+  });
+  const data = await res.json().catch(() => null);
+  // Painel antigo (sem a rota) devolve 404 em HTML, não JSON — erro bem diferente
+  // de "este site não tem convidados".
+  if (res.status === 404 && !data) {
+    throw new Error("PAINEL_DESATUALIZADO");
+  }
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data.guests || [];
+}
+
+async function cmdConvidados(argv) {
+  const config = requireLogin();
+  const targetUrl = (config.panel_url || "").replace(/\/$/, "");
+  if (!targetUrl || !config.admin_api_token) {
+    err("Painel/token não configurados. Rode: criarte-deploy panel");
+    process.exit(1);
+  }
+
+  // Fluxo é todo setinha (escolhe convite → escolhe convidado → digita o nome).
+  // Fora de TTY não há como escolher nada, então avisa em vez de sair calado.
+  if (!isInteractive()) {
+    err("`convidados` precisa de um terminal interativo — a edição é por setinha.");
+    process.exit(1);
+  }
+
+  miniHeader("✏️  Editar convidados");
+
+  let slug = argv.find((a) => !a.startsWith("-"));
+  if (!slug) {
+    slug = await pickSite(config, `De qual convite? ${c.dim}(ESC cancela)${c.reset}`);
+    if (!slug) return;
+  }
+  slug = slug.toLowerCase().replace(/^\/+|\/+$/g, "");
+
+  while (true) {
+    const sp = new Spinner("Buscando convidados...").start();
+    let guests;
+    try {
+      guests = await fetchGuests(config, targetUrl, slug);
+    } catch (e) {
+      if (e.message === "PAINEL_DESATUALIZADO") {
+        sp.fail("O painel ainda não tem o endpoint de convidados.");
+        info("Atualize o sistema-multi-site na VPS pra usar esta função.");
+      } else {
+        sp.fail(e.message);
+        if (/não tem guests\.json/i.test(e.message)) {
+          info(`${c.dim}Só convites tokenizados têm lista. Publique com um .txt de convidados primeiro.${c.reset}`);
+        }
+      }
+      return;
+    }
+    sp.succeed(`${guests.length} convidado(s) em ${c.bold}${slug}${c.reset}`);
+    if (!guests.length) { info("Este convite ainda não tem convidados."); return; }
+
+    guests.sort((a, b) => a.name.localeCompare(b.name));
+    const token = await pickGuest(guests, "Qual nome corrigir?");
+    if (!token) return;
+
+    const atual = guests.find((g) => g.token === token);
+    const novo = String(await text({
+      message: `Nome certo ${c.dim}(era: ${atual.name})${c.reset}`,
+      defaultValue: atual.name,
+      placeholder: atual.name,
+      validate: (v) => {
+        const s = String(v || "").trim();
+        if (!s) return "Não pode ficar vazio.";
+        if (s.length > 120) return "Nome longo demais.";
+      },
+    }) || "").trim();
+
+    if (novo === atual.name) {
+      info("Nome igual — nada mudou.");
+    } else {
+      const sp2 = new Spinner("Salvando...").start();
+      try {
+        const res = await fetch(`${targetUrl}/api/sites/guests`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.admin_api_token}` },
+          body: JSON.stringify({ slug, token, name: novo }),
+          signal: AbortSignal.timeout(20000),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) { sp2.fail(data.error || `HTTP ${res.status}`); return; }
+        sp2.succeed(`${c.dim}${data.before}${c.reset} → ${c.bold}${data.after}${c.reset}`);
+        ok(`Já está no ar. O link do convidado continua o mesmo:`);
+        console.log(`  ${linkify(`${targetUrl}/${slug}?t=${token}`)}`);
+      } catch (e) {
+        sp2.fail(`Erro de rede: ${e.message}`);
+        return;
+      }
+    }
+
+    if (!isInteractive()) return;
+    if (!(await confirm("Corrigir mais algum nome?", false))) return;
   }
 }
 
@@ -3370,14 +3592,14 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
 // ============================================================================
 async function runMenu() {
   // Loop: depois de cada ação volta ao menu. Só sai no "Sair" (ou Ctrl+C).
-  // Deploy/remove terminam o processo por conta própria (ações de escrita);
-  // list/doctor/config retornam e caem de volta aqui.
+  // Deploy termina o processo por conta própria; o resto retorna e cai aqui.
   while (true) {
     const action = await mainMenu();
     switch (action) {
       case "deploy":  await cmdDirectDeploy([]); break;
       case "list":    await cmdList();   await pause(); break;
-      case "remove":  await cmdRemove([]);       break;
+      case "convidados": await cmdConvidados([]); await pause(); break;
+      case "remove":  await cmdRemove([]); await pause(); break;
       case "doctor":  await cmdDoctor(); await pause(); break;
       case "config":  await runConfigMenu();     break;
       case "exit":
@@ -3412,6 +3634,9 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       console.log(VERSION);
       return;
     }
+    // Antes de qualquer comando: garante que estamos na versão do repo. Se
+    // atualizar, re-executa este mesmo comando e não volta pra cá.
+    await autoUpdate({ interactive: isInteractive() });
     if (hasDirect) {
       const deployArgs = cmd === "--direct" ? rest : rest.filter(a => a !== "--direct");
       await cmdDirectDeploy(deployArgs);
@@ -3430,6 +3655,8 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "tokenize":   await cmdTokenizar(rest); break;
       case "list":
       case "ls":         await cmdList();      break;
+      case "convidados":
+      case "guests":     await cmdConvidados(rest); break;
       case "rm":
       case "remove":
       case "delete":     await cmdRemove(rest); break;

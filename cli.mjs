@@ -2250,6 +2250,56 @@ async function pickGuest(guests, message) {
   }
 }
 
+// O registry lista todo site publicado, e a grande maioria não é convite
+// tokenizado. Sem esta chamada a setinha ofereceria dezenas de sites que só
+// respondem "não tem guests.json" depois de escolhidos.
+async function fetchConvitesTokenizados(config, targetUrl) {
+  const res = await fetch(`${targetUrl}/api/sites/guests`, {
+    headers: { Authorization: `Bearer ${config.admin_api_token}`, "Cache-Control": "no-cache" },
+    signal: AbortSignal.timeout(15000),
+  });
+  const data = await res.json().catch(() => null);
+  if (res.status === 404 && !data) throw new Error("PAINEL_DESATUALIZADO");
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return data.sites || [];
+}
+
+async function pickConvite(config, targetUrl) {
+  const sp = new Spinner("Buscando convites com lista de convidados...").start();
+  let sites;
+  try {
+    sites = await fetchConvitesTokenizados(config, targetUrl);
+  } catch (e) {
+    if (e.message === "PAINEL_DESATUALIZADO") {
+      sp.fail("O painel ainda não tem o endpoint de convidados.");
+      info("Atualize o sistema-multi-site na VPS pra usar esta função.");
+      return null;
+    }
+    sp.fail(`Erro ao buscar convites: ${e.message}`);
+    return null;
+  }
+  if (!sites.length) {
+    sp.fail("Nenhum convite com lista de convidados publicado ainda.");
+    return null;
+  }
+  sp.succeed(`${sites.length} convite(s) com lista de convidados`);
+
+  const CANCEL = "__cancel__";
+  const picked = await select({
+    message: `De qual convite? ${c.dim}(ESC cancela)${c.reset}`,
+    options: [
+      ...sites.map((s) => ({
+        value: s.slug,
+        label: s.slug,
+        hint: `${s.count} convidado(s)`,
+      })),
+      { value: CANCEL, label: "← Cancelar" },
+    ],
+    maxItems: MAX_ITEMS,
+  });
+  return picked === CANCEL ? null : picked;
+}
+
 async function fetchGuests(config, targetUrl, slug) {
   const res = await fetch(`${targetUrl}/api/sites/guests?slug=${encodeURIComponent(slug)}`, {
     headers: { Authorization: `Bearer ${config.admin_api_token}`, "Cache-Control": "no-cache" },
@@ -2284,7 +2334,7 @@ async function cmdConvidados(argv) {
 
   let slug = argv.find((a) => !a.startsWith("-"));
   if (!slug) {
-    slug = await pickSite(config, `De qual convite? ${c.dim}(ESC cancela)${c.reset}`);
+    slug = await pickConvite(config, targetUrl);
     if (!slug) return;
   }
   slug = slug.toLowerCase().replace(/^\/+|\/+$/g, "");

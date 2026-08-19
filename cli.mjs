@@ -1401,7 +1401,8 @@ function cmdHelp() {
   showBanner();
   const cmd = (s) => `${c.brand}${s}${c.reset}`;
   const dim = (s) => `${c.dim}${s}${c.reset}`;
-  console.log(`${c.italic}${c.dim}Publica sites estáticos no sistema multi-site da Criarte.${c.reset}\n`);
+  console.log(`${c.italic}${c.dim}Publica sites estáticos no sistema multi-site da Criarte.${c.reset}`);
+  console.log(`${c.dim}Atalho: ${c.reset}${c.brand}crd${c.reset}${c.dim} faz o mesmo que ${c.reset}${c.brand}criarte-deploy${c.reset}${c.dim} em qualquer comando.${c.reset}\n`);
 
   section("✦ Deploy");
   console.log(`  ${cmd("criarte-deploy")}                          ${dim("publica o site da pasta atual")}`);

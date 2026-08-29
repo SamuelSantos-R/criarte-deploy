@@ -1,0 +1,22 @@
+{
+  "principal": "#7A7F4B",
+  "principal-escuro": "#5F6E2D",
+  "principal-fundo": "#54582F",
+  "principal-sombra": "#494A31",
+  "realce": "#B08A4A",
+  "realce-escuro": "#A8843F",
+  "realce-profundo": "#A87C28",
+  "realce-suave": "#D0B479",
+  "borda": "#D6BB8D",
+  "borda-forte": "#C8B385",
+  "creme": "#FDFAF4",
+  "creme-fundo": "#F8F0E0",
+  "creme-escuro": "#F5EDD8",
+  "tinta": "#745A1A",
+  "texto": "#7A5A1A",
+  "texto-claro": "#B08A3A",
+  "ouro": "#D4B86A",
+  "ouro-claro": "#EDD89A",
+  "ouro-brilho": "#F7EDCA",
+  "sage": "#DFE2D5"
+}

@@ -21,6 +21,7 @@ import { autoUpdate } from "./src/lib/update.mjs";
 import { mainMenu, configMenu } from "./src/ui/menu.mjs";
 import { confirm, isInteractive, multiselect, outro, pause, select, text } from "./src/ui/prompts.mjs";
 import { detectBaseInfo } from "./src/lib/detect.mjs";
+import { analisarTema } from "./src/lib/harness.mjs";
 import { findPageFile, listSections, applyDisableToFile } from "./src/lib/sections.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
@@ -1429,6 +1430,10 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy fotos")} ${dim("--max 1600 --q 90")}       ${dim("largura máxima e qualidade (padrão 2000px / 82)")}`);
   console.log(`  ${cmd("criarte-deploy preview")}                        ${dim("sobe o dev server e mostra o link pra abrir no celular")}`);
   console.log(`  ${cmd("criarte-deploy preview")} ${dim("--port 3001")}            ${dim("força uma porta específica")}`);
+
+  section("🎨 Tema (editar cor no Studio)");
+  console.log(`  ${cmd("criarte-deploy harness")} ${dim("[pasta]")}               ${dim("mede o que falta pro Studio conseguir repintar o convite")}`);
+  console.log(`  ${cmd("criarte-deploy harness")} ${dim("--json")}                ${dim("mesmo laudo em JSON, pra script")}`);
 
   section("💌 RSVP (casamentos com painel admin)");
   console.log(`  ${cmd("criarte-deploy rsvp-setup")} ${dim("[slug]")}            ${dim("registra um casamento no servidor")}`);
@@ -3902,6 +3907,97 @@ async function cmdPreview(argv) {
 }
 
 // ============================================================================
+// HARNESS — o quanto o convite já está pronto pro Studio
+// ============================================================================
+async function cmdHarness(argv) {
+  const alvo = argv.find((a) => !a.startsWith("-"));
+  const dir = alvo ? resolve(alvo) : process.cwd();
+
+  if (!existsSync(join(dir, "package.json"))) {
+    err("Não achei package.json aqui.");
+    info("Roda esse comando de dentro da pasta do convite, ou passa a pasta: crd harness ./meu-convite");
+    process.exitCode = 1;
+    return;
+  }
+
+  const laudo = analisarTema(dir);
+
+  if (argv.includes("--json")) {
+    console.log(JSON.stringify(laudo, null, 2));
+    return;
+  }
+
+  miniHeader("🔎 Harness do tema");
+  console.log(`${c.dim}${laudo.arquivos} arquivos lidos em ${basename(dir)}${c.reset}\n`);
+
+  const marca = { ok: `${c.ok}✓${c.reset}`, falta: `${c.errFg}✗${c.reset}`, aviso: `${c.warnFg}⚠${c.reset}` };
+  for (const p of laudo.provas) {
+    const cauda = p.detalhe ? ` ${c.dim}— ${p.detalhe}${c.reset}` : "";
+    console.log(` ${marca[p.estado]} ${p.titulo}${cauda}`);
+  }
+
+  const cheio = Math.round((laudo.pontos / laudo.total) * 20);
+  const cor = laudo.pontos === laudo.total ? c.ok : laudo.pontos >= laudo.total - 2 ? c.warnFg : c.errFg;
+  console.log(`\n ${cor}${"█".repeat(cheio)}${c.dim}${"░".repeat(20 - cheio)}${c.reset} ${c.bold}${laudo.pontos}/${laudo.total}${c.reset}\n`);
+
+  if (laudo.filtros.length > 0) {
+    const totais = laudo.filtros.filter((f) => f.total).length;
+    console.log(`${c.brand}❖${c.reset} ${c.bold}Ícone com cor presa em filter: (${laudo.filtros.length})${c.reset}`);
+    console.log(`${c.dim}A receita invert/sepia/hue-rotate é numérica: acerta uma cor de destino só,`);
+    console.log(`então trocar o token não muda o ícone. Troca por mask-image + background-color.${c.reset}`);
+    if (totais > 0) console.log(`${c.dim}${totais} começam com brightness(0) — recolor total, a origem vira silhueta.${c.reset}`);
+    for (const f of laudo.filtros.slice(0, 8)) {
+      console.log(`  ${c.dim}·${c.reset} ${f.arquivo}:${f.linha} ${c.dim}${f.receita.slice(0, 52)}${c.reset}`);
+    }
+    if (laudo.filtros.length > 8) console.log(`  ${c.dim}… e mais ${laudo.filtros.length - 8}${c.reset}`);
+    console.log();
+  }
+
+  const reusa = laudo.hex.filter((h) => h.token);
+  if (reusa.length > 0) {
+    console.log(`${c.brand}❖${c.reset} ${c.bold}Já tem nome no tema — é só trocar pelo token (${reusa.length})${c.reset}`);
+    for (const h of reusa.slice(0, 10)) {
+      console.log(`  ${h.valor} ${c.dim}×${String(h.ocorrencias).padEnd(4)}${c.reset} → ${c.cyan}${h.token}${c.reset}`);
+    }
+    if (reusa.length > 10) console.log(`  ${c.dim}… e mais ${reusa.length - 10}${c.reset}`);
+    console.log();
+  }
+
+  if (laudo.conhecidos.length > 0) {
+    console.log(`${c.brand}❖${c.reset} ${c.bold}Cores da paleta da casa — o nome já existe (${laudo.conhecidos.length})${c.reset}`);
+    for (const h of laudo.conhecidos.slice(0, 12)) {
+      const onde = h.arquivos.length === 1 ? h.arquivos[0] : `${h.arquivos.length} arquivos`;
+      console.log(`  ${h.valor} ${c.dim}×${String(h.ocorrencias).padEnd(4)}${c.reset} → ${c.cyan}${h.daCasa}${c.reset} ${c.dim}${onde}${c.reset}`);
+    }
+    if (laudo.conhecidos.length > 12) console.log(`  ${c.dim}… e mais ${laudo.conhecidos.length - 12}${c.reset}`);
+    console.log();
+  }
+
+  if (laudo.ineditos.length > 0) {
+    console.log(`${c.brand}❖${c.reset} ${c.bold}Cores que ninguém nomeou ainda (${laudo.ineditos.length})${c.reset}`);
+    console.log(`${c.dim}Aqui é decisão tua: vira token novo ou some do convite.${c.reset}`);
+    for (const h of laudo.ineditos.slice(0, 12)) {
+      const onde = h.arquivos.length === 1 ? h.arquivos[0] : `${h.arquivos.length} arquivos`;
+      console.log(`  ${h.valor} ${c.dim}×${String(h.ocorrencias).padEnd(4)} ${onde}${c.reset}`);
+    }
+    if (laudo.ineditos.length > 12) console.log(`  ${c.dim}… e mais ${laudo.ineditos.length - 12}${c.reset}`);
+    console.log();
+  }
+
+  if (laudo.soltos.length > 0) {
+    console.log(`${c.dim}Bloco "tema" pro convite.json. Nome vindo da paleta da casa é confiável;`);
+    console.log(`nome de família (ouro, verde, rosa…) é palpite por matiz — renomeia:${c.reset}`);
+    console.log(`${c.cyan}${JSON.stringify({ tema: laudo.sugestao }, null, 2)}${c.reset}\n`);
+  }
+
+  if (laudo.pontos === laudo.total) {
+    ok("Convite pronto: o Studio consegue repintar tudo pelo bloco tema.");
+  } else {
+    info(`Cada ${c.errFg}✗${c.reset} acima é uma cor que o cliente não consegue trocar no Studio.`);
+  }
+}
+
+// ============================================================================
 // Menu interativo (setinha) — despacha pros comandos já existentes
 // ============================================================================
 async function runMenu() {
@@ -3982,6 +4078,8 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "webp":       await cmdFotos(rest);  break;
       case "preview":
       case "dev":        await cmdPreview(rest); break;
+      case "harness":
+      case "tema":       await cmdHarness(rest); break;
       case "help":
       case "--help":
       case "-h":     cmdHelp();          break;

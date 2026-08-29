@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { loadSettings, saveSettings } from "./paths";
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, startJob, type Job } from "./cli";
+import { duplicarSite } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, iniciarServidor, pararServidor, rolarPreview } from "./preview";
@@ -90,6 +91,10 @@ export function registerIpc(): void {
   handle("sites:list", () => listSites());
   handle("convite:read", (_e, id: unknown) => readConvite(asString(id, "id")));
   handle("convite:write", (_e, id: unknown, data: unknown) => writeConvite(asString(id, "id"), data));
+
+  handle("sites:duplicate", (_e, id: unknown, categoria: unknown, slug: unknown) =>
+    duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
+  );
 
   handle("assets:import", (_e, id: unknown, origens: unknown) => {
     if (!Array.isArray(origens)) throw new Error("seleção inválida");

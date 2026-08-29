@@ -24,6 +24,11 @@ export const pickRoot = () => call(api.pickRoot());
 export const listSites = () => call(api.listSites()) as Promise<Site[]>;
 export const readConvite = (id: string) => call(api.readConvite(id)) as Promise<Record<string, unknown>>;
 export const writeConvite = (id: string, data: unknown) => call(api.writeConvite(id, data));
+
+export type Copia = { id: string; siteId: string; envTrocado: boolean };
+export const duplicarSite = (id: string, categoria: string, slug: string) =>
+  call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
+
 export const importAssets = (id: string, origens: string[]) =>
   call(api.importAssets(id, origens)) as Promise<AssetImportado[]>;
 export const pickAssets = (id: string, pasta: boolean) =>

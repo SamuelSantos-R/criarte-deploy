@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { FolderOpen, Redo2, RefreshCw, RotateCcw, Save, Square, Undo2 } from "lucide-react";
+import { Copy, FolderOpen, Redo2, RefreshCw, RotateCcw, Save, Square, Undo2 } from "lucide-react";
 import { previewScroll, readConvite, reveal, writeConvite, type Site } from "@/lib/api";
 import {
   alternarSecao,
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/primitives";
 import { JsonForm } from "@/components/JsonForm";
 import { ProvedorSite } from "@/components/CampoArquivo";
 import { acharAparelho, Palco } from "@/components/Palco";
+import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { Topo } from "@/components/Topo";
 
@@ -151,6 +152,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   const [secao, setSecao] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [duplicando, setDuplicando] = useState(false);
   const rodando = usarServidor();
   // O dev server é um só no app inteiro: se a tela de Preview levou pra outro
   // site, este painel volta a oferecer "Ligar" em vez de mostrar convite alheio.
@@ -308,6 +310,24 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     return () => window.removeEventListener("keydown", atalho);
   });
 
+  /**
+   * "Salvar como" de editor de texto: o que está na tela vai pro convite novo e
+   * o antigo volta ao que estava salvo. Sem isso a edição ficaria nos dois, que
+   * é justamente o que suja a base de onde sai o deploy.
+   */
+  const aoDuplicar = async (copia: { id: string }): Promise<void> => {
+    setDuplicando(false);
+    try {
+      if (dados) await writeConvite(copia.id, dados);
+      await desfazerNoDisco();
+      await derrubarServidor();
+      setId(copia.id);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <ProvedorSite value={id}>
     <div className="flex h-full min-h-0 min-w-0 flex-col">
@@ -349,6 +369,11 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           {sujo && (
             <Button variant="ghost" onClick={descartar}>
               <RotateCcw size={13} /> Descartar
+            </Button>
+          )}
+          {id && (
+            <Button variant="ghost" onClick={() => setDuplicando(true)}>
+              <Copy size={13} /> Salvar como novo
             </Button>
           )}
           {id && (
@@ -443,6 +468,15 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           </Palco>
         </aside>
       </div>
+
+      {duplicando && id && (
+        <SalvarComoNovo
+          origemId={id}
+          categoriaPadrao={id.split("/")[0] ?? "casamento"}
+          onFechar={() => setDuplicando(false)}
+          onPronto={(copia) => void aoDuplicar(copia)}
+        />
+      )}
     </div>
     </ProvedorSite>
   );

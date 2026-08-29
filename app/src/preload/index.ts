@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "ele
 type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 type AssetImportado = { nome: string; web: string; bytes: number };
 type Servidor = { siteId: string; url: string; lan: string | null };
+type Copia = { id: string; siteId: string; envTrocado: boolean };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
 
@@ -20,6 +21,8 @@ const api = {
   listSites: () => invoke<unknown[]>("sites:list"),
   readConvite: (id: string) => invoke<unknown>("convite:read", id),
   writeConvite: (id: string, data: unknown) => invoke<void>("convite:write", id, data),
+  duplicarSite: (id: string, categoria: string, slug: string) =>
+    invoke<Copia>("sites:duplicate", id, categoria, slug),
 
   importAssets: (id: string, origens: string[]) =>
     invoke<AssetImportado[]>("assets:import", id, origens),

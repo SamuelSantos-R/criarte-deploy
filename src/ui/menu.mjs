@@ -3,8 +3,8 @@
 // ============================================================================
 // Só decide QUAL ação o usuário quer; quem executa é o router (onde os comandos
 // vivem em escopo). Assim o menu não precisa importar o monolito inteiro.
-// Retorna uma string de ação: "deploy" | "list" | "remove" | "doctor" |
-// "config" | "exit".
+// Retorna uma string de ação: "deploy" | "list" | "convidados" | "fotos" |
+// "remove" | "doctor" | "config" | "exit".
 // ============================================================================
 import { basename } from "node:path";
 import { intro, selectBack } from "./prompts.mjs";
@@ -20,6 +20,8 @@ export async function mainMenu() {
       { value: "deploy", label: "Fazer deploy desta pasta", hint: folder },
       { value: "list", label: "Listar sites no ar" },
       { value: "convidados", label: "Corrigir nome de convidado", hint: "sem trocar o link já enviado" },
+      { value: "fotos", label: "Converter fotos pra WebP", hint: "png/jpg desta pasta, em lote" },
+      { value: "preview", label: "Ver no celular", hint: "sobe o dev server na rede local" },
       { value: "remove", label: "Remover um site" },
       { value: "doctor", label: `Diagnóstico ${c.dim}(doctor)${c.reset}` },
       { value: "config", label: "Configurações" },

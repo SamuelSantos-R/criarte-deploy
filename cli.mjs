@@ -3,14 +3,14 @@
  * Criarte Deploy CLI
  * Publica um site finalizado no monorepo multi-site sem precisar cloná-lo localmente.
  */
-import { execSync } from "node:child_process";
+import { execSync, execFileSync, spawn } from "node:child_process";
 import {
   existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync,
   rmSync, cpSync, readdirSync, statSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { homedir, tmpdir } from "node:os";
-import { join, basename, relative, extname, dirname, sep } from "node:path";
+import { homedir, tmpdir, networkInterfaces } from "node:os";
+import { join, basename, relative, extname, dirname, sep, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
@@ -1423,6 +1423,12 @@ function cmdHelp() {
   console.log(`  ${cmd("criarte-deploy tokenizar")} ${dim("[pasta]")}             ${dim("injeta a tokenização num convite normal (scaffold)")}`);
   console.log(`  ${dim("depois: criarte-deploy com o .txt de convidados na pasta gera os tokens")}`);
   console.log(`  ${cmd("criarte-deploy convidados")} ${dim("[cat/nome]")}       ${dim("corrige nome errado sem trocar o link nem refazer o deploy")}`);
+
+  section("🖼 Assets");
+  console.log(`  ${cmd("criarte-deploy fotos")} ${dim("[pasta]")}                 ${dim("converte png/jpg pra webp em lote (originais ficam)")}`);
+  console.log(`  ${cmd("criarte-deploy fotos")} ${dim("--max 1600 --q 90")}       ${dim("largura máxima e qualidade (padrão 2000px / 82)")}`);
+  console.log(`  ${cmd("criarte-deploy preview")}                        ${dim("sobe o dev server e mostra o link pra abrir no celular")}`);
+  console.log(`  ${cmd("criarte-deploy preview")} ${dim("--port 3001")}            ${dim("força uma porta específica")}`);
 
   section("💌 RSVP (casamentos com painel admin)");
   console.log(`  ${cmd("criarte-deploy rsvp-setup")} ${dim("[slug]")}            ${dim("registra um casamento no servidor")}`);
@@ -3639,6 +3645,263 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
 }
 
 // ============================================================================
+// FOTOS — converte png/jpg pra webp em lote (saída do Photoshop → site)
+// ============================================================================
+// cwebp resolve conversão e resize numa passada só (`-resize <w> 0` mantém a
+// proporção). Não tem fallback pro ffmpeg de propósito: o build do Homebrew sai
+// sem libwebp, então "tem ffmpeg" não significa "consegue gerar webp".
+const FOTO_EXT = new Set([".png", ".jpg", ".jpeg"]);
+const FOTO_SKIP_DIRS = new Set(["node_modules", ".next", ".git", "out", "dist", "build", ".turbo", ".vercel"]);
+
+function hasCwebp() {
+  try { execFileSync("cwebp", ["-version"], { stdio: "pipe" }); return true; } catch { return false; }
+}
+
+// Largura em pixels via sips (nativo do macOS). Em outro SO devolve null e o
+// resize é pulado — converter sem redimensionar ainda vale a pena.
+function imageWidth(file) {
+  try {
+    const out = execFileSync("sips", ["-g", "pixelWidth", file], { stdio: ["ignore", "pipe", "ignore"] }).toString();
+    const m = out.match(/pixelWidth:\s*(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  } catch { return null; }
+}
+
+function findFotos(dir, acc = []) {
+  let entries;
+  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return acc; }
+  for (const e of entries) {
+    if (e.name.startsWith(".")) continue;
+    const full = join(dir, e.name);
+    if (e.isDirectory()) {
+      if (!FOTO_SKIP_DIRS.has(e.name)) findFotos(full, acc);
+    } else if (FOTO_EXT.has(extname(e.name).toLowerCase())) {
+      acc.push(full);
+    }
+  }
+  return acc;
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function parseFotoArgs(argv) {
+  const opts = { dir: null, max: 2000, q: 82, force: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--max") opts.max = parseInt(argv[++i], 10);
+    else if (a === "--q" || a === "--qualidade") opts.q = parseInt(argv[++i], 10);
+    else if (a === "--force") opts.force = true;
+    else if (!a.startsWith("-") && !opts.dir) opts.dir = a;
+  }
+  if (!Number.isFinite(opts.max) || opts.max < 200) opts.max = 2000;
+  if (!Number.isFinite(opts.q) || opts.q < 1 || opts.q > 100) opts.q = 82;
+  return opts;
+}
+
+async function cmdFotos(argv) {
+  const opts = parseFotoArgs(argv);
+  miniHeader("🖼  Fotos → WebP");
+
+  // Sai com return, não exit: em modo menu isso derrubaria a sessão inteira.
+  if (!hasCwebp()) {
+    err("cwebp não encontrado.");
+    info(`Instala uma vez com: ${c.cyan}brew install webp${c.reset}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const root = opts.dir ? resolve(process.cwd(), opts.dir) : process.cwd();
+  if (!existsSync(root)) {
+    err(`Pasta não encontrada: ${root}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`${c.dim}Pasta:${c.reset} ${c.cyan}${root}${c.reset}`);
+  console.log(`${c.dim}Largura máx:${c.reset} ${opts.max}px  ${c.dim}·  qualidade:${c.reset} ${opts.q}\n`);
+
+  const sp = new Spinner("Procurando imagens...").start();
+  const fotos = findFotos(root);
+  if (!fotos.length) { sp.fail("Nenhum .png/.jpg/.jpeg aqui."); return; }
+  sp.succeed(`${fotos.length} imagem(ns) encontrada(s)`);
+  console.log();
+
+  let convertidas = 0, puladas = 0, falhas = 0, antes = 0, depois = 0;
+
+  for (const src of fotos) {
+    const out = src.replace(/\.(png|jpe?g)$/i, ".webp");
+    const rel = relative(root, src) || basename(src);
+
+    // Já convertida e o original não mudou desde então: não refaz.
+    if (!opts.force && existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) {
+      puladas++;
+      continue;
+    }
+
+    const srcSize = statSync(src).size;
+    const w = imageWidth(src);
+    const resize = w && w > opts.max ? ["-resize", String(opts.max), "0"] : [];
+
+    try {
+      execFileSync("cwebp", ["-quiet", ...resize, "-q", String(opts.q), src, "-o", out], { stdio: "pipe" });
+    } catch {
+      falhas++;
+      err(`${rel} ${c.dim}— cwebp recusou${c.reset}`);
+      continue;
+    }
+
+    const outSize = statSync(out).size;
+    antes += srcSize;
+    depois += outSize;
+    convertidas++;
+    const pct = Math.round((1 - outSize / srcSize) * 100);
+    const nota = resize.length ? `${c.dim}  ${w}→${opts.max}px${c.reset}` : "";
+    console.log(`  ${c.ok}✓${c.reset} ${rel}${c.dim}  ${fmtBytes(srcSize)} → ${c.reset}${c.bold}${fmtBytes(outSize)}${c.reset}${c.dim}  −${pct}%${c.reset}${nota}`);
+  }
+
+  console.log();
+  if (convertidas) {
+    const pct = antes ? Math.round((1 - depois / antes) * 100) : 0;
+    boxed([
+      `${c.bold}${convertidas}${c.reset} convertida(s)   ${fmtBytes(antes)} ${c.dim}→${c.reset} ${c.ok}${c.bold}${fmtBytes(depois)}${c.reset}   ${c.dim}economia de ${pct}%${c.reset}`,
+    ], { color: c.ok });
+  }
+  if (puladas) info(`${puladas} já tinha .webp em dia ${c.dim}(--force refaz tudo)${c.reset}`);
+  if (falhas) warn(`${falhas} imagem(ns) falharam.`);
+  console.log(`${c.dim}Os originais continuam onde estavam — o .webp foi criado ao lado.${c.reset}`);
+}
+
+// ============================================================================
+// PREVIEW — sobe o dev server e mostra o link da rede pra abrir no celular
+// ============================================================================
+// Interfaces virtuais (VPN, Docker, VM, AirDrop) também têm IPv4 não-interno,
+// mas o celular não alcança nenhuma delas. Filtra pelo nome.
+const IFACE_VIRTUAL = /^(bridge|utun|vmnet|vboxnet|docker|awdl|llw|tun|tap|feth|ap\d)/;
+
+function lanIPs() {
+  const out = [];
+  for (const [name, addrs] of Object.entries(networkInterfaces())) {
+    if (IFACE_VIRTUAL.test(name)) continue;
+    for (const a of addrs || []) {
+      if (a.family !== "IPv4" || a.internal) continue;
+      // 169.254.x.x é auto-atribuído quando não há DHCP (cabo solto, por ex.).
+      // Responde neste Mac, mas o celular nunca chega lá.
+      if (a.address.startsWith("169.254.")) continue;
+      out.push({ name, address: a.address });
+    }
+  }
+  // enX é Wi-Fi/Ethernet no macOS — é o que o celular enxerga. Vem primeiro.
+  return out.sort((x, y) => Number(!x.name.startsWith("en")) - Number(!y.name.startsWith("en")));
+}
+
+function pkgManager(dir) {
+  if (existsSync(join(dir, "pnpm-lock.yaml"))) return "pnpm";
+  if (existsSync(join(dir, "yarn.lock"))) return "yarn";
+  if (existsSync(join(dir, "bun.lockb"))) return "bun";
+  return "npm";
+}
+
+function mostrarLinksPreview(ips, porta) {
+  const linhas = [`${c.dim}Neste Mac:${c.reset}   ${c.cyan}http://localhost:${porta}${c.reset}`];
+  for (const { name, address } of ips) {
+    linhas.push(`${c.dim}No celular:${c.reset}  ${c.bold}${c.accent}http://${address}:${porta}${c.reset} ${c.dim}(${name})${c.reset}`);
+  }
+  boxed(linhas, { color: c.accent });
+  if (ips.length) console.log(`${c.dim}O celular tem que estar no mesmo Wi-Fi. Dá pra salvar o link na tela de início.${c.reset}`);
+  console.log(`${c.dim}Salvou o arquivo, a página recarrega sozinha.  Ctrl+C encerra.${c.reset}\n`);
+}
+
+function parsePreviewArgs(argv) {
+  const opts = { port: null };
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--port" || argv[i] === "-p") opts.port = parseInt(argv[++i], 10);
+  }
+  if (!Number.isInteger(opts.port) || opts.port < 1 || opts.port > 65535) opts.port = null;
+  return opts;
+}
+
+async function cmdPreview(argv) {
+  const opts = parsePreviewArgs(argv);
+  miniHeader("📱 Preview no celular");
+
+  const root = process.cwd();
+  const falhar = (msg, dica) => {
+    err(msg);
+    if (dica) info(dica);
+    process.exitCode = 1;
+  };
+
+  if (!existsSync(join(root, "package.json"))) {
+    return falhar("Não achei package.json aqui.", "Roda esse comando de dentro da pasta do convite.");
+  }
+  let pkg;
+  try { pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")); }
+  catch { return falhar("package.json inválido."); }
+  if (!pkg.scripts?.dev) {
+    return falhar(`"${pkg.name || basename(root)}" não tem script "dev".`);
+  }
+  if (!existsSync(join(root, "node_modules"))) {
+    return falhar("As dependências não foram instaladas.", `Roda ${c.cyan}npm install${c.reset} nesta pasta primeiro.`);
+  }
+
+  const ips = lanIPs();
+  if (!ips.length) warn("Nenhuma rede local detectada — só vai dar pra abrir neste Mac.");
+
+  const pm = pkgManager(root);
+  const env = { ...process.env, FORCE_COLOR: "1" };
+  if (opts.port) env.PORT = String(opts.port);
+
+  const sp = new Spinner(`Subindo o dev server (${pm} run dev)...`).start();
+  const child = spawn(pm, ["run", "dev"], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+
+  // A porta sai da saída do Next, não de um chute: se a 3000 estiver ocupada
+  // ele sobe em outra e o link do celular tem que bater com a real.
+  let pronto = false;
+  let buffer = "";
+  const onChunk = (buf) => {
+    const txt = buf.toString();
+    if (pronto) { process.stdout.write(txt); return; }
+    buffer += txt;
+    const m = buffer.match(/https?:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
+    if (!m) return;
+    pronto = true;
+    sp.succeed("Dev server no ar");
+    mostrarLinksPreview(ips, m[1]);
+  };
+  child.stdout.on("data", onChunk);
+  child.stderr.on("data", onChunk);
+
+  const encerrar = () => { child.kill("SIGINT"); };
+  process.on("SIGINT", encerrar);
+
+  await new Promise((res) => {
+    let fim = false;
+    const acabou = (code) => {
+      if (fim) return;
+      fim = true;
+      process.off("SIGINT", encerrar);
+      if (!pronto) {
+        sp.fail("O dev server não subiu.");
+        // Sem isso o erro do Next some, porque a saída fica presa no buffer.
+        if (buffer.trim()) console.log(`\n${buffer.trim()}\n`);
+        process.exitCode = code || 1;
+      } else {
+        console.log(`\n${c.dim}Preview encerrado.${c.reset}`);
+      }
+      res();
+    };
+    child.on("close", acabou);
+    child.on("error", (e) => {
+      if (!fim) { fim = true; process.off("SIGINT", encerrar); sp.fail(`Não consegui rodar ${pm}: ${e.message}`); process.exitCode = 1; res(); }
+    });
+  });
+}
+
+// ============================================================================
 // Menu interativo (setinha) — despacha pros comandos já existentes
 // ============================================================================
 async function runMenu() {
@@ -3650,6 +3913,8 @@ async function runMenu() {
       case "deploy":  await cmdDirectDeploy([]); break;
       case "list":    await cmdList();   await pause(); break;
       case "convidados": await cmdConvidados([]); await pause(); break;
+      case "fotos":   await cmdFotos([]);  await pause(); break;
+      case "preview": await cmdPreview([]); await pause(); break;
       case "remove":  await cmdRemove([]); await pause(); break;
       case "doctor":  await cmdDoctor(); await pause(); break;
       case "config":  await runConfigMenu();     break;
@@ -3713,6 +3978,10 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
       case "delete":     await cmdRemove(rest); break;
       case "check":      await cmdCheck();     break;
       case "locks":      await cmdLocks(rest);  break;
+      case "fotos":
+      case "webp":       await cmdFotos(rest);  break;
+      case "preview":
+      case "dev":        await cmdPreview(rest); break;
       case "help":
       case "--help":
       case "-h":     cmdHelp();          break;

@@ -538,6 +538,9 @@ async function cmdLogin() {
 const IGNORE_DIRS = new Set([
   "node_modules", ".next", "out", ".git", "dist", ".turbo",
   ".vscode", ".idea",
+  // Originais parqueados pelo Studio depois da troca por .webp. Ficam no site
+  // pra poder voltar atrás, mas subir o pesado junto anularia a conversão.
+  ".originais",
 ]);
 const IGNORE_FILES = new Set([
   ".DS_Store", ".env", ".env.local", ".env.production.local",

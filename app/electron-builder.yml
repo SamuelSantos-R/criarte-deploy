@@ -1,0 +1,57 @@
+appId: ao.criarte.studio
+productName: Criarte Studio
+copyright: Criarte Design AO
+
+directories:
+  output: dist
+  buildResources: resources
+
+files:
+  - out/**
+  - package.json
+
+# O CLI viaja junto: o app roda cli.mjs com o próprio binário do Electron
+# (ELECTRON_RUN_AS_NODE), então a máquina não precisa ter Node instalado.
+extraResources:
+  - from: ../cli.mjs
+    to: cli/cli.mjs
+  - from: ../banner.mjs
+    to: cli/banner.mjs
+  - from: ../package.json
+    to: cli/package.json
+  - from: ../src
+    to: cli/src
+  - from: ../templates
+    to: cli/templates
+  - from: ../node_modules
+    to: cli/node_modules
+    filter:
+      - "**/*"
+      - "!**/*.md"
+      - "!**/test/**"
+      - "!**/.bin/**"
+
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.icns
+  darkModeSupport: true
+  target:
+    - target: dmg
+      arch:
+        - x64
+  # Ferramenta interna, sem conta de developer: assinatura ad-hoc. Hardened
+  # runtime quebraria o ELECTRON_RUN_AS_NODE que roda o CLI.
+  identity: null
+  hardenedRuntime: false
+
+dmg:
+  title: Criarte Studio
+  contents:
+    - x: 140
+      y: 200
+    - x: 400
+      y: 200
+      type: link
+      path: /Applications
+
+npmRebuild: false

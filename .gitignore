@@ -1,3 +1,8 @@
 node_modules/
 .DS_Store
 *.log
+
+# Criarte Studio (Electron)
+app/out/
+app/dist/
+app/*.tsbuildinfo

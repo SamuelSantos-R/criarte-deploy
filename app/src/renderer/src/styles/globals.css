@@ -1,0 +1,116 @@
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 70% — o chão. Verde-tinta da sálvia da marca, escurecido até virar
+       bancada: puxa da identidade sem competir com o creme do convite. */
+    --ground: #1a1e16;
+    --surface: #222719;
+    --surface-2: #2b3120;
+
+    /* 20% — estrutura. Réguas, texto secundário, divisórias. */
+    --rule: #3b422e;
+    --rule-strong: #55603f;
+    --muted: #9a9782;
+    --text: #f0ebdd;
+
+    /* 10% — dois acentos com trabalhos diferentes, nunca no mesmo lugar:
+       o dourado suave da marca é AÇÃO (botão, serial), a sálvia é LUGAR
+       (marcador de ativo, foco). Ninguém confunde onde clicar com onde está. */
+    --accent: #b08d57;
+    --sage: #869b7e;
+    /* Sálvia profunda — só vive sobre o papel creme da prova. */
+    --accent-deep: #4f6249;
+
+    /* Semântico — carrega estado, não é o acento. */
+    --ok: #a3bd93;
+    --bad: #e0806a;
+
+    /* A prova. Único lugar onde o creme do convite aparece: é a peça sendo
+       trabalhada em cima da mesa, não a pele da ferramenta. */
+    --paper: #f5ede0;
+    --paper-ink: #3d2b1a;
+    --paper-muted: #6b5d4c;
+  }
+
+  * {
+    border-color: var(--rule);
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* Foco sempre visível — nunca outline:none sem substituto. */
+  :focus-visible {
+    outline: 2px solid var(--sage);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  input,
+  textarea {
+    user-select: text;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--rule);
+    border: 3px solid var(--ground);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--rule-strong);
+  }
+}
+
+@layer components {
+  /* Grão sobre o chão — dá textura de papel de prova sem virar ilustração. */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

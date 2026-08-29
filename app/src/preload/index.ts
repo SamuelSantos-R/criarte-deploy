@@ -24,16 +24,14 @@ const api = {
   importAssets: (id: string, origens: string[]) =>
     invoke<AssetImportado[]>("assets:import", id, origens),
   pickAssets: (id: string, pasta: boolean) => invoke<AssetImportado[]>("assets:pick", id, pasta),
+  trocarPorWebp: (id: string) => invoke<unknown>("assets:webp", id),
   // O File do drag-and-drop não carrega mais o caminho no renderer isolado.
   caminhoDe: (file: File) => webUtils.getPathForFile(file),
 
   previewStart: (id: string) => invoke<Servidor>("preview:start", id),
   previewStop: () => invoke<void>("preview:stop"),
   previewState: () => invoke<Servidor | null>("preview:state"),
-  previewMount: (area: unknown, disp: unknown) =>
-    invoke<{ zoom: number }>("preview:mount", area, disp),
-  previewHide: () => invoke<void>("preview:hide"),
-  previewReload: () => invoke<void>("preview:reload"),
+  previewScroll: (ancora: string) => invoke<boolean>("preview:scroll", ancora),
 
   envelopeModelo: () => invoke<unknown>("envelope:modelo"),
   envelopeLista: () => invoke<unknown>("envelope:lista"),

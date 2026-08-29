@@ -3,7 +3,7 @@ import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { join } from "node:path";
 import { registerIpc } from "./ipc";
 import { killAll } from "./cli";
-import { pararServidor } from "./preview";
+import { origensDoPreview, pararServidor } from "./preview";
 
 const DEV_URL = process.env["ELECTRON_RENDERER_URL"];
 
@@ -18,7 +18,9 @@ function csp(): string {
     // As fotos dos convites moram no R2 — é a única origem remota permitida.
     "img-src 'self' data: https://*.r2.dev",
     "object-src 'none'",
-    "frame-src 'none'",
+    // O preview é um <iframe> pro `next dev` local. Só o loopback: o app nunca
+    // emoldura nada da internet.
+    "frame-src http://localhost:* http://127.0.0.1:*",
     "base-uri 'none'",
     "form-action 'none'",
     DEV_URL ? `connect-src 'self' ${DEV_URL} ws://localhost:* http://localhost:*` : "connect-src 'self'",
@@ -27,6 +29,9 @@ function csp(): string {
 
 function hardenSession(): void {
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
+    // O site em preview passa pela mesma sessão. Carimbar a CSP do app nele
+    // mataria o `next dev`, que precisa de eval e de websocket pro HMR.
+    if (origensDoPreview().some((o) => details.url.startsWith(o))) return cb({});
     cb({ responseHeaders: { ...details.responseHeaders, "Content-Security-Policy": [csp()] } });
   });
   // Nada de câmera, microfone, geolocalização, notificação — o app não usa.

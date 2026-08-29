@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { FileText, Image, Rocket, SlidersHorizontal, Smartphone, Stamp } from "lucide-react";
 import { getSettings, listSites, type Site } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -56,12 +56,36 @@ function Botao({
   );
 }
 
+/**
+ * Uma tela de trabalho nunca é desmontada depois da primeira visita: o preview
+ * ao vivo mora dentro dela e desmontar mataria o site aberto (e o log do deploy,
+ * e a rolagem do formulário). Trocar de aba é só esconder por CSS.
+ */
+function Aba({ ativa, children }: { ativa: boolean; children: ReactNode }): ReactElement {
+  return (
+    <div
+      aria-hidden={!ativa}
+      // `hidden` some do layout mas mantém o nó — o iframe do preview continua vivo.
+      className={cn("min-h-0 min-w-0 flex-1 flex-col", ativa ? "flex" : "hidden")}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function App(): ReactElement {
   const [sitesRoot, setSitesRoot] = useState<string | null>(null);
   const [pronto, setPronto] = useState(false);
   const [sites, setSites] = useState<Site[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [tela, setTela] = useState<Tela>("convites");
+  // Monta na primeira visita e nunca mais desmonta. Ver <Aba>.
+  const [visitadas, setVisitadas] = useState<Tela[]>(["convites"]);
+
+  const irPara = (destino: Tela): void => {
+    setTela(destino);
+    setVisitadas((v) => (v.includes(destino) ? v : [...v, destino]));
+  };
 
   const recarregar = useCallback(() => {
     listSites()
@@ -103,14 +127,14 @@ export default function App(): ReactElement {
             item={item}
             ativo={tela === item.id}
             bloqueado={semRaiz}
-            onClick={() => setTela(item.id)}
+            onClick={() => irPara(item.id)}
           />
         ))}
 
         <span className="mt-auto" />
         {erro && <span title={erro} aria-label={`Erro: ${erro}`} className="mb-2 h-1.5 w-1.5 rounded-full bg-bad" />}
         {AVULSO.map((item) => (
-          <Botao key={item.id} item={item} ativo={tela === item.id} bloqueado={false} onClick={() => setTela(item.id)} />
+          <Botao key={item.id} item={item} ativo={tela === item.id} bloqueado={false} onClick={() => irPara(item.id)} />
         ))}
         <span
           title={`${sites.length} ${sites.length === 1 ? "site" : "sites"}`}
@@ -125,10 +149,26 @@ export default function App(): ReactElement {
         {pronto && ((semRaiz && tela !== "envelope") || tela === "config") && (
           <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
         )}
-        {pronto && !semRaiz && tela === "convites" && <Convites sites={sites} recarregar={recarregar} />}
-        {pronto && !semRaiz && tela === "preview" && <Preview sites={sites} />}
-        {pronto && !semRaiz && tela === "deploy" && <Deploy sites={sites} />}
-        {pronto && !semRaiz && tela === "fotos" && <Fotos sites={sites} />}
+        {pronto && !semRaiz && visitadas.includes("convites") && (
+          <Aba ativa={tela === "convites"}>
+            <Convites sites={sites} recarregar={recarregar} />
+          </Aba>
+        )}
+        {pronto && !semRaiz && visitadas.includes("preview") && (
+          <Aba ativa={tela === "preview"}>
+            <Preview sites={sites} />
+          </Aba>
+        )}
+        {pronto && !semRaiz && visitadas.includes("deploy") && (
+          <Aba ativa={tela === "deploy"}>
+            <Deploy sites={sites} />
+          </Aba>
+        )}
+        {pronto && !semRaiz && visitadas.includes("fotos") && (
+          <Aba ativa={tela === "fotos"}>
+            <Fotos sites={sites} />
+          </Aba>
+        )}
         {pronto && tela === "envelope" && <Envelope />}
       </main>
     </div>

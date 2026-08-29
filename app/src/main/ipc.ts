@@ -5,14 +5,8 @@ import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, startJob, type Job } from "./cli";
 import { FILTROS, importAssets } from "./assets";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
-import {
-  esconderVista,
-  estadoPreview,
-  iniciarServidor,
-  montarVista,
-  pararServidor,
-  recarregarVista,
-} from "./preview";
+import { estadoPreview, iniciarServidor, pararServidor, rolarPreview } from "./preview";
+import { trocarPorWebp } from "./webp";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 
@@ -102,6 +96,8 @@ export function registerIpc(): void {
     return importAssets(asString(id, "id"), origens.map((o) => asString(o, "caminho")));
   });
 
+  handle("assets:webp", (_e, id: unknown) => trocarPorWebp(asString(id, "id")));
+
   handle("assets:pick", async (event, id: unknown, pasta: unknown) => {
     const siteId = asString(id, "id");
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -119,9 +115,9 @@ export function registerIpc(): void {
   handle("preview:start", (_e, id: unknown) => iniciarServidor(asString(id, "id")));
   handle("preview:stop", () => pararServidor());
   handle("preview:state", () => estadoPreview());
-  handle("preview:mount", (_e, area: unknown, disp: unknown) => montarVista(area, disp));
-  handle("preview:hide", () => esconderVista());
-  handle("preview:reload", () => recarregarVista());
+  handle("preview:scroll", (event, ancora: unknown) =>
+    rolarPreview(event.sender, asString(ancora, "âncora")),
+  );
 
   handle("envelope:modelo", async (event) => {
     const escolha = await abrir(event, {

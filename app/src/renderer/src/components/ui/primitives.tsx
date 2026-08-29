@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 // Padding/raio/elevação variam de propósito entre variantes — o "tudo com a
 // mesma cara" é justamente o que faz interface parecer gerada.
 const button = cva(
-  "no-drag inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors disabled:pointer-events-none disabled:opacity-40",
+  "no-drag inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage",
   {
     variants: {
       variant: {

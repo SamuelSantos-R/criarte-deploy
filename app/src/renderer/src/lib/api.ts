@@ -29,17 +29,21 @@ export const importAssets = (id: string, origens: string[]) =>
 export const pickAssets = (id: string, pasta: boolean) =>
   call(api.pickAssets(id, pasta)) as Promise<AssetImportado[]>;
 export const caminhoDe = api.caminhoDe;
+
+export type TrocaWebp = { nome: string; webp: string; bytes: number; bytesWebp: number; refs: number };
+export type RelatorioWebp = {
+  trocas: TrocaWebp[];
+  arquivos: string[];
+  semPar: string[];
+  parqueadas: number;
+};
+export const trocarPorWebp = (id: string) => call(api.trocarPorWebp(id)) as Promise<RelatorioWebp>;
 export type Servidor = { siteId: string; url: string; lan: string | null };
-export type Retangulo = { x: number; y: number; width: number; height: number };
-export type MetricaDispositivo = { largura: number; altura: number; dpr: number; movel: boolean };
 
 export const previewStart = (id: string) => call(api.previewStart(id)) as Promise<Servidor>;
 export const previewStop = () => call(api.previewStop());
 export const previewState = () => call(api.previewState()) as Promise<Servidor | null>;
-export const previewMount = (area: Retangulo, disp: MetricaDispositivo) =>
-  call(api.previewMount(area, disp)) as Promise<{ zoom: number }>;
-export const previewHide = () => call(api.previewHide());
-export const previewReload = () => call(api.previewReload());
+export const previewScroll = (ancora: string) => call(api.previewScroll(ancora)) as Promise<boolean>;
 
 export type Convidado = { url: string; nome: string };
 export type Modelo = { nome: string; largura: number; altura: number; dataUrl: string };

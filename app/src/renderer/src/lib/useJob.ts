@@ -20,6 +20,7 @@ export function useJob(): {
   rodar: (job: Job) => Promise<void>;
   cancelar: () => void;
   limpar: () => void;
+  anexar: (textos: string[], stream?: "out" | "err") => void;
 } {
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [estado, setEstado] = useState<Estado>("parado");
@@ -85,5 +86,14 @@ export function useJob(): {
     setEstado("parado");
   }, []);
 
-  return { linhas, estado, rodando: estado === "rodando", erro, rodar, cancelar, limpar };
+  // O que a tela faz depois do CLI sair sai no mesmo console: pro Heatz é uma
+  // operação só, não faz sentido o relatório aparecer em outro canto da tela.
+  const anexar = useCallback((textos: string[], stream: "out" | "err" = "out") => {
+    setLinhas((atual) => [
+      ...atual.slice(-2000),
+      ...textos.map((texto) => ({ n: contador.current++, stream, texto })),
+    ]);
+  }, []);
+
+  return { linhas, estado, rodando: estado === "rodando", erro, rodar, cancelar, limpar, anexar };
 }

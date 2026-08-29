@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContentsView, session } from "electron";
+import { type WebContents } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
@@ -6,17 +6,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { siteDir } from "./sites";
 
-export type Retangulo = { x: number; y: number; width: number; height: number };
-export type Dispositivo = { largura: number; altura: number; dpr: number; movel: boolean };
 export type Servidor = { siteId: string; url: string; lan: string | null };
 
-const UA_MOVEL =
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-
 let servidor: (Servidor & { child: ChildProcess }) | null = null;
-let vista: WebContentsView | null = null;
-// Guardado antes de virar iPhone: depois de trocar não dá pra recuperar.
-let uaPadrao = "";
 
 /**
  * `169.254.*` é APIPA (sem DHCP) e `feth/bridge/utun/awdl` são interfaces
@@ -58,7 +50,18 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
   // O próprio Electron vira Node: não precisa de node/npm no PATH da GUI.
   const child = spawn(process.execPath, [bin, "dev", "--port", String(porta), "--hostname", "0.0.0.0"], {
     cwd,
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", FORCE_COLOR: "0", NODE_ENV: "development" },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      FORCE_COLOR: "0",
+      NODE_ENV: "development",
+      // O FSEvents não chega até os sites: o Next recompilava uma vez e depois
+      // ficava cego, e mudança no convite.json nunca aparecia no preview.
+      // Sondar de 600ms custa quase nada num projeto deste tamanho.
+      WATCHPACK_POLLING: "600",
+      CHOKIDAR_USEPOLLING: "1",
+      CHOKIDAR_INTERVAL: "600",
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -90,151 +93,46 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
 }
 
 export function pararServidor(): void {
-  soltarVista();
   servidor?.child.kill("SIGTERM");
   servidor = null;
 }
 
-function soltarVista(): void {
-  if (!vista) return;
-  const win = BrowserWindow.getAllWindows()[0];
-  win?.contentView.removeChildView(vista);
-  vista.webContents.close();
-  vista = null;
-}
-
-function inteiro(v: unknown, min: number, max: number): number {
-  const n = Math.trunc(Number(v));
-  if (!Number.isFinite(n)) throw new Error("número inválido");
-  return Math.min(Math.max(n, min), max);
-}
-
-function comoRetangulo(v: unknown): Retangulo {
-  const r = (v ?? {}) as Record<string, unknown>;
-  return {
-    x: inteiro(r.x, 0, 20_000),
-    y: inteiro(r.y, 0, 20_000),
-    width: inteiro(r.width, 1, 20_000),
-    height: inteiro(r.height, 1, 20_000),
-  };
-}
-
-function comoDispositivo(v: unknown): Dispositivo {
-  const d = (v ?? {}) as Record<string, unknown>;
-  return {
-    largura: inteiro(d.largura, 240, 3840),
-    altura: inteiro(d.altura, 240, 3840),
-    dpr: Math.min(Math.max(Number(d.dpr) || 1, 1), 4),
-    movel: d.movel === true,
-  };
+export function estadoPreview(): Servidor | null {
+  return servidor ? { siteId: servidor.siteId, url: servidor.url, lan: servidor.lan } : null;
 }
 
 /**
- * O site acha que tem a largura do aparelho; o zoom só encolhe o desenho pra
- * caber no painel. Sem isso o `pointer: coarse` do CSS não responde e o
- * preview mente sobre o que o convidado vê no telefone.
+ * Prefixos que pertencem ao site em preview. A CSP do app não pode ser carimbada
+ * neles: o `next dev` usa eval e HMR, e o nosso `script-src 'self'` mataria o site.
  */
-async function aplicarDispositivo(d: Dispositivo, area: Retangulo): Promise<number> {
-  if (!vista) return 1;
-  const zoom = Math.min(area.width / d.largura, area.height / d.altura, 1);
-  const wc = vista.webContents;
-
-  vista.setBounds({
-    x: Math.round(area.x + (area.width - d.largura * zoom) / 2),
-    y: Math.round(area.y + (area.height - d.altura * zoom) / 2),
-    width: Math.round(d.largura * zoom),
-    height: Math.round(d.altura * zoom),
-  });
-
-  // Quem encolhe é o `scale` do override, não `setZoomFactor` — o zoom do
-  // Electron entra na conta do viewport e o site passa a achar que tem
-  // `largura / zoom` px. O zoom fica travado em 1.
-  wc.setZoomFactor(1);
-  try {
-    if (!wc.debugger.isAttached()) wc.debugger.attach("1.3");
-    // Limpar antes: reenviar o override por cima do anterior faz o `scale`
-    // velho entrar na conta e o viewport sai errado na troca de aparelho.
-    await wc.debugger.sendCommand("Emulation.clearDeviceMetricsOverride");
-    await wc.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
-      width: d.largura,
-      height: d.altura,
-      deviceScaleFactor: d.dpr,
-      mobile: d.movel,
-      scale: zoom,
-      screenWidth: d.largura,
-      screenHeight: d.altura,
-    });
-    await wc.debugger.sendCommand("Emulation.setTouchEmulationEnabled", {
-      enabled: d.movel,
-      // O CDP recusa 0 — e a recusa derruba os comandos seguintes desta fila.
-      maxTouchPoints: d.movel ? 5 : 1,
-    });
-    // `setUserAgent` do Electron só vale na próxima navegação; o override do
-    // CDP troca o `navigator.userAgent` da página que já está aberta.
-    await wc.debugger.sendCommand("Emulation.setUserAgentOverride", {
-      userAgent: d.movel ? UA_MOVEL : uaPadrao,
-    });
-  } catch {
-    // Sem CDP o preview ainda mostra o site, só não finge ser telefone.
-  }
-  return zoom;
+export function origensDoPreview(): string[] {
+  if (!servidor) return [];
+  const { port } = new URL(servidor.url);
+  return [`http://localhost:${port}`, `http://127.0.0.1:${port}`, ...(servidor.lan ? [servidor.lan] : [])];
 }
 
-// Troca de aparelho e ResizeObserver disparam juntos; sem fila os comandos do
-// CDP se intercalam e a vista fica com o tamanho de um e o toque de outro.
-let fila: Promise<unknown> = Promise.resolve();
+const ANCORA = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
-export function montarVista(alvo: unknown, disp: unknown): Promise<{ zoom: number }> {
-  const tarefa = fila.then(
-    () => montarAgora(alvo, disp),
-    () => montarAgora(alvo, disp),
+/**
+ * O iframe do preview é cross-origin, e o Chrome ignora navegação por âncora
+ * vinda de fora — trava contra sequestro de scroll (medido: 1 de 12 tentativas).
+ * Do processo main dá pra entrar no subframe e rolar direto.
+ */
+export async function rolarPreview(wc: WebContents, ancora: string): Promise<boolean> {
+  if (!ANCORA.test(ancora)) throw new Error("âncora inválida");
+  const origens = origensDoPreview();
+  if (origens.length === 0) return false;
+  const frame = wc.mainFrame.framesInSubtree.find(
+    (f) => f !== wc.mainFrame && origens.some((o) => f.url.startsWith(o)),
   );
-  fila = tarefa.catch(() => undefined);
-  return tarefa;
-}
-
-async function montarAgora(alvo: unknown, disp: unknown): Promise<{ zoom: number }> {
-  if (!servidor) throw new Error("nenhum preview rodando");
-  const win = BrowserWindow.getAllWindows()[0];
-  if (!win) throw new Error("sem janela");
-  const area = comoRetangulo(alvo);
-  const d = comoDispositivo(disp);
-
-  if (!vista) {
-    vista = new WebContentsView({
-      webPreferences: {
-        // Sessão própria e efêmera: o site em preview não encosta no estado do app.
-        session: session.fromPartition(`preview-${Date.now()}`),
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
-    const base = servidor.url;
-    // O preview só existe pra ver o site local. Link pra fora sai no navegador.
-    vista.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    vista.webContents.on("will-navigate", (e, url) => {
-      if (!url.startsWith(base)) e.preventDefault();
-    });
-    win.contentView.addChildView(vista);
-    // Antes do primeiro request: o override do CDP só entra depois de carregar.
-    uaPadrao = vista.webContents.getUserAgent().replace(/ Electron\/[\d.]+/, "");
-    if (d.movel) vista.webContents.setUserAgent(UA_MOVEL);
-    await vista.webContents.loadURL(base);
-  }
-
-  const zoom = await aplicarDispositivo(d, area);
-  return { zoom };
-}
-
-export function esconderVista(): void {
-  soltarVista();
-}
-
-export function recarregarVista(): void {
-  vista?.webContents.reload();
-}
-
-export function estadoPreview(): Servidor | null {
-  return servidor ? { siteId: servidor.siteId, url: servidor.url, lan: servidor.lan } : null;
+  if (!frame) return false;
+  const achou = await frame.executeJavaScript(
+    `(() => {
+      const alvo = document.getElementById(${JSON.stringify(ancora)});
+      if (!alvo) return false;
+      alvo.scrollIntoView({ behavior: "smooth", block: "start" });
+      return true;
+    })()`,
+  );
+  return achou === true;
 }

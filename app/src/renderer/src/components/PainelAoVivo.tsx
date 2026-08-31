@@ -18,6 +18,7 @@ export function PainelAoVivo({
   ligando,
   podeLigar,
   recarga,
+  emprestado,
   onRecarregar,
   onLigar,
   onParar,
@@ -28,6 +29,8 @@ export function PainelAoVivo({
   ligando: boolean;
   podeLigar: boolean;
   recarga: number;
+  /** O preview é do anfitrião, servido pela rede: aqui não há o que ligar nem parar. */
+  emprestado?: boolean;
   onRecarregar: () => void;
   onLigar: () => void;
   onParar: () => void;
@@ -76,7 +79,11 @@ export function PainelAoVivo({
               </Button>
             </>
           )}
-          {url ? (
+          {emprestado ? (
+            <span className="font-mono text-label uppercase tracking-[0.16em] text-muted">
+              do anfitrião
+            </span>
+          ) : url ? (
             <Button variant="danger" size="sm" onClick={onParar}>
               <Square size={13} /> Parar
             </Button>
@@ -100,7 +107,11 @@ export function PainelAoVivo({
       >
         <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
           <p className="text-[13px] text-muted">
-            {ligando ? "Subindo o Next do site…" : "Ligue pra ver o convite de verdade repintando enquanto edita."}
+            {emprestado
+              ? "O anfitrião ainda não ligou o preview. Quando ligar, aparece aqui sozinho."
+              : ligando
+                ? "Subindo o Next do site…"
+                : "Ligue pra ver o convite de verdade repintando enquanto edita."}
           </p>
           {ligando && (
             <p className="font-mono text-[11px] text-muted/70">a primeira vez demora uns segundos.</p>

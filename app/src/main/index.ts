@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { registerIpc } from "./ipc";
 import { killAll } from "./cli";
 import { origensDoPreview, pararServidor } from "./preview";
+import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 
 const DEV_URL = process.env["ELECTRON_RENDERER_URL"];
@@ -20,7 +21,8 @@ function csp(): string {
     "img-src 'self' data: https://*.r2.dev",
     "object-src 'none'",
     // O preview é um <iframe> pro `next dev` local. Só o loopback: o app nunca
-    // emoldura nada da internet.
+    // emoldura nada da internet. O preview do anfitrião na sessão a dois entra
+    // por aqui também, porque o espelho o serve em 127.0.0.1.
     "frame-src http://localhost:* http://127.0.0.1:*",
     "base-uri 'none'",
     "form-action 'none'",
@@ -32,7 +34,9 @@ function hardenSession(): void {
   session.defaultSession.webRequest.onHeadersReceived((details, cb) => {
     // O site em preview passa pela mesma sessão. Carimbar a CSP do app nele
     // mataria o `next dev`, que precisa de eval e de websocket pro HMR.
-    if (origensDoPreview().some((o) => details.url.startsWith(o))) return cb({});
+    const espelho = urlDoEspelho();
+    const livres = espelho ? [...origensDoPreview(), espelho] : origensDoPreview();
+    if (livres.some((o) => details.url.startsWith(o))) return cb({});
     cb({ responseHeaders: { ...details.responseHeaders, "Content-Security-Policy": [csp()] } });
   });
   // Nada de câmera, microfone, geolocalização, notificação — o app não usa.

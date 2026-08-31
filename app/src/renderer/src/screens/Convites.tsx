@@ -539,12 +539,15 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
 
         <Divisor largura={largura} onLargura={setLargura} />
 
+        {/* No convidado não há pasta pra rodar `next dev`: o que se vê é o preview
+            do anfitrião servido pela LAN, e o QR aponta pro Mac dele. */}
         <PainelAoVivo
-          url={servidor?.url ?? null}
-          lan={servidor?.lan ?? null}
+          url={convidado ? coop.estado.aoVivo : (servidor?.url ?? null)}
+          lan={convidado ? coop.estado.aoVivo : (servidor?.lan ?? null)}
           largura={largura}
           ligando={ligando}
           podeLigar={!!id}
+          emprestado={convidado}
           recarga={recarga}
           onRecarregar={() => setRecarga((n) => n + 1)}
           onLigar={() => void ligarAoVivo()}

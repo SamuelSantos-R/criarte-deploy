@@ -23,6 +23,7 @@ const FORA: EstadoCoop = {
   codigo: null,
   pares: [],
   trancas: [],
+  aoVivo: null,
   erro: null,
 };
 

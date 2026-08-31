@@ -94,6 +94,8 @@ export type EstadoCoop = {
   codigo: string | null;
   pares: string[];
   trancas: Tranca[];
+  /** Preview do anfitrião, servido pela LAN. Só o convidado recebe. */
+  aoVivo: string | null;
   erro: string | null;
 };
 

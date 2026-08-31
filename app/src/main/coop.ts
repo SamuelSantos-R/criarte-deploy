@@ -2,7 +2,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { BrowserWindow } from "electron";
 import { copiavel, empacotar } from "./pacote";
-import { ipDaRede } from "./preview";
+import { aoMudarPreview, estadoPreview, ipDaRede } from "./preview";
+import { ligarEspelho, pararEspelho, urlDoEspelho } from "./espelho";
 import { readConvite, siteDir, writeConvite } from "./sites";
 
 /**
@@ -27,6 +28,8 @@ export type EstadoCoop = {
   codigo: string | null;
   pares: string[];
   trancas: Tranca[];
+  /** Preview do outro lado, pronto pro iframe. Só o convidado tem — o anfitrião vê o seu. */
+  aoVivo: string | null;
   erro: string | null;
 };
 
@@ -45,8 +48,14 @@ let anfitriao: {
   faltas: Map<string, { n: number; ate: number }>;
 } | null = null;
 
-let convidado: { siteId: string; endereco: string; nome: string; parar: AbortController } | null =
-  null;
+let convidado: {
+  siteId: string;
+  endereco: string;
+  nome: string;
+  parar: AbortController;
+  /** Porta do `next dev` do anfitrião. Nula quer dizer: lá o preview está desligado. */
+  portaAoVivo: number | null;
+} | null = null;
 
 /** Cabeçalhos do convidado. O `x-coop-par` só é preenchido quando o `bemvindo` chega. */
 let cabecalhoAtual: Record<string, string> | null = null;
@@ -73,6 +82,11 @@ function mesmoCodigo(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
+/** Vem da rede: só passa porta alta inteira, que é onde o `next dev` nasce. */
+function portaValida(v: unknown): number | null {
+  return typeof v === "number" && Number.isInteger(v) && v >= 1024 && v <= 65535 ? v : null;
+}
+
 function caminhoValido(v: unknown): v is (string | number)[] {
   return (
     Array.isArray(v) &&
@@ -86,6 +100,31 @@ function emitir(canal: string, carga: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send(canal, carga);
 }
 
+/**
+ * Só a porta viaja. O convidado remonta o endereço com o IP que ele próprio
+ * digitou pra entrar: assim um anfitrião de má fé não consegue apontar o iframe
+ * do outro Studio pra uma origem qualquer.
+ */
+function portaAoVivoDoAnfitriao(): number | null {
+  const s = estadoPreview();
+  if (!anfitriao || !s || s.siteId !== anfitriao.siteId) return null;
+  return Number(new URL(s.url).port) || null;
+}
+
+/**
+ * Sobe (ou derruba) o espelho conforme o anfitrião ligou ou parou o preview. O
+ * que vai pro renderer é sempre o endereço local do espelho, nunca o da rede.
+ */
+async function acertarEspelho(): Promise<void> {
+  const porta = convidado?.portaAoVivo;
+  if (!porta) {
+    pararEspelho();
+    return;
+  }
+  const ip = convidado?.endereco.split(":")[0];
+  await ligarEspelho(`http://${ip}:${porta}`).catch(() => pararEspelho());
+}
+
 export function estadoCoop(): EstadoCoop {
   if (anfitriao) {
     limparTrancas();
@@ -96,6 +135,7 @@ export function estadoCoop(): EstadoCoop {
       codigo: anfitriao.codigo,
       pares: [...anfitriao.pares.values()].map((p) => p.nome),
       trancas: [...anfitriao.trancas.entries()].map(([secao, t]) => ({ secao, nome: t.nome })),
+      aoVivo: null,
       erro: null,
     };
   }
@@ -107,15 +147,32 @@ export function estadoCoop(): EstadoCoop {
       codigo: null,
       pares: [],
       trancas: [],
+      aoVivo: urlDoEspelho(),
       erro: null,
     };
   }
-  return { papel: null, siteId: null, endereco: null, codigo: null, pares: [], trancas: [], erro: null };
+  return {
+    papel: null,
+    siteId: null,
+    endereco: null,
+    codigo: null,
+    pares: [],
+    trancas: [],
+    aoVivo: null,
+    erro: null,
+  };
 }
 
 function avisarEstado(): void {
   emitir("coop:estado", estadoCoop());
 }
+
+// Ligar ou parar o preview é notícia pra quem está na mesa: é o que faz o painel
+// ao vivo do convidado acender sozinho, sem ele ter a pasta do site.
+aoMudarPreview(() => {
+  if (!anfitriao) return;
+  difundir("aovivo", { porta: portaAoVivoDoAnfitriao() });
+});
 
 // ------------------------------------------------------------------ anfitrião
 
@@ -236,7 +293,7 @@ async function atender(req: IncomingMessage, res: ServerResponse): Promise<void>
       connection: "keep-alive",
     });
     res.write(
-      `event: bemvindo\ndata: ${JSON.stringify({ parId: par.id, siteId: anfitriao.siteId, doc: anfitriao.doc })}\n\n`,
+      `event: bemvindo\ndata: ${JSON.stringify({ parId: par.id, siteId: anfitriao.siteId, doc: anfitriao.doc, porta: portaAoVivoDoAnfitriao() })}\n\n`,
     );
     anfitriao.pares.set(par.id, par);
     avisarEstado();
@@ -388,7 +445,7 @@ export async function entrarSessao(
   // O mesmo objeto vai pro consumidor e pro `enviarPatch`: quando o `bemvindo`
   // chegar com o parId, ele é preenchido no lugar e os dois lados enxergam.
   cabecalhoAtual = { "content-type": "application/json", "x-coop-codigo": codigo, "x-coop-par": "" };
-  convidado = { siteId: "", endereco, nome, parar };
+  convidado = { siteId: "", endereco, nome, parar, portaAoVivo: null };
   void consumir(res.body, cabecalhoAtual, endereco);
   return estadoCoop();
 }
@@ -415,8 +472,16 @@ async function consumir(
         const carga = JSON.parse(dado) as Record<string, unknown>;
         if (evento === "bemvindo") {
           cabecalho["x-coop-par"] = String(carga.parId);
-          if (convidado) convidado.siteId = String(carga.siteId ?? "");
+          if (convidado) {
+            convidado.siteId = String(carga.siteId ?? "");
+            convidado.portaAoVivo = portaValida(carga.porta);
+          }
+          await acertarEspelho();
           emitir("coop:cheio", { doc: carga.doc });
+          avisarEstado();
+        } else if (evento === "aovivo") {
+          if (convidado) convidado.portaAoVivo = portaValida(carga.porta);
+          await acertarEspelho();
           avisarEstado();
         } else if (evento === "patch") {
           emitir("coop:patch", carga);
@@ -433,6 +498,7 @@ async function consumir(
     if (convidado?.endereco === endereco) {
       convidado = null;
       cabecalhoAtual = null;
+      pararEspelho();
       emitir("coop:caiu", { motivo: "o anfitrião encerrou a sessão" });
       avisarEstado();
     }
@@ -492,6 +558,7 @@ export async function fecharSessao(): Promise<EstadoCoop> {
     convidado.parar.abort();
     convidado = null;
     cabecalhoAtual = null;
+    pararEspelho();
   }
   avisarEstado();
   return estadoCoop();

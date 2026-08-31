@@ -107,12 +107,25 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
   }
 
   servidor = { siteId, url, lan: lanIp ? `http://${lanIp}:${porta}` : null, child };
+  for (const ouvinte of ouvintes) ouvinte();
   return { siteId, url: servidor.url, lan: servidor.lan };
 }
 
 export function pararServidor(): void {
   servidor?.child.kill("SIGTERM");
   servidor = null;
+  for (const ouvinte of ouvintes) ouvinte();
+}
+
+const ouvintes: (() => void)[] = [];
+
+/**
+ * O co-op precisa saber quando o preview sobe ou cai pra contar ao convidado.
+ * É assinatura e não import de volta porque `coop` já importa daqui — fechar o
+ * ciclo deixaria a ordem de avaliação dos módulos decidir quem existe primeiro.
+ */
+export function aoMudarPreview(ouvinte: () => void): void {
+  ouvintes.push(ouvinte);
 }
 
 export function estadoPreview(): Servidor | null {

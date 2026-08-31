@@ -24,6 +24,7 @@ type EstadoCoop = {
   codigo: string | null;
   pares: string[];
   trancas: Tranca[];
+  aoVivo: string | null;
   erro: string | null;
 };
 

@@ -15,7 +15,15 @@ export type Job =
   | { kind: "deploy"; siteId: string; dryRun: boolean }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }
-  | { kind: "doctor" };
+  | { kind: "doctor" }
+  | { kind: "deps" };
+
+export type EstadoDeps = {
+  raiz: string | null;
+  temManifesto: boolean;
+  temNext: boolean;
+  npm: string | null;
+};
 
 const api = window.criarte;
 
@@ -34,6 +42,8 @@ export const onConviteMudou = api.onConviteMudou;
 export type Copia = { id: string; siteId: string; envTrocado: boolean };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
+export const salvarSessaoComoNovo = (categoria: string, slug: string, doc: unknown) =>
+  call(api.salvarSessaoComoNovo(categoria, slug, doc)) as Promise<Copia>;
 
 export const importAssets = (id: string, origens: string[]) =>
   call(api.importAssets(id, origens)) as Promise<AssetImportado[]>;
@@ -101,6 +111,8 @@ export const onCoopPatch = api.onCoopPatch;
 export const onCoopCheio = api.onCoopCheio;
 export const onCoopTrancas = api.onCoopTrancas;
 export const onCoopCaiu = api.onCoopCaiu;
+
+export const estadoDeps = () => call(api.estadoDeps()) as Promise<EstadoDeps>;
 
 export const startJob = (job: Job) => call(api.startJob(job));
 export const cancelJob = (runId: string) => call(api.cancelJob(runId));

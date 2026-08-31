@@ -11,6 +11,12 @@ type Gravacao = { conflito: boolean; marca: number };
 type ConviteMudou = { id: string; marca: number };
 type Patch = { caminho: (string | number)[]; valor: unknown };
 type Tranca = { secao: string; nome: string };
+type EstadoDeps = {
+  raiz: string | null;
+  temManifesto: boolean;
+  temNext: boolean;
+  npm: string | null;
+};
 type EstadoCoop = {
   papel: "anfitriao" | "convidado" | null;
   siteId: string | null;
@@ -50,6 +56,8 @@ const api = {
   vigiarConvite: (id: string | null) => invoke<void>("convite:watch", id),
   duplicarSite: (id: string, categoria: string, slug: string) =>
     invoke<Copia>("sites:duplicate", id, categoria, slug),
+  salvarSessaoComoNovo: (categoria: string, slug: string, doc: unknown) =>
+    invoke<Copia>("sites:salvarSessao", categoria, slug, doc),
 
   importAssets: (id: string, origens: string[]) =>
     invoke<AssetImportado[]>("assets:import", id, origens),
@@ -68,6 +76,8 @@ const api = {
   envelopePasta: () => invoke<string | null>("envelope:pasta"),
   envelopeGerar: (opcoes: unknown) => invoke<unknown>("envelope:gerar", opcoes),
   envelopeAbrirSaida: () => invoke<void>("envelope:abrirSaida"),
+
+  estadoDeps: () => invoke<EstadoDeps>("deps:estado"),
 
   startJob: (job: unknown) => invoke<string>("job:start", job),
   cancelJob: (runId: string) => invoke<boolean>("job:cancel", runId),

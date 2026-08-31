@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { siteDir } from "./sites";
 
 export type Servidor = { siteId: string; url: string; lan: string | null };
@@ -27,6 +27,22 @@ export function ipDaRede(): string | null {
   return null;
 }
 
+/**
+ * O `next` não mora mais dentro de cada convite: há um `node_modules` só, na
+ * raiz de sites, e todos comem de lá. Subir as pastas é o mesmo que o Node faz
+ * pra resolver um import — assim um convite recém-criado abre no preview sem
+ * ninguém precisar de terminal.
+ */
+function acharNext(desde: string): string | null {
+  for (let dir = desde; ; ) {
+    const bin = join(dir, "node_modules", "next", "dist", "bin", "next");
+    if (existsSync(bin)) return bin;
+    const acima = dirname(dir);
+    if (acima === dir) return null;
+    dir = acima;
+  }
+}
+
 function portaLivre(): Promise<number> {
   return new Promise((res, rej) => {
     const s = createServer();
@@ -43,8 +59,10 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
   pararServidor();
 
   const cwd = await siteDir(siteId);
-  const bin = join(cwd, "node_modules", "next", "dist", "bin", "next");
-  if (!existsSync(bin)) throw new Error("o site não tem node_modules — rode `npm install` na pasta dele");
+  const bin = acharNext(cwd);
+  if (!bin) {
+    throw new Error("faltam as dependências dos convites — vá em Configurações e clique em Instalar");
+  }
 
   const porta = await portaLivre();
   // O próprio Electron vira Node: não precisa de node/npm no PATH da GUI.

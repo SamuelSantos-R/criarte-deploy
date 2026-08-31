@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { CornerDownLeft } from "lucide-react";
-import { duplicarSite, type Copia } from "@/lib/api";
+import { duplicarSite, salvarSessaoComoNovo, type Copia } from "@/lib/api";
 import { Button, Field, Input } from "@/components/ui/primitives";
 
 /** Acento vira letra sem acento, o resto que não é [a-z0-9] vira hífen. */
@@ -17,11 +17,14 @@ function emSlug(bruto: string): string {
 export function SalvarComoNovo({
   origemId,
   categoriaPadrao,
+  daSessao,
   onFechar,
   onPronto,
 }: {
   origemId: string;
   categoriaPadrao: string;
+  /** Presente só no convidado do co-op: o site vem do anfitrião pela rede. */
+  daSessao?: Record<string, unknown>;
   onFechar: () => void;
   onPronto: (copia: Copia) => void;
 }): ReactElement {
@@ -50,7 +53,11 @@ export function SalvarComoNovo({
     setCopiando(true);
     setErro(null);
     try {
-      onPronto(await duplicarSite(origemId, categoria, slug));
+      onPronto(
+        daSessao
+          ? await salvarSessaoComoNovo(categoria, slug, daSessao)
+          : await duplicarSite(origemId, categoria, slug),
+      );
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
       setCopiando(false);
@@ -75,8 +82,17 @@ export function SalvarComoNovo({
             Salvar como novo
           </h2>
           <p className="mt-1.5 text-[12px] leading-[1.5] text-muted">
-            Copia <span className="font-mono text-text">{origemId}</span> pra uma pasta nova. O
-            original continua intocado — é ele que você deploya.
+            {daSessao ? (
+              <>
+                Traz <span className="font-mono text-text">{origemId}</span> do anfitrião pela rede e
+                grava aqui na tua máquina, com o convite como está na tela agora.
+              </>
+            ) : (
+              <>
+                Copia <span className="font-mono text-text">{origemId}</span> pra uma pasta nova. O
+                original continua intocado — é ele que você deploya.
+              </>
+            )}
           </p>
         </div>
 
@@ -119,7 +135,8 @@ export function SalvarComoNovo({
               Cancelar
             </Button>
             <Button variant="primary" disabled={!valido || copiando} onClick={() => void duplicar()}>
-              <CornerDownLeft size={13} /> {copiando ? "Copiando…" : "Duplicar"}
+              <CornerDownLeft size={13} />{" "}
+              {copiando ? (daSessao ? "Baixando…" : "Copiando…") : daSessao ? "Trazer" : "Duplicar"}
             </Button>
           </div>
         </div>

@@ -1,8 +1,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { BrowserWindow } from "electron";
+import { copiavel, empacotar } from "./pacote";
 import { ipDaRede } from "./preview";
-import { readConvite, writeConvite } from "./sites";
+import { readConvite, siteDir, writeConvite } from "./sites";
 
 /**
  * Co-op na LAN: um Studio vira anfitrião e serve o convite por SSE; o outro
@@ -252,6 +253,22 @@ async function atender(req: IncomingMessage, res: ServerResponse): Promise<void>
     return;
   }
 
+  // Mandar o source inteiro é caro e só faz sentido pra quem já está na mesa:
+  // exige o par, não só o código.
+  if (req.method === "GET" && url.pathname === "/fonte") {
+    if (!anfitriao.pares.has(String(req.headers["x-coop-par"] ?? ""))) {
+      return recusar(res, 403, "entre primeiro");
+    }
+    const raiz = await siteDir(anfitriao.siteId);
+    const pacote = await empacotar(raiz, (p) => copiavel(p, raiz));
+    res.writeHead(200, {
+      "content-type": "application/octet-stream",
+      "content-length": String(pacote.byteLength),
+    });
+    res.end(pacote);
+    return;
+  }
+
   if (req.method !== "POST") return recusar(res, 404, "não existe");
   const parId = String(req.headers["x-coop-par"] ?? "");
   const par = anfitriao.pares.get(parId);
@@ -434,6 +451,22 @@ export async function enviarPatch(patch: Patch): Promise<{ ok: boolean; erro?: s
   if (res.ok) return { ok: true };
   const corpo = (await res.json().catch(() => ({}))) as { erro?: string };
   return { ok: false, erro: corpo.erro ?? `recusado (${res.status})` };
+}
+
+/**
+ * Puxa a pasta do site do anfitrião. É o que permite ao convidado ficar com um
+ * convite que funcione — só o `convite.json` daria uma pasta que aparece na
+ * lista mas não abre no preview nem publica, por não ter o source do Next.
+ */
+export async function baixarFonte(): Promise<Buffer> {
+  if (anfitriao) {
+    const raiz = await siteDir(anfitriao.siteId);
+    return empacotar(raiz, (p) => copiavel(p, raiz));
+  }
+  if (!convidado || !cabecalhoAtual?.["x-coop-par"]) throw new Error("fora de sessão");
+  const res = await fetch(`http://${convidado.endereco}/fonte`, { headers: cabecalhoAtual });
+  if (!res.ok) throw new Error(`o anfitrião recusou mandar o site (${res.status})`);
+  return Buffer.from(await res.arrayBuffer());
 }
 
 export async function pedirTranca(secao: string, soltar: boolean): Promise<boolean> {

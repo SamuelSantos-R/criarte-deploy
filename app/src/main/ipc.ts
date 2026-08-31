@@ -3,7 +3,8 @@ import { existsSync } from "node:fs";
 import { loadSettings, saveSettings } from "./paths";
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, startJob, type Job } from "./cli";
-import { duplicarSite } from "./duplicar";
+import { estadoDeps } from "./deps";
+import { duplicarSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, iniciarServidor, pararServidor, rolarPreview } from "./preview";
@@ -75,6 +76,8 @@ function asJob(v: unknown): Job {
       };
     case "doctor":
       return { kind: "doctor" };
+    case "deps":
+      return { kind: "deps" };
     default:
       throw new Error("job desconhecido");
   }
@@ -120,6 +123,10 @@ export function registerIpc(): void {
 
   handle("sites:duplicate", (_e, id: unknown, categoria: unknown, slug: unknown) =>
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
+  );
+
+  handle("sites:salvarSessao", (_e, categoria: unknown, slug: unknown, doc: unknown) =>
+    salvarSessaoComoNovo(asString(categoria, "categoria"), asString(slug, "nome"), doc),
   );
 
   handle("assets:import", (_e, id: unknown, origens: unknown) => {
@@ -195,6 +202,8 @@ export function registerIpc(): void {
   handle("coop:tranca", (_e, secao: unknown, soltar: unknown) =>
     pedirTranca(asString(secao, "secção"), soltar === true),
   );
+
+  handle("deps:estado", () => estadoDeps());
 
   handle("job:start", (event, job: unknown) => startJob(event.sender, asJob(job)));
   handle("job:cancel", (_e, runId: unknown) => cancelJob(runId));

@@ -1,26 +1,13 @@
-import { cp, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, extname, join } from "node:path";
+import { join } from "node:path";
+import { baixarFonte } from "./coop";
+import { copiavel, desempacotar } from "./pacote";
 import { containedPath, requireSitesRoot } from "./paths";
 import { readConvite, siteDir } from "./sites";
 
 const NOME = /^[a-z0-9][a-z0-9-]*$/;
-
-/** Pesado, gerado ou específico da máquina — nada disso define o convite. */
-const PULAR = new Set([
-  "node_modules",
-  ".next",
-  "out",
-  "dist",
-  "build",
-  ".turbo",
-  ".vercel",
-  ".git",
-  ".originais",
-  ".DS_Store",
-  "tsconfig.tsbuildinfo",
-]);
 
 type Credenciais = { url: string; serviceKey: string };
 
@@ -85,30 +72,51 @@ async function trocarSiteId(destino: string, siteId: string): Promise<boolean> {
 
 export type Copia = { id: string; siteId: string; envTrocado: boolean };
 
-/**
- * Ordem proposital: registra no Supabase **antes** de copiar. Se a cópia falhar
- * sobra uma linha órfã no banco, que não faz mal a ninguém; na ordem inversa
- * sobraria uma pasta carregando o uuid do casal anterior, e o mural de recados
- * do convite novo escreveria em cima do antigo.
- */
-export async function duplicarSite(origemId: string, categoria: string, slug: string): Promise<Copia> {
+async function destinoLivre(categoria: string, slug: string): Promise<string> {
   if (!NOME.test(categoria)) throw new Error("categoria inválida — minúsculas e hífen");
   if (!NOME.test(slug)) throw new Error("nome inválido — minúsculas e hífen");
-
-  const origem = await siteDir(origemId);
   const destino = await containedPath(requireSitesRoot(), categoria, slug);
   if (existsSync(destino)) throw new Error(`${categoria}/${slug} já existe`);
+  return destino;
+}
 
-  const titulo = tituloDe(await readConvite(origemId), slug);
-  const siteId = await registrar(slug, titulo);
+/**
+ * Ordem proposital: registra no Supabase **antes** de escrever os ficheiros. Se
+ * a cópia falhar sobra uma linha órfã no banco, que não faz mal a ninguém; na
+ * ordem inversa sobraria uma pasta carregando o uuid do casal anterior, e o
+ * mural de recados do convite novo escreveria em cima do antigo.
+ */
+export async function duplicarSite(origemId: string, categoria: string, slug: string): Promise<Copia> {
+  const origem = await siteDir(origemId);
+  const destino = await destinoLivre(categoria, slug);
+  const { dados } = await readConvite(origemId);
+  const siteId = await registrar(slug, tituloDe(dados, slug));
 
-  await cp(origem, destino, {
-    recursive: true,
-    // Listas de convidados são nome real + link intransferível do casal antigo.
-    // Elas vivem na raiz do site; `.txt` dentro de public/ é outra história.
-    filter: (src) =>
-      !PULAR.has(basename(src)) && !(dirname(src) === origem && extname(src) === ".txt"),
-  });
+  await cp(origem, destino, { recursive: true, filter: (src) => copiavel(src, origem) });
+
+  return { id: `${categoria}/${slug}`, siteId, envTrocado: await trocarSiteId(destino, siteId) };
+}
+
+/**
+ * O convidado do co-op não tem a pasta do site — só o documento na tela. Aqui o
+ * source vem do anfitrião pela rede e o `convite.json` gravado é o da sessão,
+ * com as edições dos dois, não o que estava no disco de lá.
+ */
+export async function salvarSessaoComoNovo(
+  categoria: string,
+  slug: string,
+  doc: unknown,
+): Promise<Copia> {
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    throw new Error("convite.json tem que ser um objeto");
+  }
+  const destino = await destinoLivre(categoria, slug);
+  const pacote = await baixarFonte();
+  const siteId = await registrar(slug, tituloDe(doc, slug));
+
+  await mkdir(destino, { recursive: true });
+  await desempacotar(pacote, destino);
+  await writeFile(join(destino, "convite.json"), `${JSON.stringify(doc, null, 2)}\n`, "utf8");
 
   return { id: `${categoria}/${slug}`, siteId, envTrocado: await trocarSiteId(destino, siteId) };
 }

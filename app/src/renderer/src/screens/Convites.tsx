@@ -353,10 +353,14 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   const aoDuplicar = async (copia: { id: string }): Promise<void> => {
     setDuplicando(false);
     try {
-      if (dados) await writeConvite(copia.id, dados);
-      await desfazerNoDisco();
-      await derrubarServidor();
-      setId(copia.id);
+      // O convidado não tinha convite aberto do próprio disco pra devolver ao
+      // estado salvo, e o convite.json dele já foi escrito com o doc da sessão.
+      if (!convidado) {
+        if (dados) await writeConvite(copia.id, dados);
+        await desfazerNoDisco();
+        await derrubarServidor();
+        setId(copia.id);
+      }
       recarregar();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -435,9 +439,11 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
               </>
             )}
           </button>
-          {id && !convidado && (
+          {/* No convidado é o único jeito de ficar com o convite: a pasta do
+              site está na máquina do anfitrião, não na dele. */}
+          {(id || convidado) && dados && (
             <Button variant="ghost" onClick={() => setDuplicando(true)}>
-              <Copy size={13} /> Salvar como novo
+              <Copy size={13} /> {convidado ? "Salvar aqui" : "Salvar como novo"}
             </Button>
           )}
           {id && !convidado && (
@@ -540,14 +546,22 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
         />
       </div>
 
-      {duplicando && id && (
-        <SalvarComoNovo
-          origemId={id}
-          categoriaPadrao={id.split("/")[0] ?? "casamento"}
-          onFechar={() => setDuplicando(false)}
-          onPronto={(copia) => void aoDuplicar(copia)}
-        />
-      )}
+      {duplicando &&
+        dados &&
+        (() => {
+          // No convidado a origem é o site do anfitrião, que não existe aqui.
+          const origem = (convidado ? coop.estado.siteId : id) ?? "";
+          if (!origem) return null;
+          return (
+            <SalvarComoNovo
+              origemId={origem}
+              categoriaPadrao={origem.split("/")[0] ?? "casamento"}
+              daSessao={convidado ? dados : undefined}
+              onFechar={() => setDuplicando(false)}
+              onPronto={(copia) => void aoDuplicar(copia)}
+            />
+          );
+        })()}
     </div>
     </ProvedorSite>
   );

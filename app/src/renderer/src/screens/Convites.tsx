@@ -80,7 +80,14 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     aoPatch: ({ caminho, valor }) => {
       if (dados) setDados(setIn(dados, caminho, valor) as Record<string, unknown>);
     },
-    aoDocumento: (doc) => recomecar(doc),
+    aoDocumento: (doc) => {
+      recomecar(doc);
+      // A secção só era escolhida ao ler convite do disco. Quem entra sem convite
+      // próprio recebia o documento do anfitrião e continuava com o formulário
+      // em branco — tinha de "Salvar aqui" primeiro só pra ter o que abrir.
+      const secoes = Object.keys(doc).filter((k) => k !== CHAVE_SECOES);
+      setSecao((atual) => (atual && secoes.includes(atual) ? atual : (secoes[0] ?? null)));
+    },
   });
   const bloqueio = coop.donoDe(secao);
   // O documento em cena é o do anfitrião, mas o `id` daqui é o site local. Deixar
@@ -112,8 +119,11 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     };
   }, [coop.ligado, secao, coop.tomar, coop.soltar]);
 
+  // No convidado o que está em cena é o convite do anfitrião. Ler o ficheiro
+  // local por cima trocaria o documento sem trocar a sessão, e os patches
+  // seguintes iriam descrever um convite que o anfitrião não tem.
   useEffect(() => {
-    if (!id) return;
+    if (!id || convidado) return;
     let vivo = true;
     recomecar(null);
     setSecao(null);
@@ -131,7 +141,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     return () => {
       vivo = false;
     };
-  }, [id, recomecar]);
+  }, [id, convidado, recomecar]);
 
   // O main avisa quando o arquivo muda por fora. Sem o vigia, o guarda do mtime
   // ainda segura a gravação — mas só na hora de gravar, e aí já vira pergunta.
@@ -494,7 +504,13 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
             />
           ) : (
             <>
-              {!id && <p className="text-[13px] text-muted">Escolha um site com convite.json.</p>}
+              {!id && !dados && (
+                <p className="text-[13px] text-muted">
+                  {convidado
+                    ? "Esperando o convite do anfitrião…"
+                    : "Escolha um site com convite.json."}
+                </p>
+              )}
               {id && !dados && !erro && (
                 <p className="font-mono text-[12px] text-muted">Lendo convite.json…</p>
               )}

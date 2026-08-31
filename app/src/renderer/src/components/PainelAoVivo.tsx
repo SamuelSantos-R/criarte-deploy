@@ -1,14 +1,20 @@
-import { type ReactElement } from "react";
-import { RefreshCw, Square } from "lucide-react";
+import { useState, type ReactElement } from "react";
+import { QrCode, RefreshCw, Square } from "lucide-react";
 import { Button } from "@/components/ui/primitives";
 import { acharAparelho, Palco } from "@/components/Palco";
+import { ModalQR } from "@/components/ModalQR";
+import { SeletorAparelho } from "@/components/SeletorAparelho";
 
-// O convite nasce no telefone: a coluna do editor mostra o aparelho, não o desktop.
-const APARELHO = acharAparelho("13");
+const CHAVE_APARELHO = "criarte:aparelho-ao-vivo";
+
+// O convite nasce no telefone: a coluna do editor abre no aparelho, não no desktop.
+const PADRAO = "13";
 
 /** Não é maquete: é o site rodando. O que se digita à esquerda repinta aqui. */
 export function PainelAoVivo({
   url,
+  lan,
+  largura,
   ligando,
   podeLigar,
   recarga,
@@ -17,6 +23,8 @@ export function PainelAoVivo({
   onParar,
 }: {
   url: string | null;
+  lan: string | null;
+  largura: number;
   ligando: boolean;
   podeLigar: boolean;
   recarga: number;
@@ -24,22 +32,49 @@ export function PainelAoVivo({
   onLigar: () => void;
   onParar: () => void;
 }): ReactElement {
+  const [qrAberto, setQrAberto] = useState(false);
+  // O telefone é limitado pela altura da janela, então alargar o painel só rende
+  // quando o aparelho é mais largo que alto — daí a escolha viver aqui.
+  const [aparelho, setAparelho] = useState(() =>
+    acharAparelho(localStorage.getItem(CHAVE_APARELHO) ?? PADRAO),
+  );
+
   return (
-    <aside className="flex w-[460px] shrink-0 flex-col border-l border-rule bg-surface">
+    <aside className="flex shrink-0 flex-col bg-surface" style={{ width: largura }}>
       <div className="no-drag flex h-[38px] shrink-0 items-center gap-2 border-b border-rule px-4">
-        <span className="font-mono text-label uppercase text-muted">Ao vivo</span>
+        <span className="shrink-0 font-mono text-label uppercase text-muted">Ao vivo</span>
         {url && (
-          <span
-            aria-hidden
-            className="h-[5px] w-[5px] shrink-0 animate-pulse rounded-full bg-ok"
-            style={{ animationDuration: "2s" }}
-          />
+          <>
+            <span
+              aria-hidden
+              className="h-[5px] w-[5px] shrink-0 animate-pulse rounded-full bg-ok"
+              style={{ animationDuration: "2s" }}
+            />
+            <SeletorAparelho
+              valor={aparelho}
+              onChange={(a) => {
+                setAparelho(a);
+                localStorage.setItem(CHAVE_APARELHO, a.id);
+              }}
+              className="min-w-[88px] max-w-[176px] flex-1"
+            />
+          </>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {url && (
-            <Button variant="ghost" onClick={onRecarregar} aria-label="Recarregar" title="Recarregar">
-              <RefreshCw size={13} />
-            </Button>
+            <>
+              <Button variant="ghost" onClick={onRecarregar} aria-label="Recarregar" title="Recarregar">
+                <RefreshCw size={13} />
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setQrAberto(true)}
+                aria-label="Ver no telefone"
+                title="Ver no telefone"
+              >
+                <QrCode size={13} />
+              </Button>
+            </>
           )}
           {url ? (
             <Button variant="danger" size="sm" onClick={onParar}>
@@ -53,9 +88,11 @@ export function PainelAoVivo({
         </div>
       </div>
 
+      {qrAberto && <ModalQR lan={lan} url={url} onFechar={() => setQrAberto(false)} />}
+
       <Palco
         url={url}
-        aparelho={APARELHO}
+        aparelho={aparelho}
         margem={20}
         legenda={false}
         recarga={recarga}

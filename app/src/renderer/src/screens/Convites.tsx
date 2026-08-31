@@ -27,6 +27,7 @@ import { JsonForm, setIn, type Caminho } from "@/components/JsonForm";
 import { PainelCoop } from "@/components/PainelCoop";
 import { useCoop } from "@/lib/useCoop";
 import { ProvedorSite } from "@/components/CampoArquivo";
+import { Divisor, useLarguraPainel } from "@/components/Divisor";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
@@ -52,6 +53,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   const servidor = rodando?.siteId === id ? rodando : null;
   const [ligando, setLigando] = useState(false);
   const [recarga, setRecarga] = useState(0);
+  const [largura, setLargura] = useLarguraPainel();
   // Enquanto o site está ao vivo o disco carrega o rascunho, não o salvo.
   // Sem esta marca não dá pra saber se ainda tem sujeira pra desfazer no arquivo.
   const rascunho = useRef(false);
@@ -535,8 +537,12 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           )}
         </section>
 
+        <Divisor largura={largura} onLargura={setLargura} />
+
         <PainelAoVivo
           url={servidor?.url ?? null}
+          lan={servidor?.lan ?? null}
+          largura={largura}
           ligando={ligando}
           podeLigar={!!id}
           recarga={recarga}

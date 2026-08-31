@@ -39,6 +39,7 @@ const APELIDOS: Record<string, string> = {
   recados: "Mural",
   dresscode: "Dress code",
   eyebrow: "Chapéu",
+  pretoEBranco: "Foto em preto e branco",
 };
 
 export function rotulo(chave: string): string {

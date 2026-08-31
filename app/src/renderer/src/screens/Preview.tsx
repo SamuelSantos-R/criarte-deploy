@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactElement } from "react";
-import QRCode from "qrcode";
 import { QrCode, RefreshCw, RotateCw, Square } from "lucide-react";
 import { type Site } from "@/lib/api";
 import { derrubarServidor, subirServidor, usarServidor } from "@/lib/servidor";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/primitives";
+import { ModalQR } from "@/components/ModalQR";
 import { APARELHOS, Palco, type Aparelho } from "@/components/Palco";
+import { Button } from "@/components/ui/primitives";
 import { SeletorAparelho } from "@/components/SeletorAparelho";
 import { SeletorSite } from "@/components/SeletorSite";
 import { Topo } from "@/components/Topo";
@@ -23,7 +23,6 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
   const servidor = rodando?.siteId === id ? rodando : null;
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [qr, setQr] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
 
   useEffect(() => {
@@ -32,14 +31,6 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
 
   const largura = deitado ? aparelho.a : aparelho.l;
   const altura = deitado ? aparelho.l : aparelho.a;
-
-  useEffect(() => {
-    const alvo = servidor?.lan;
-    if (!alvo) return setQr(null);
-    QRCode.toDataURL(alvo, { margin: 1, width: 220, color: { dark: "#1a1e16", light: "#f5ede0" } })
-      .then(setQr)
-      .catch(() => setQr(null));
-  }, [servidor]);
 
   const subir = async (): Promise<void> => {
     if (!id) return;
@@ -56,7 +47,7 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
 
   const derrubar = async (): Promise<void> => {
     await derrubarServidor();
-    setQr(null);
+    setQrAberto(false);
   };
 
   return (
@@ -138,38 +129,15 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
           </div>
         </Palco>
 
-        {qrAberto && (
-        <aside className="w-[248px] shrink-0 overflow-y-auto border-l border-rule px-5 py-6">
-          <span className="font-mono text-label uppercase text-muted">Ver no telefone</span>
-          {qr && servidor?.lan ? (
-            <>
-              <img
-                src={qr}
-                alt={`QR code para abrir ${servidor.lan} no telefone`}
-                className="mt-3 block w-full border border-rule"
-              />
-              <p className="mt-3 break-all font-mono text-[11px] text-text/85">{servidor.lan}</p>
-              <p className="mt-2 text-[12px] leading-[1.5] text-muted">
-                Telefone e Mac no mesmo Wi-Fi. Aponte a câmera.
-              </p>
-            </>
-          ) : (
-            <p className="mt-3 text-[12px] leading-[1.5] text-muted">
-              {servidor
-                ? "Sem IP de rede — o Mac não está numa Wi-Fi alcançável pelo telefone."
-                : "O QR aparece quando o preview subir."}
-            </p>
-          )}
-
-          {servidor && (
-            <>
-              <span className="mt-8 block font-mono text-label uppercase text-muted">Neste Mac</span>
-              <p className="mt-2 break-all font-mono text-[11px] text-text/85">{servidor.url}</p>
-            </>
-          )}
-        </aside>
-        )}
       </div>
+
+      {qrAberto && (
+        <ModalQR
+          lan={servidor?.lan ?? null}
+          url={servidor?.url ?? null}
+          onFechar={() => setQrAberto(false)}
+        />
+      )}
     </div>
   );
 }

@@ -8,6 +8,16 @@ import { FILTROS, importAssets } from "./assets";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, iniciarServidor, pararServidor, rolarPreview } from "./preview";
 import { trocarPorWebp } from "./webp";
+import { vigiarConvite } from "./vigia";
+import {
+  abrirSessao,
+  entrarSessao,
+  enviarPatch,
+  estadoCoop,
+  fecharSessao,
+  pedirTranca,
+  type Patch,
+} from "./coop";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 
@@ -70,6 +80,17 @@ function asJob(v: unknown): Job {
   }
 }
 
+function asPatch(v: unknown): Patch {
+  if (!v || typeof v !== "object") throw new Error("patch inválido");
+  const p = v as Record<string, unknown>;
+  if (!Array.isArray(p.caminho) || p.caminho.length === 0) throw new Error("caminho inválido");
+  for (const parte of p.caminho) {
+    const ok = (typeof parte === "string" && parte.length <= 64) || typeof parte === "number";
+    if (!ok) throw new Error("caminho inválido");
+  }
+  return { caminho: p.caminho as (string | number)[], valor: p.valor };
+}
+
 export function registerIpc(): void {
   handle("settings:get", () => loadSettings());
 
@@ -90,7 +111,12 @@ export function registerIpc(): void {
 
   handle("sites:list", () => listSites());
   handle("convite:read", (_e, id: unknown) => readConvite(asString(id, "id")));
-  handle("convite:write", (_e, id: unknown, data: unknown) => writeConvite(asString(id, "id"), data));
+  handle("convite:write", (_e, id: unknown, data: unknown, marca: unknown) =>
+    writeConvite(asString(id, "id"), data, typeof marca === "number" ? marca : undefined),
+  );
+  handle("convite:watch", (_e, id: unknown) =>
+    vigiarConvite(id === null ? null : asString(id, "id")),
+  );
 
   handle("sites:duplicate", (_e, id: unknown, categoria: unknown, slug: unknown) =>
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
@@ -158,6 +184,17 @@ export function registerIpc(): void {
     if (!pasta) throw new Error("nenhuma pasta de saída ainda");
     await shell.openPath(pasta);
   });
+
+  handle("coop:abrir", (_e, id: unknown) => abrirSessao(asString(id, "id")));
+  handle("coop:entrar", (_e, endereco: unknown, codigo: unknown, nome: unknown) =>
+    entrarSessao(asString(endereco, "endereço"), asString(codigo, "código"), asString(nome, "nome")),
+  );
+  handle("coop:fechar", () => fecharSessao());
+  handle("coop:estado", () => estadoCoop());
+  handle("coop:patch", (_e, patch: unknown) => enviarPatch(asPatch(patch)));
+  handle("coop:tranca", (_e, secao: unknown, soltar: unknown) =>
+    pedirTranca(asString(secao, "secção"), soltar === true),
+  );
 
   handle("job:start", (event, job: unknown) => startJob(event.sender, asJob(job)));
   handle("job:cancel", (_e, runId: unknown) => cancelJob(runId));

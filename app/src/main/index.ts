@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { registerIpc } from "./ipc";
 import { killAll } from "./cli";
 import { origensDoPreview, pararServidor } from "./preview";
+import { pararVigia } from "./vigia";
 
 const DEV_URL = process.env["ELECTRON_RENDERER_URL"];
 
@@ -100,10 +101,12 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   killAll();
   pararServidor();
+  pararVigia();
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
   killAll();
   pararServidor();
+  pararVigia();
 });

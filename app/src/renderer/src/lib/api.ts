@@ -22,8 +22,14 @@ const api = window.criarte;
 export const getSettings = () => call(api.getSettings());
 export const pickRoot = () => call(api.pickRoot());
 export const listSites = () => call(api.listSites()) as Promise<Site[]>;
-export const readConvite = (id: string) => call(api.readConvite(id)) as Promise<Record<string, unknown>>;
-export const writeConvite = (id: string, data: unknown) => call(api.writeConvite(id, data));
+export type Convite = { dados: Record<string, unknown>; marca: number };
+export type Gravacao = { conflito: boolean; marca: number };
+
+export const readConvite = (id: string) => call(api.readConvite(id)) as Promise<Convite>;
+export const writeConvite = (id: string, data: unknown, marca?: number) =>
+  call(api.writeConvite(id, data, marca)) as Promise<Gravacao>;
+export const vigiarConvite = (id: string | null) => call(api.vigiarConvite(id));
+export const onConviteMudou = api.onConviteMudou;
 
 export type Copia = { id: string; siteId: string; envTrocado: boolean };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
@@ -68,6 +74,33 @@ export const envelopeLista = () => call(api.envelopeLista()) as Promise<Lista | 
 export const envelopePasta = () => call(api.envelopePasta()) as Promise<string | null>;
 export const envelopeGerar = (p: PedidoEnvelope) => call(api.envelopeGerar(p)) as Promise<Saida>;
 export const envelopeAbrirSaida = () => call(api.envelopeAbrirSaida());
+
+export type Patch = { caminho: (string | number)[]; valor: unknown };
+export type Tranca = { secao: string; nome: string };
+export type EstadoCoop = {
+  papel: "anfitriao" | "convidado" | null;
+  siteId: string | null;
+  endereco: string | null;
+  codigo: string | null;
+  pares: string[];
+  trancas: Tranca[];
+  erro: string | null;
+};
+
+export const coopAbrir = (id: string) => call(api.coopAbrir(id)) as Promise<EstadoCoop>;
+export const coopEntrar = (endereco: string, codigo: string, nome: string) =>
+  call(api.coopEntrar(endereco, codigo, nome)) as Promise<EstadoCoop>;
+export const coopFechar = () => call(api.coopFechar()) as Promise<EstadoCoop>;
+export const coopEstado = () => call(api.coopEstado()) as Promise<EstadoCoop>;
+export const coopPatch = (patch: Patch) =>
+  call(api.coopPatch(patch)) as Promise<{ ok: boolean; erro?: string }>;
+export const coopTranca = (secao: string, soltar: boolean) =>
+  call(api.coopTranca(secao, soltar)) as Promise<boolean>;
+export const onCoopEstado = api.onCoopEstado;
+export const onCoopPatch = api.onCoopPatch;
+export const onCoopCheio = api.onCoopCheio;
+export const onCoopTrancas = api.onCoopTrancas;
+export const onCoopCaiu = api.onCoopCaiu;
 
 export const startJob = (job: Job) => call(api.startJob(job));
 export const cancelJob = (runId: string) => call(api.cancelJob(runId));

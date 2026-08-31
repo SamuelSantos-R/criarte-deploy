@@ -1,149 +1,42 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { Copy, FolderOpen, Redo2, RefreshCw, RotateCcw, Save, Square, Undo2 } from "lucide-react";
-import { previewScroll, readConvite, reveal, writeConvite, type Site } from "@/lib/api";
+import { Copy, FolderOpen, Lock, Redo2, RotateCcw, Save, Undo2, Users } from "lucide-react";
+import {
+  onConviteMudou,
+  previewScroll,
+  readConvite,
+  reveal,
+  vigiarConvite,
+  writeConvite,
+  type Site,
+} from "@/lib/api";
 import {
   alternarSecao,
   ancoraDe,
+  ausentes,
   CHAVE_SECOES,
   estaLigada,
-  iconeDe,
   podeDesligar,
   rotulo,
+  semearSecao,
 } from "@/lib/secoes";
 import { derrubarServidor, subirServidor, usarServidor } from "@/lib/servidor";
 import { useHistorico } from "@/lib/useHistorico";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
-import { JsonForm } from "@/components/JsonForm";
+import { JsonForm, setIn, type Caminho } from "@/components/JsonForm";
+import { PainelCoop } from "@/components/PainelCoop";
+import { useCoop } from "@/lib/useCoop";
 import { ProvedorSite } from "@/components/CampoArquivo";
-import { acharAparelho, Palco } from "@/components/Palco";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
+import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
+import { BotaoTrilha, ChaveSecao, Regua } from "@/components/ReguaSecoes";
 import { Topo } from "@/components/Topo";
-
-// O convite nasce no telefone: a coluna do editor mostra o aparelho, não o desktop.
-const APARELHO = acharAparelho("13");
 
 // Tempo entre a última tecla e o disco. Curto o bastante pra parecer ao vivo,
 // longo o bastante pra não gravar letra por letra enquanto se digita um nome.
 const REPOUSO = 400;
 
-function Regua({
-  chaves,
-  atual,
-  desligadas,
-  onEscolher,
-}: {
-  chaves: string[];
-  atual: string | null;
-  desligadas: Set<string>;
-  onEscolher: (chave: string) => void;
-}): ReactElement {
-  return (
-    <nav aria-label="Seções do convite" className="w-[136px] shrink-0 overflow-y-auto border-r border-rule py-2">
-      {chaves.map((chave, i) => {
-        const Icone = iconeDe(chave);
-        const ativo = chave === atual;
-        const fora = desligadas.has(chave);
-        return (
-          <button
-            key={chave}
-            onClick={() => onEscolher(chave)}
-            aria-current={ativo ? "true" : undefined}
-            title={fora ? `${rotulo(chave)} — fora da página` : undefined}
-            className={cn(
-              "no-drag relative flex w-full items-center gap-2 px-3 py-[7px] text-left text-[12px] transition-colors",
-              ativo ? "bg-surface-2 text-text" : "text-muted hover:text-text",
-            )}
-          >
-            <span className={cn("absolute left-0 top-0 h-full w-[2px]", ativo ? "bg-sage" : "bg-transparent")} />
-            <span className="w-[15px] shrink-0 font-mono text-serial text-muted/70">
-              {String(i + 1).padStart(2, "0")}
-            </span>
-            <Icone size={14} strokeWidth={1.6} aria-hidden />
-            {/* Risca, não só cinza: quem enxerga mal a cor ainda vê que saiu da página. */}
-            <span className={cn("truncate", fora && "line-through decoration-1")}>{rotulo(chave)}</span>
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-/**
- * Trilho reto, não pílula: a chave herda a mesma linguagem do par desfazer/refazer
- * do topo. O rótulo diz o estado por escrito — cor sozinha não conta.
- */
-function ChaveSecao({
-  ligada,
-  nome,
-  onAlternar,
-}: {
-  ligada: boolean;
-  nome: string;
-  onAlternar: (proxima: boolean) => void;
-}): ReactElement {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={ligada}
-      onClick={() => onAlternar(!ligada)}
-      title={ligada ? `Tirar ${nome} da página` : `Devolver ${nome} à página`}
-      className={cn(
-        "no-drag flex h-[28px] shrink-0 items-center gap-2 px-1 transition-colors",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage",
-        ligada ? "text-text hover:text-accent" : "text-muted hover:text-text",
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "flex h-[15px] w-[28px] items-center border px-[2px]",
-          ligada ? "justify-end border-accent/70" : "justify-start border-rule-strong",
-        )}
-      >
-        <span className={cn("h-[9px] w-[9px]", ligada ? "bg-accent" : "bg-muted")} />
-      </span>
-      <span className="font-mono text-label uppercase tracking-[0.14em]">
-        {ligada ? "na página" : "fora"}
-      </span>
-    </button>
-  );
-}
-
-function BotaoTrilha({
-  rotuloAcao,
-  atalho,
-  Icone,
-  disabled,
-  onClick,
-}: {
-  rotuloAcao: string;
-  atalho: string;
-  Icone: typeof Undo2;
-  disabled: boolean;
-  onClick: () => void;
-}): ReactElement {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      title={`${rotuloAcao} (${atalho})`}
-      aria-label={`${rotuloAcao} — ${atalho}`}
-      aria-keyshortcuts={atalho === "⌘Z" ? "Meta+Z" : "Shift+Meta+Z"}
-      className={cn(
-        "flex h-[28px] w-[32px] items-center justify-center transition-colors",
-        "text-muted hover:bg-surface-2 hover:text-text",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-sage",
-        "disabled:pointer-events-none disabled:text-muted/30",
-      )}
-    >
-      <Icone size={13} strokeWidth={1.8} aria-hidden />
-    </button>
-  );
-}
 
 export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () => void }): ReactElement {
   const comConvite = useMemo(() => sites.filter((s) => s.temConvite), [sites]);
@@ -162,6 +55,10 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   // Enquanto o site está ao vivo o disco carrega o rascunho, não o salvo.
   // Sem esta marca não dá pra saber se ainda tem sujeira pra desfazer no arquivo.
   const rascunho = useRef(false);
+  // mtime do convite.json na última vez que este painel o leu ou gravou. Vai
+  // junto em toda gravação: é o que impede o Studio de apagar edição feita fora.
+  const marca = useRef<number | null>(null);
+  const [conflito, setConflito] = useState(false);
   const {
     valor: dados,
     definir: setDados,
@@ -172,10 +69,46 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     podeRefazer,
   } = useHistorico<Record<string, unknown>>();
 
+  const [mostrarCoop, setMostrarCoop] = useState(false);
+  // Patch que chegou da rede entra pelo mesmo caminho de uma edição local, mas
+  // sem voltar pra rede — senão os dois Studios ficavam a devolver-se o mesmo.
+  // O hook guarda estes ganchos num ref e refaz a cada render, então `dados`
+  // aqui dentro é sempre o de agora — não o do render em que a sessão abriu.
+  const coop = useCoop({
+    aoPatch: ({ caminho, valor }) => {
+      if (dados) setDados(setIn(dados, caminho, valor) as Record<string, unknown>);
+    },
+    aoDocumento: (doc) => recomecar(doc),
+  });
+  const bloqueio = coop.donoDe(secao);
+  // O documento em cena é o do anfitrião, mas o `id` daqui é o site local. Deixar
+  // gravar escreveria o convite do outro por cima de um ficheiro que não é dele.
+  const convidado = coop.estado.papel === "convidado";
+  // Com sessão aberta quem grava é o anfitrião, a cada patch. O mtime que este
+  // painel guarda envelhece a cada gravação dessas, então um ⌘S daqui bateria na
+  // guarda e acusaria conflito com o próprio trabalho.
+  const emSessao = coop.ligado;
+
   // A lista chega depois do primeiro render — abre o convite mais recente.
   useEffect(() => {
     if (id === null && comConvite[0]) setId(comConvite[0].id);
   }, [id, comConvite]);
+
+  // Entrar numa secção pede a tranca; sair devolve. Sem isto duas pessoas
+  // digitavam no mesmo campo e a última tecla ganhava.
+  //
+  // A renovação existe porque a tranca do anfitrião caduca aos 30s e só a
+  // digitação a estica: quem fica a ler a secção por um minuto perdia-a sem sair
+  // dela, e o outro entrava por cima.
+  useEffect(() => {
+    if (!coop.ligado || !secao) return;
+    coop.tomar(secao);
+    const renovar = setInterval(() => coop.tomar(secao), 12_000);
+    return () => {
+      clearInterval(renovar);
+      coop.soltar(secao);
+    };
+  }, [coop.ligado, secao, coop.tomar, coop.soltar]);
 
   useEffect(() => {
     if (!id) return;
@@ -183,9 +116,11 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     recomecar(null);
     setSecao(null);
     setErro(null);
+    setConflito(false);
     readConvite(id)
-      .then((d) => {
+      .then(({ dados: d, marca: m }) => {
         if (!vivo) return;
+        marca.current = m;
         recomecar(d);
         setOriginal(JSON.stringify(d));
         setSecao(Object.keys(d).find((k) => k !== CHAVE_SECOES) ?? null);
@@ -196,25 +131,65 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     };
   }, [id, recomecar]);
 
+  // O main avisa quando o arquivo muda por fora. Sem o vigia, o guarda do mtime
+  // ainda segura a gravação — mas só na hora de gravar, e aí já vira pergunta.
+  useEffect(() => {
+    void vigiarConvite(id).catch(() => {});
+    return () => {
+      void vigiarConvite(null).catch(() => {});
+    };
+  }, [id]);
+
   // `secoes` é o mapa do que está fora da página, não uma seção editável.
   const chaves = dados ? Object.keys(dados).filter((k) => k !== CHAVE_SECOES) : [];
   const desligadas = new Set(chaves.filter((k) => dados !== null && !estaLigada(dados, k)));
+  const faltando = dados ? ausentes(dados) : [];
   const sujo = dados !== null && JSON.stringify(dados) !== original;
+
+  /** Fora da sessão é um no-op — o editor não muda de forma por causa do co-op. */
+  const publicar = useCallback(
+    (caminho: Caminho, valor: unknown): void => {
+      if (coop.ligado) void coop.publicar({ caminho, valor });
+    },
+    [coop.ligado, coop.publicar],
+  );
+
+  const semear = (chave: string): void => {
+    if (!dados) return;
+    const proximo = semearSecao(dados, chave);
+    setDados(proximo);
+    publicar([chave], proximo[chave]);
+    setSecao(chave);
+  };
+
+  /**
+   * Toda gravação passa por aqui levando o mtime que este painel leu. Disco
+   * mexido por fora derruba a gravação em vez de apagar o que o outro escreveu.
+   */
+  const gravar = useCallback(async (alvo: string, corpo: unknown): Promise<boolean> => {
+    const r = await writeConvite(alvo, corpo, marca.current ?? undefined);
+    if (r.conflito) {
+      setConflito(true);
+      return false;
+    }
+    marca.current = r.marca;
+    return true;
+  }, []);
 
   // Devolve ao arquivo o último estado salvo. Chamado sempre que o rascunho
   // deixa de estar em cena: descartar, trocar de site, desligar, sair da tela.
   const desfazerNoDisco = useCallback(async (): Promise<void> => {
     if (!rascunho.current || !id || !original) return;
     rascunho.current = false;
-    await writeConvite(id, JSON.parse(original) as unknown).catch(() => {});
-  }, [id, original]);
+    await gravar(id, JSON.parse(original) as unknown).catch(() => false);
+  }, [id, original, gravar]);
 
   const salvar = async (): Promise<void> => {
-    if (!id || !dados || salvando) return;
+    if (!id || !dados || salvando || emSessao) return;
     setSalvando(true);
     setErro(null);
     try {
-      await writeConvite(id, dados);
+      if (!(await gravar(id, dados))) return;
       rascunho.current = false;
       setOriginal(JSON.stringify(dados));
       recarregar();
@@ -222,6 +197,36 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
       setSalvando(false);
+    }
+  };
+
+  /** Larga o que está na tela e volta ao que o arquivo diz agora. */
+  const ficarComArquivo = useCallback(async (): Promise<void> => {
+    if (!id) return;
+    rascunho.current = false;
+    try {
+      const { dados: d, marca: m } = await readConvite(id);
+      marca.current = m;
+      recomecar(d);
+      setOriginal(JSON.stringify(d));
+      setConflito(false);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }, [id, recomecar]);
+
+  /** Sem `marca`: grava por cima de propósito, apagando o que mudou no arquivo. */
+  const gravarPorCima = async (): Promise<void> => {
+    if (!id || !dados) return;
+    try {
+      const r = await writeConvite(id, dados);
+      marca.current = r.marca;
+      rascunho.current = false;
+      setOriginal(JSON.stringify(dados));
+      setConflito(false);
+      recarregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -252,21 +257,49 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   // O `next dev` sonda o disco (WATCHPACK_POLLING), então gravar o rascunho é o
   // bastante: o HMR repinta a página aberta sozinho, sem reload.
   useEffect(() => {
-    if (!servidor || !id || !dados) return;
+    // Com conflito em cena o disco não é mais nosso: insistir só faria a
+    // gravação bater na trava a cada tecla.
+    if (!servidor || !id || !dados || conflito || emSessao) return;
     // Voltar ao valor salvo — desfazendo ou desligando e religando uma seção —
     // deixava o disco preso no último rascunho, e o preview mentia.
     if (!sujo) {
       if (!rascunho.current) return;
       rascunho.current = false;
-      void writeConvite(id, dados).catch((e: Error) => setErro(e.message));
+      void gravar(id, dados).catch((e: Error) => setErro(e.message));
       return;
     }
     const t = setTimeout(() => {
       rascunho.current = true;
-      void writeConvite(id, dados).catch((e: Error) => setErro(e.message));
+      void gravar(id, dados).catch((e: Error) => setErro(e.message));
     }, REPOUSO);
     return () => clearTimeout(t);
-  }, [servidor, id, dados, sujo]);
+  }, [servidor, id, dados, sujo, conflito, emSessao, gravar]);
+
+  /**
+   * Arquivo mexido por fora. Sem nada pendente na tela o disco simplesmente
+   * ganha — recarrega calado, que é o caso comum de editar o json à mão. Com
+   * edição pendente vira pergunta, porque aí um dos dois lados morre.
+   */
+  useEffect(() => {
+    if (!id) return;
+    return onConviteMudou(({ id: alvo }) => {
+      if (alvo !== id) return;
+      if (sujo || rascunho.current) {
+        setConflito(true);
+        return;
+      }
+      void ficarComArquivo();
+    });
+  }, [id, sujo, ficarComArquivo]);
+
+  // Fim de sessão: o disco levou todos os patches e o `marca` daqui ficou velho.
+  // Reler é o que devolve a tela e o mtime ao mesmo ponto — e no convidado é o
+  // que troca o convite do anfitrião pelo ficheiro local dele.
+  const estavaEmSessao = useRef(false);
+  useEffect(() => {
+    if (estavaEmSessao.current && !emSessao) void ficarComArquivo();
+    estavaEmSessao.current = emSessao;
+  }, [emSessao, ficarComArquivo]);
 
   // Trocar de seção leva o preview até o bloco correspondente, pra não ter que
   // procurar rolando. Quem rola é o processo main: o Chrome ignora âncora
@@ -286,7 +319,9 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   useEffect(() => {
     return () => {
       const { id: alvo, original: salvo } = ultimo.current;
-      if (rascunho.current && alvo && salvo) void writeConvite(alvo, JSON.parse(salvo) as unknown);
+      if (rascunho.current && alvo && salvo) {
+        void writeConvite(alvo, JSON.parse(salvo) as unknown, marca.current ?? undefined);
+      }
     };
   }, []);
 
@@ -362,111 +397,147 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           />
         </div>
 
-        {sujo && (
+        {sujo && !emSessao && (
           <span className="font-mono text-serial uppercase tracking-[0.18em] text-accent">alterado</span>
         )}
+        {emSessao && (
+          <span className="font-mono text-serial uppercase tracking-[0.18em] text-muted">
+            {convidado ? "grava no anfitrião" : "grava sozinho"}
+          </span>
+        )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {sujo && (
+          {sujo && !emSessao && (
             <Button variant="ghost" onClick={descartar}>
               <RotateCcw size={13} /> Descartar
             </Button>
           )}
-          {id && (
+          {/* Ligado, o botão para de ser botão e vira placa: o ponto verde e a
+              contagem dizem que tem mais gente na mesa sem ter que abrir o painel. */}
+          <button
+            type="button"
+            aria-pressed={mostrarCoop}
+            onClick={() => setMostrarCoop((v) => !v)}
+            title={coop.ligado ? "Sessão a dois — abrir painel" : "Editar a dois"}
+            className={cn(
+              "no-drag flex h-[28px] shrink-0 items-center gap-2 px-2 text-[12px] transition-colors",
+              "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-sage",
+              mostrarCoop ? "bg-surface-2 text-text" : "text-muted hover:text-text",
+            )}
+          >
+            <Users size={13} strokeWidth={1.8} aria-hidden />
+            <span>A dois</span>
+            {coop.ligado && (
+              <>
+                <span aria-hidden className="h-[5px] w-[5px] shrink-0 rounded-full bg-ok" />
+                <span className="font-mono text-serial text-muted">
+                  {String(coop.estado.pares.length + 1).padStart(2, "0")}
+                </span>
+              </>
+            )}
+          </button>
+          {id && !convidado && (
             <Button variant="ghost" onClick={() => setDuplicando(true)}>
               <Copy size={13} /> Salvar como novo
             </Button>
           )}
-          {id && (
+          {id && !convidado && (
             <Button variant="ghost" onClick={() => void reveal(id)}>
               <FolderOpen size={13} /> Abrir pasta
             </Button>
           )}
-          <Button variant="primary" size="sm" disabled={!sujo || salvando} onClick={() => void salvar()}>
-            <Save size={13} /> {salvando ? "Salvando…" : "Salvar"}
-          </Button>
+          {!emSessao && (
+            <Button variant="primary" size="sm" disabled={!sujo || salvando} onClick={() => void salvar()}>
+              <Save size={13} /> {salvando ? "Salvando…" : "Salvar"}
+            </Button>
+          )}
         </div>
       </Topo>
 
+      {conflito && (
+        <FaixaConflito
+          onFicarComArquivo={() => void ficarComArquivo()}
+          onGravarPorCima={() => void gravarPorCima()}
+        />
+      )}
+
       <div className="flex min-h-0 min-w-0 flex-1">
         {dados && secao && (
-          <Regua chaves={chaves} atual={secao} desligadas={desligadas} onEscolher={setSecao} />
+          <Regua
+            chaves={chaves}
+            atual={secao}
+            desligadas={desligadas}
+            faltando={faltando}
+            onEscolher={setSecao}
+            onSemear={semear}
+          />
         )}
 
         <section className="min-w-0 flex-1 overflow-auto px-7 pb-16 pt-6">
           {erro && <p className="border-l-2 border-bad pl-3 text-[13px] text-bad">{erro}</p>}
-          {!id && <p className="text-[13px] text-muted">Escolha um site com convite.json.</p>}
-          {id && !dados && !erro && <p className="font-mono text-[12px] text-muted">Lendo convite.json…</p>}
-          {dados && secao && (
+          {mostrarCoop ? (
+            <PainelCoop
+              estado={coop.estado}
+              erro={coop.erro}
+              ocupado={coop.ocupado}
+              siteId={id}
+              abrir={(alvo) => void coop.abrir(alvo)}
+              entrar={(endereco, codigo, nome) => void coop.entrar(endereco, codigo, nome)}
+              fechar={() => void coop.fechar()}
+            />
+          ) : (
             <>
-              <div className="mb-5 flex items-center gap-3 border-b border-rule pb-2">
-                <h2 className="font-mono text-label uppercase tracking-[0.18em] text-text">
-                  {rotulo(secao)}
-                </h2>
-                {podeDesligar(secao) && (
-                  <ChaveSecao
-                    ligada={estaLigada(dados, secao)}
-                    nome={rotulo(secao)}
-                    onAlternar={(proxima) => setDados(alternarSecao(dados, secao, proxima))}
-                  />
-                )}
-              </div>
-              <JsonForm dados={dados} secao={secao} onChange={setDados} />
+              {!id && <p className="text-[13px] text-muted">Escolha um site com convite.json.</p>}
+              {id && !dados && !erro && (
+                <p className="font-mono text-[12px] text-muted">Lendo convite.json…</p>
+              )}
+              {dados && secao && (
+                <>
+                  <div className="mb-5 flex items-center gap-3 border-b border-rule pb-2">
+                    <h2 className="font-mono text-label uppercase tracking-[0.18em] text-text">
+                      {rotulo(secao)}
+                    </h2>
+                    {podeDesligar(secao) && !bloqueio && (
+                      <ChaveSecao
+                        ligada={estaLigada(dados, secao)}
+                        nome={rotulo(secao)}
+                        onAlternar={(proxima) => {
+                          const proximo = alternarSecao(dados, secao, proxima);
+                          setDados(proximo);
+                          publicar([CHAVE_SECOES], proximo[CHAVE_SECOES] ?? {});
+                        }}
+                      />
+                    )}
+                    {/* Cadeado e nome, não só o cinza do formulário: quem chega no
+                        meio da edição precisa saber de quem é a mão, não só que
+                        a caixa não responde. */}
+                    {bloqueio && (
+                      <span className="flex items-center gap-1.5 font-mono text-label uppercase tracking-[0.14em] text-muted">
+                        <Lock size={12} strokeWidth={1.8} aria-hidden />
+                        {bloqueio.nome} está aqui
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    aria-disabled={bloqueio ? true : undefined}
+                    className={cn(bloqueio && "pointer-events-none select-none opacity-40")}
+                  >
+                    <JsonForm dados={dados} secao={secao} onChange={setDados} onPatch={publicar} />
+                  </div>
+                </>
+              )}
             </>
           )}
         </section>
 
-        {/* Não é maquete: é o site rodando. O que se digita à esquerda repinta aqui. */}
-        <aside className="flex w-[460px] shrink-0 flex-col border-l border-rule bg-surface">
-          <div className="no-drag flex h-[38px] shrink-0 items-center gap-2 border-b border-rule px-4">
-            <span className="font-mono text-label uppercase text-muted">Ao vivo</span>
-            {servidor && (
-              <span
-                aria-hidden
-                className="h-[5px] w-[5px] shrink-0 animate-pulse rounded-full bg-ok"
-                style={{ animationDuration: "2s" }}
-              />
-            )}
-            <div className="ml-auto flex items-center gap-2">
-              {servidor && (
-                <Button
-                  variant="ghost"
-                  onClick={() => setRecarga((n) => n + 1)}
-                  aria-label="Recarregar"
-                  title="Recarregar"
-                >
-                  <RefreshCw size={13} />
-                </Button>
-              )}
-              {servidor ? (
-                <Button variant="danger" size="sm" onClick={() => void desligarAoVivo()}>
-                  <Square size={13} /> Parar
-                </Button>
-              ) : (
-                <Button variant="primary" size="sm" disabled={!id || ligando} onClick={() => void ligarAoVivo()}>
-                  {ligando ? "Subindo…" : "Ligar"}
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <Palco
-            url={servidor?.url ?? null}
-            aparelho={APARELHO}
-            margem={20}
-            legenda={false}
-            recarga={recarga}
-            className="relative min-h-0 flex-1 overflow-hidden bg-surface-2/40"
-          >
-            <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
-              <p className="text-[13px] text-muted">
-                {ligando ? "Subindo o Next do site…" : "Ligue pra ver o convite de verdade repintando enquanto edita."}
-              </p>
-              {ligando && (
-                <p className="font-mono text-[11px] text-muted/70">a primeira vez demora uns segundos.</p>
-              )}
-            </div>
-          </Palco>
-        </aside>
+        <PainelAoVivo
+          url={servidor?.url ?? null}
+          ligando={ligando}
+          podeLigar={!!id}
+          recarga={recarga}
+          onRecarregar={() => setRecarga((n) => n + 1)}
+          onLigar={() => void ligarAoVivo()}
+          onParar={() => void desligarAoVivo()}
+        />
       </div>
 
       {duplicando && id && (

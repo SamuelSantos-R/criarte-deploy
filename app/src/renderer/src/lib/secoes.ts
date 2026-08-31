@@ -16,11 +16,16 @@ import {
   Milestone,
   Music,
   Palette,
+  Ruler,
+  Flower2,
   Shirt,
   Tags,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { MEDIDAS_PADRAO } from "@/components/PainelMedidas";
+import { ORNAMENTOS_PADRAO } from "@/components/PainelOrnamentos";
+import { TEMA_PADRAO } from "@/components/PainelTema";
 
 const APELIDOS: Record<string, string> = {
   r2: "CDN (R2)",
@@ -47,6 +52,8 @@ const ICONES: Record<string, LucideIcon> = {
   meta: Tags,
   data: Calendar,
   tema: Palette,
+  medidas: Ruler,
+  ornamentos: Flower2,
   assets: Cloud,
   hero: Image,
   galeria: Images,
@@ -77,6 +84,11 @@ const ANCORAS: Record<string, string> = {
   galeria: "galeria",
   versiculo: "versiculo",
   pais: "versiculo",
+  // Mexe no hero e no versículo. Aponta pro versículo porque é lá que estão duas
+  // das medidas; o nome dos noivos já está à vista no topo.
+  medidas: "versiculo",
+  // Aparece no canto de todas as seccoes; o versiculo e a primeira que tem uma.
+  ornamentos: "versiculo",
   historia: "historia",
   eventos: "evento",
   cronograma: "nosso-dia",
@@ -110,6 +122,41 @@ const DESLIGAVEIS = new Set([
 ]);
 
 export const CHAVE_SECOES = "secoes";
+
+/**
+ * O editor só desenha chave que já existe no convite.json, então uma seção que o
+ * template aceita mas o arquivo não tem some da tela — foi assim que o painel de
+ * medidas sumiu num convite feito por "Salvar como novo". Aqui ficam as seções
+ * que o Studio sabe criar sozinho, com o conteúdo de partida.
+ *
+ * Só entra o que é configuração pura. Bloco de conteúdo (história, galeria) fica
+ * de fora de propósito: semear um vazio poria uma seção oca no ar.
+ */
+const SEMENTES: Record<string, () => Record<string, unknown>> = {
+  medidas: () => ({ ...MEDIDAS_PADRAO }),
+  ornamentos: () => ({ ...ORNAMENTOS_PADRAO }),
+  tema: () => ({ ...TEMA_PADRAO }),
+};
+
+export function ausentes(dados: Record<string, unknown>): string[] {
+  return Object.keys(SEMENTES).filter((k) => !(k in dados));
+}
+
+export function semearSecao(
+  dados: Record<string, unknown>,
+  chave: string,
+): Record<string, unknown> {
+  const semente = SEMENTES[chave];
+  if (!semente) return dados;
+  // Antes de `tema`, que é sempre o último bloco de configuração do arquivo.
+  const proximo: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(dados)) {
+    if (k === "tema") proximo[chave] = semente();
+    proximo[k] = v;
+  }
+  if (!(chave in proximo)) proximo[chave] = semente();
+  return proximo;
+}
 
 export function podeDesligar(chave: string): boolean {
   return DESLIGAVEIS.has(chave);

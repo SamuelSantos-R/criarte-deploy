@@ -15,7 +15,7 @@ let servidor: (Servidor & { child: ChildProcess }) | null = null;
  * virtuais: todas respondem HTTP no próprio Mac e enganam o teste, mas o
  * celular nunca alcança. O que sobra é o IP que dá pra ler no QR.
  */
-function ipDaRede(): string | null {
+export function ipDaRede(): string | null {
   for (const [nome, addrs] of Object.entries(networkInterfaces())) {
     if (/^(feth|bridge|utun|awdl|llw|ap\d)/.test(nome)) continue;
     for (const a of addrs ?? []) {

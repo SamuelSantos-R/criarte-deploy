@@ -6,6 +6,31 @@ type Servidor = { siteId: string; url: string; lan: string | null };
 type Copia = { id: string; siteId: string; envTrocado: boolean };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
+type Convite = { dados: unknown; marca: number };
+type Gravacao = { conflito: boolean; marca: number };
+type ConviteMudou = { id: string; marca: number };
+type Patch = { caminho: (string | number)[]; valor: unknown };
+type Tranca = { secao: string; nome: string };
+type EstadoCoop = {
+  papel: "anfitriao" | "convidado" | null;
+  siteId: string | null;
+  endereco: string | null;
+  codigo: string | null;
+  pares: string[];
+  trancas: Tranca[];
+  erro: string | null;
+};
+
+/** Um `on*` por canal, cada um devolvendo o seu próprio desligar. */
+function ouvir<T>(canal: string) {
+  return (cb: (p: T) => void): (() => void) => {
+    const listener = (_e: IpcRendererEvent, payload: T): void => cb(payload);
+    ipcRenderer.on(canal, listener);
+    return (): void => {
+      ipcRenderer.off(canal, listener);
+    };
+  };
+}
 
 const invoke = <T>(canal: string, ...args: unknown[]): Promise<Result<T>> =>
   ipcRenderer.invoke(canal, ...args);
@@ -19,8 +44,10 @@ const api = {
   pickRoot: () => invoke<{ sitesRoot: string | null }>("settings:pickRoot"),
 
   listSites: () => invoke<unknown[]>("sites:list"),
-  readConvite: (id: string) => invoke<unknown>("convite:read", id),
-  writeConvite: (id: string, data: unknown) => invoke<void>("convite:write", id, data),
+  readConvite: (id: string) => invoke<Convite>("convite:read", id),
+  writeConvite: (id: string, data: unknown, marca?: number) =>
+    invoke<Gravacao>("convite:write", id, data, marca),
+  vigiarConvite: (id: string | null) => invoke<void>("convite:watch", id),
   duplicarSite: (id: string, categoria: string, slug: string) =>
     invoke<Copia>("sites:duplicate", id, categoria, slug),
 
@@ -45,6 +72,19 @@ const api = {
   startJob: (job: unknown) => invoke<string>("job:start", job),
   cancelJob: (runId: string) => invoke<boolean>("job:cancel", runId),
 
+  coopAbrir: (id: string) => invoke<EstadoCoop>("coop:abrir", id),
+  coopEntrar: (endereco: string, codigo: string, nome: string) =>
+    invoke<EstadoCoop>("coop:entrar", endereco, codigo, nome),
+  coopFechar: () => invoke<EstadoCoop>("coop:fechar"),
+  coopEstado: () => invoke<EstadoCoop>("coop:estado"),
+  coopPatch: (patch: Patch) => invoke<{ ok: boolean; erro?: string }>("coop:patch", patch),
+  coopTranca: (secao: string, soltar: boolean) => invoke<boolean>("coop:tranca", secao, soltar),
+  onCoopEstado: ouvir<EstadoCoop>("coop:estado"),
+  onCoopPatch: ouvir<Patch>("coop:patch"),
+  onCoopCheio: ouvir<{ doc: Record<string, unknown> }>("coop:cheio"),
+  onCoopTrancas: ouvir<{ trancas: Tranca[] }>("coop:trancas"),
+  onCoopCaiu: ouvir<{ motivo: string }>("coop:caiu"),
+
   reveal: (id: string) => invoke<void>("shell:reveal", id),
   openExternal: (url: string) => invoke<void>("shell:openExternal", url),
 
@@ -57,6 +97,13 @@ const api = {
     const listener = (_e: IpcRendererEvent, payload: FimCli): void => cb(payload);
     ipcRenderer.on("cli:done", listener);
     return () => ipcRenderer.off("cli:done", listener);
+  },
+  onConviteMudou: (cb: (p: ConviteMudou) => void) => {
+    const listener = (_e: IpcRendererEvent, payload: ConviteMudou): void => cb(payload);
+    ipcRenderer.on("convite:mudou", listener);
+    return (): void => {
+      ipcRenderer.off("convite:mudou", listener);
+    };
   },
 };
 

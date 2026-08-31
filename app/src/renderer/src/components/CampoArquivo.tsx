@@ -31,10 +31,15 @@ export function CampoArquivo({
   valor,
   label,
   onChange,
+  aceita,
+  aceitaNota,
 }: {
   valor: string;
   label: string;
   onChange: (valor: string) => void;
+  /** Restringe o campo a um subconjunto das extensões. Sem isto, aceita tudo. */
+  aceita?: RegExp;
+  aceitaNota?: string;
 }): ReactElement {
   const siteId = useContext(SiteAtual);
   const [sobre, setSobre] = useState(false);
@@ -49,6 +54,12 @@ export function CampoArquivo({
     try {
       const arquivos = await acao;
       if (arquivos.length === 0) return;
+      // O ficheiro já foi copiado pra public/assets antes de chegar aqui — recusar
+      // agora só impede que o convite passe a apontar pra ele.
+      if (aceita && !aceita.test(arquivos[0].nome)) {
+        setErro(`${arquivos[0].nome} não serve aqui${aceitaNota ? ` — ${aceitaNota}` : ""}`);
+        return;
+      }
       onChange(comoEscrever(valor, arquivos[0].web));
       setNota(
         arquivos.length === 1

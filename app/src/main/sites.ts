@@ -56,15 +56,45 @@ export async function siteDir(id: string): Promise<string> {
   return containedPath(root, categoria, slug);
 }
 
-export async function readConvite(id: string): Promise<unknown> {
-  const file = await containedPath(await siteDir(id), "convite.json");
-  return JSON.parse(await readFile(file, "utf8"));
+export async function conviteFile(id: string): Promise<string> {
+  return containedPath(await siteDir(id), "convite.json");
 }
 
-export async function writeConvite(id: string, data: unknown): Promise<void> {
+export type Convite = { dados: unknown; marca: number };
+/** `conflito` verdadeiro quer dizer que nada foi gravado. */
+export type Gravacao = { conflito: boolean; marca: number };
+
+/** mtime da última gravação feita pelo próprio Studio, por site. */
+const gravadas = new Map<string, number>();
+
+export async function readConvite(id: string): Promise<Convite> {
+  const file = await conviteFile(id);
+  const texto = await readFile(file, "utf8");
+  return { dados: JSON.parse(texto), marca: (await stat(file)).mtimeMs };
+}
+
+/**
+ * A `marca` é o mtime que o renderer leu. Sem ela a gravação passa por cima de
+ * tudo; com ela, arquivo mexido por fora faz a gravação parar em vez de apagar
+ * o trabalho de quem editou o convite.json à mão ou noutra máquina.
+ */
+export async function writeConvite(id: string, data: unknown, marca?: number): Promise<Gravacao> {
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("convite.json tem que ser um objeto");
   }
-  const file = await containedPath(await siteDir(id), "convite.json");
+  const file = await conviteFile(id);
+  if (typeof marca === "number") {
+    const noDisco = await stat(file)
+      .then((s) => s.mtimeMs)
+      .catch(() => null);
+    if (noDisco !== null && noDisco !== marca) return { conflito: true, marca: noDisco };
+  }
   await writeFile(file, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  const nova = (await stat(file)).mtimeMs;
+  gravadas.set(id, nova);
+  return { conflito: false, marca: nova };
+}
+
+export function gravadaPeloStudio(id: string, marca: number): boolean {
+  return gravadas.get(id) === marca;
 }

@@ -3,6 +3,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
 import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
 import { PainelTema } from "@/components/PainelTema";
+import { PainelMedidas } from "@/components/PainelMedidas";
+import { PainelOrnamentos } from "@/components/PainelOrnamentos";
 import { rotulo } from "@/lib/secoes";
 
 export type Caminho = (string | number)[];
@@ -195,13 +197,17 @@ export function JsonForm({
   dados,
   secao,
   onChange,
+  onPatch,
 }: {
   dados: Record<string, unknown>;
   secao: string;
   onChange: (proximo: Record<string, unknown>) => void;
+  /** Só o galho que mudou. É o que o co-op manda pela rede — o objeto inteiro não. */
+  onPatch?: (caminho: Caminho, valor: unknown) => void;
 }): ReactElement {
   const alterar = (caminho: Caminho, valor: unknown): void => {
     onChange(setIn(dados, caminho, valor) as Record<string, unknown>);
+    onPatch?.(caminho, valor);
   };
 
   const valor = dados[secao];
@@ -212,6 +218,22 @@ export function JsonForm({
       <PainelTema
         tema={valor as Record<string, string>}
         onChange={(token, cor) => alterar([secao, token], cor)}
+      />
+    );
+  }
+  if (secao === "medidas" && valor !== null && typeof valor === "object" && !Array.isArray(valor)) {
+    return (
+      <PainelMedidas
+        medidas={valor as Record<string, unknown>}
+        onChange={(chave, novo) => alterar([secao, chave], novo)}
+      />
+    );
+  }
+  if (secao === "ornamentos" && valor !== null && typeof valor === "object" && !Array.isArray(valor)) {
+    return (
+      <PainelOrnamentos
+        ornamentos={valor as Record<string, unknown>}
+        onChange={(chave, novo) => alterar([secao, chave], novo)}
       />
     );
   }

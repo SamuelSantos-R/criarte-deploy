@@ -9,7 +9,7 @@ import {
   rmSync, cpSync, readdirSync, statSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { homedir, tmpdir, networkInterfaces } from "node:os";
+import { homedir, tmpdir, networkInterfaces, userInfo } from "node:os";
 import { join, basename, relative, extname, dirname, sep, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
@@ -439,25 +439,78 @@ async function maybeToggleSections(stagingDir) {
 // ============================================================================
 // Config
 // ============================================================================
+// Devolve a config OU o motivo de não ter dado. Engolir tudo num `null` fazia o
+// CLI pedir login por causa de ficheiro sem permissão: a pessoa colava um token
+// novo, o `saveConfig` batia no mesmo EACCES e o ciclo recomeçava do zero.
+function readConfig() {
+  if (!existsSync(CONFIG_FILE)) return { config: null, motivo: "ausente" };
+  let cru;
+  try {
+    cru = readFileSync(CONFIG_FILE, "utf8");
+  } catch (e) {
+    const negado = e.code === "EACCES" || e.code === "EPERM";
+    return { config: null, motivo: negado ? "sem-acesso" : "ilegivel", erro: e };
+  }
+  try {
+    return { config: JSON.parse(cru), motivo: null };
+  } catch (e) {
+    return { config: null, motivo: "corrompido", erro: e };
+  }
+}
+
 function loadConfig() {
-  if (!existsSync(CONFIG_FILE)) return null;
-  try { return JSON.parse(readFileSync(CONFIG_FILE, "utf8")); }
-  catch { return null; }
+  return readConfig().config;
 }
 
 function saveConfig(config) {
   if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try {
+    writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });
+  } catch (e) {
+    if (e.code !== "EACCES" && e.code !== "EPERM") throw e;
+    err(`Sem permissão pra gravar ${CONFIG_FILE}.`);
+    explicarDono();
+    process.exit(1);
+  }
+}
+
+// O caso real: o config.json foi copiado de outra máquina com `cp -p`/`rsync -a`
+// e veio com o dono de lá. Modo 600 + dono errado = ninguém aqui consegue abrir.
+function explicarDono() {
+  let dono = null;
+  try {
+    const st = statSync(CONFIG_FILE);
+    dono = userInfo().uid === st.uid ? null : st.uid;
+  } catch { /* sem stat, segue com a dica genérica */ }
+  if (dono !== null) {
+    info(`O ficheiro é do uid ${c.bold}${dono}${c.reset}, tu és ${c.bold}${userInfo().username}${c.reset} (uid ${userInfo().uid}).`);
+  }
+  info(`Devolve o ficheiro pro teu usuário:`);
+  info(`  ${c.cyan}sudo chown -R $(whoami) ${CONFIG_DIR}${c.reset}`);
 }
 
 function requireLogin() {
-  const config = loadConfig();
-  if (!config) {
-    err("Você ainda não fez login.");
-    info(`Rode primeiro: ${c.cyan}criarte-deploy login${c.reset}`);
+  const { config, motivo } = readConfig();
+  if (config) return config;
+
+  if (motivo === "sem-acesso") {
+    err(`A config existe mas não dá pra ler: ${CONFIG_FILE}`);
+    explicarDono();
+    info(`${c.dim}Não é falta de login — o token já está lá dentro.${c.reset}`);
     process.exit(1);
   }
-  return config;
+  if (motivo === "corrompido") {
+    err(`${CONFIG_FILE} não é um JSON válido.`);
+    info(`Vê o estrago com ${c.cyan}head -c 200 ${CONFIG_FILE}${c.reset} ou refaz com ${c.cyan}criarte-deploy login${c.reset}.`);
+    process.exit(1);
+  }
+  if (motivo === "ilegivel") {
+    err(`Não deu pra ler ${CONFIG_FILE}.`);
+    process.exit(1);
+  }
+  err("Você ainda não fez login.");
+  info(`Rode primeiro: ${c.cyan}criarte-deploy login${c.reset}`);
+  process.exit(1);
 }
 
 // ============================================================================
@@ -4043,6 +4096,15 @@ async function runConfigMenu() {
 const [, , cmd, ...rest] = process.argv;
 const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--direct";
 
+// Publicar a pasta atual sem dizer categoria/slug começa por uma flag — é assim
+// que o Studio chama (`--yes --dry-run`). Sem esta lista o router lia a flag
+// como nome de comando e respondia com o help.
+const FLAGS_DEPLOY = new Set([
+  "--yes", "-y", "--dry-run", "--validate-only", "--no-wait", "--skip-upload",
+  "--skip-typecheck", "--guests-reset", "--verbose",
+  "--subdomain", "--category", "--slug", "--domain", "--rsvp-email", "--guests-file",
+]);
+
 (async () => {
   try {
     if (cmd === "-v" || cmd === "--version" || cmd === "version") {
@@ -4094,6 +4156,7 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
         break;
       default:
         if (cmd && cmd.startsWith("-")) {
+          if (FLAGS_DEPLOY.has(cmd)) { await cmdDirectDeploy([cmd, ...rest]); break; }
           err(`Comando desconhecido: ${cmd}`);
           cmdHelp();
           process.exit(1);

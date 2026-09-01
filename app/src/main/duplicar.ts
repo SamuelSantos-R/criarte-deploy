@@ -179,7 +179,16 @@ async function renomearNoSupabase(antigo: string, novo: string): Promise<void> {
     },
     body: JSON.stringify({ slug: novo }),
   });
+  if (r.status === 409) {
+    throw new Error(
+      `a pasta já se chama "${novo}", mas o Supabase não aceitou: já existe outro convite registado com esse nome. ` +
+        `Apaga a linha antiga em cr_sites (ou escolhe outro nome) e renomeia de novo — o convite continua a funcionar entretanto.`,
+    );
+  }
   if (!r.ok) {
-    throw new Error(`pasta renomeada, mas o Supabase recusou o slug novo (${r.status})`);
+    throw new Error(
+      `a pasta já se chama "${novo}", mas o Supabase recusou o slug novo (${r.status}). ` +
+        `O convite continua a funcionar: o mural anda pelo uuid, não pelo nome.`,
+    );
   }
 }

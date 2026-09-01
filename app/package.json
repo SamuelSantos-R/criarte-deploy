@@ -1,6 +1,6 @@
 {
   "name": "criarte-studio",
-  "version": "5.17.0",
+  "version": "5.18.0",
   "description": "Fábrica de convites da Criarte Design AO",
   "main": "./out/main/index.js",
   "author": "Criarte Design AO",
@@ -14,7 +14,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "subset-font": "^2.7.0"
   },
   "devDependencies": {
     "@fontsource/ibm-plex-mono": "^5.1.1",

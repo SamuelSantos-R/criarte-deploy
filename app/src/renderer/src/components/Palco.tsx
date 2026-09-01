@@ -32,7 +32,6 @@ export function Palco({
   deitado = false,
   margem = 28,
   legenda = true,
-  recarga = 0,
   className,
   children,
 }: {
@@ -41,7 +40,6 @@ export function Palco({
   deitado?: boolean;
   margem?: number;
   legenda?: boolean;
-  recarga?: number;
   className?: string;
   children?: ReactNode;
 }): ReactElement {
@@ -76,10 +74,12 @@ export function Palco({
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
           <div className="relative shrink-0" style={{ width: largura * zoom, height: altura * zoom }}>
             <iframe
-              // A `key` sem o zoom: mudar de aparelho só re-escala, não recarrega
-              // a página. Recarregar é escolha explícita, pelo botão.
-              key={`${url}#${recarga}`}
-              src={url}
+              // A `key` sem o zoom e sem a recarga: trocar de aparelho só
+              // re-escala, e recarregar acontece por dentro do frame (o main
+              // manda um location.reload). Remontar o elemento dava o branco de
+              // montar um iframe do zero e perdia a posição do scroll.
+              key={url}
+              src={url ? `${url}${url.includes("?") ? "&" : "?"}studio=1` : url}
               title="Preview do convite"
               allow="autoplay; fullscreen"
               className="absolute left-0 top-0 block border-0 bg-white"

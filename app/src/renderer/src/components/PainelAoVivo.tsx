@@ -17,7 +17,6 @@ export function PainelAoVivo({
   largura,
   ligando,
   podeLigar,
-  recarga,
   emprestado,
   onRecarregar,
   onLigar,
@@ -28,7 +27,6 @@ export function PainelAoVivo({
   largura: number;
   ligando: boolean;
   podeLigar: boolean;
-  recarga: number;
   /** O preview é do anfitrião, servido pela rede: aqui não há o que ligar nem parar. */
   emprestado?: boolean;
   onRecarregar: () => void;
@@ -102,7 +100,6 @@ export function PainelAoVivo({
         aparelho={aparelho}
         margem={20}
         legenda={false}
-        recarga={recarga}
         className="relative min-h-0 flex-1 overflow-hidden bg-surface-2/40"
       >
         <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">

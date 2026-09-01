@@ -1,7 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { useSiteValido } from "@/lib/useSiteValido";
 import { QrCode, RefreshCw, RotateCw, Square } from "lucide-react";
-import { type Site } from "@/lib/api";
+import { type Site, previewRepintar} from "@/lib/api";
 import { derrubarServidor, subirServidor, usarServidor } from "@/lib/servidor";
 import { cn } from "@/lib/utils";
 import { ModalQR } from "@/components/ModalQR";
@@ -24,7 +24,6 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
   const servidor = rodando?.siteId === id ? rodando : null;
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [recarga, setRecarga] = useState(0);
 
   useSiteValido(sites, id, setId);
 
@@ -75,7 +74,7 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
           >
             <RotateCw size={13} />
           </Button>
-          <Button variant="ghost" disabled={!servidor} onClick={() => setRecarga((n) => n + 1)}>
+          <Button variant="ghost" disabled={!servidor} onClick={() => void previewRepintar()}>
             <RefreshCw size={13} /> Recarregar
           </Button>
           <Button
@@ -104,7 +103,6 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
           url={servidor?.url ?? null}
           aparelho={aparelho}
           deitado={deitado}
-          recarga={recarga}
           className="relative min-w-0 flex-1 overflow-hidden bg-surface-2/40"
         >
           <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">

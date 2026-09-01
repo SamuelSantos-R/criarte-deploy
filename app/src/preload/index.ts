@@ -77,6 +77,7 @@ const api = {
   previewStop: () => invoke<void>("preview:stop"),
   previewState: () => invoke<Servidor | null>("preview:state"),
   previewScroll: (ancora: string) => invoke<boolean>("preview:scroll", ancora),
+  previewRepintar: () => invoke<boolean>("preview:repintar"),
 
   envelopeModelo: () => invoke<unknown>("envelope:modelo"),
   envelopeLista: () => invoke<unknown>("envelope:lista"),

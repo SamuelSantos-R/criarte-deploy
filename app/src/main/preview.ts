@@ -142,6 +142,27 @@ export function origensDoPreview(): string[] {
   return [`http://localhost:${port}`, `http://127.0.0.1:${port}`, ...(servidor.lan ? [servidor.lan] : [])];
 }
 
+/**
+ * Recarrega o preview sem destruir o iframe. Medido: o `next dev` serve o
+ * convite.json novo em ~3s, mas a página já aberta nunca repinta sozinha — 20s
+ * de observação e nada. O HMR não propaga a mudança do json, ao contrário do
+ * que se assumia. Então quem manda recarregar somos nós.
+ *
+ * Recarregar por dentro do frame, e não trocando a `key` do elemento no React,
+ * mantém a posição do scroll (o Chromium restaura-a no reload) e evita o branco
+ * de montar um iframe do zero.
+ */
+export async function repintarPreview(wc: WebContents): Promise<boolean> {
+  const origens = origensDoPreview();
+  if (origens.length === 0) return false;
+  const frame = wc.mainFrame.framesInSubtree.find(
+    (f) => f !== wc.mainFrame && origens.some((o) => f.url.startsWith(o)),
+  );
+  if (!frame) return false;
+  await frame.executeJavaScript("location.reload()");
+  return true;
+}
+
 const ANCORA = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
 /**

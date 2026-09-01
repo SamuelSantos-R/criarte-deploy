@@ -3,6 +3,7 @@ import { useSiteValido } from "@/lib/useSiteValido";
 import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
+  previewRepintar,
   previewScroll,
   readConvite,
   reveal,
@@ -55,7 +56,6 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   // site, este painel volta a oferecer "Ligar" em vez de mostrar convite alheio.
   const servidor = rodando?.siteId === id ? rodando : null;
   const [ligando, setLigando] = useState(false);
-  const [recarga, setRecarga] = useState(0);
   const [largura, setLargura] = useLarguraPainel();
   // Enquanto o site está ao vivo o disco carrega o rascunho, não o salvo.
   // Sem esta marca não dá pra saber se ainda tem sujeira pra desfazer no arquivo.
@@ -267,8 +267,10 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     await derrubarServidor();
   };
 
-  // O `next dev` sonda o disco (WATCHPACK_POLLING), então gravar o rascunho é o
-  // bastante: o HMR repinta a página aberta sozinho, sem reload.
+  // Gravar o rascunho não chega. Medido: o `next dev` serve o convite.json novo
+  // em ~3s, mas a página já aberta nunca repinta — 20s de observação e nada. O
+  // HMR não propaga a mudança do json. Então mandamos recarregar nós, por
+  // dentro do frame, o que preserva o scroll e não remonta o iframe.
   useEffect(() => {
     // Com conflito em cena o disco não é mais nosso: insistir só faria a
     // gravação bater na trava a cada tecla.
@@ -278,12 +280,16 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
     if (!sujo) {
       if (!rascunho.current) return;
       rascunho.current = false;
-      void gravar(id, dados).catch((e: Error) => setErro(e.message));
+      void gravar(id, dados)
+        .then(() => previewRepintar())
+        .catch((e: Error) => setErro(e.message));
       return;
     }
     const t = setTimeout(() => {
       rascunho.current = true;
-      void gravar(id, dados).catch((e: Error) => setErro(e.message));
+      void gravar(id, dados)
+        .then(() => previewRepintar())
+        .catch((e: Error) => setErro(e.message));
     }, REPOUSO);
     return () => clearTimeout(t);
   }, [servidor, id, dados, sujo, conflito, emSessao, gravar]);
@@ -581,8 +587,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           ligando={ligando}
           podeLigar={!!id}
           emprestado={convidado}
-          recarga={recarga}
-          onRecarregar={() => setRecarga((n) => n + 1)}
+          onRecarregar={() => void previewRepintar()}
           onLigar={() => void ligarAoVivo()}
           onParar={() => void desligarAoVivo()}
         />

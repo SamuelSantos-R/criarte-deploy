@@ -8,7 +8,7 @@ import { duplicarSite, renomearSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
-import { estadoPreview, iniciarServidor, pararServidor, rolarPreview } from "./preview";
+import { estadoPreview, iniciarServidor, pararServidor, repintarPreview, rolarPreview } from "./preview";
 import { trocarPorWebp } from "./webp";
 import { vigiarConvite } from "./vigia";
 import {
@@ -266,6 +266,8 @@ export function registerIpc(): void {
   );
 
   handle("deps:estado", () => estadoDeps());
+
+  handle("preview:repintar", (event) => repintarPreview(event.sender));
 
   handle("deploy:destino", (_e, id: unknown) => destinoPublicacao(asString(id, "id")));
 

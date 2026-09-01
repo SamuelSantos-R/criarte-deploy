@@ -79,6 +79,7 @@ export const previewStart = (id: string) => call(api.previewStart(id)) as Promis
 export const previewStop = () => call(api.previewStop());
 export const previewState = () => call(api.previewState()) as Promise<Servidor | null>;
 export const previewScroll = (ancora: string) => call(api.previewScroll(ancora)) as Promise<boolean>;
+export const previewRepintar = () => call(api.previewRepintar()) as Promise<boolean>;
 
 export type Convidado = { url: string; nome: string };
 export type Modelo = { nome: string; largura: number; altura: number; dataUrl: string };

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, stat } from "node:fs/promises";
+import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { containedPath } from "./paths";
 import { siteDir } from "./sites";
@@ -30,7 +30,7 @@ function nomeSeguro(caminho: string): string {
   return `${base || "asset"}${ext}`;
 }
 
-async function arquivosDe(origem: string): Promise<string[]> {
+export async function arquivosDe(origem: string): Promise<string[]> {
   const info = await stat(origem);
   if (info.isFile()) return [origem];
   if (!info.isDirectory()) return [];
@@ -75,6 +75,27 @@ export async function importAssets(siteId: string, origens: string[]): Promise<A
   }
   if (importados.length === 0) throw new Error("nenhum arquivo aceito na seleção");
   return importados;
+}
+
+/**
+ * O mesmo destino do `importAssets`, mas a partir de bytes em vez de um caminho:
+ * é por aqui que entra o ficheiro que o convidado mandou pela rede, já que o PC
+ * dele não tem a pasta do site.
+ */
+export async function gravarAsset(
+  siteId: string,
+  nomeBruto: string,
+  conteudo: Buffer,
+): Promise<AssetImportado> {
+  const ext = extname(nomeBruto).toLowerCase();
+  if (!EXTENSOES.has(ext)) throw new Error(`extensão não aceita: ${ext || "sem extensão"}`);
+  if (conteudo.byteLength > TAMANHO_MAX) throw new Error(`${nomeBruto} passa de 300 MB`);
+  const dir = await siteDir(siteId);
+  const destinoDir = await containedPath(dir, "public", "assets");
+  await mkdir(destinoDir, { recursive: true });
+  const nome = nomeSeguro(nomeBruto);
+  await writeFile(await containedPath(destinoDir, nome), conteudo);
+  return { nome, web: `/assets/${nome}`, bytes: conteudo.byteLength };
 }
 
 export const FILTROS = [

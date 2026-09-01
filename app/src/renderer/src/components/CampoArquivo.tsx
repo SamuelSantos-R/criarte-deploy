@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, type DragEvent, type ReactElement } from "react";
 import { File as FileIcon, FolderOpen, Upload, X } from "lucide-react";
-import { caminhoDe, importAssets, pickAssets } from "@/lib/api";
+import { caminhoDe, coopAsset, coopPickAsset, importAssets, pickAssets } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
 
-const SiteAtual = createContext<string | null>(null);
+/** `convidado` porque o PC dela não tem a pasta do site: o ficheiro vai pela sessão. */
+export type Destino = { siteId: string | null; convidado: boolean };
+
+const SiteAtual = createContext<Destino>({ siteId: null, convidado: false });
 export const ProvedorSite = SiteAtual.Provider;
 
 const EXTENSAO = /\.(jpe?g|png|webp|avif|gif|svg|mp4|webm|mov|mp3|m4a|ogg|wav|woff2?|ttf|otf)$/i;
@@ -41,7 +44,8 @@ export function CampoArquivo({
   aceita?: RegExp;
   aceitaNota?: string;
 }): ReactElement {
-  const siteId = useContext(SiteAtual);
+  const { siteId, convidado } = useContext(SiteAtual);
+  const pronto = convidado || siteId !== null;
   const [sobre, setSobre] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [nota, setNota] = useState<string | null>(null);
@@ -73,12 +77,18 @@ export function CampoArquivo({
     }
   };
 
+  const mandar = (caminhos: string[]): Promise<{ nome: string; web: string }[]> =>
+    convidado ? coopAsset(caminhos) : importAssets(siteId as string, caminhos);
+
+  const escolher = (pasta: boolean): Promise<{ nome: string; web: string }[]> =>
+    convidado ? coopPickAsset(pasta) : pickAssets(siteId as string, pasta);
+
   const soltar = (e: DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     setSobre(false);
-    if (!siteId) return;
+    if (!pronto) return;
     const caminhos = [...e.dataTransfer.files].map(caminhoDe).filter(Boolean);
-    if (caminhos.length > 0) void aplicar(importAssets(siteId, caminhos));
+    if (caminhos.length > 0) void aplicar(mandar(caminhos));
   };
 
   const nome = valor.split("/").pop() ?? "";
@@ -125,15 +135,15 @@ export function CampoArquivo({
         )}
         <Button
           variant="ghost"
-          disabled={!siteId || ocupado}
-          onClick={() => siteId && void aplicar(pickAssets(siteId, false))}
+          disabled={!pronto || ocupado}
+          onClick={() => pronto && void aplicar(escolher(false))}
         >
           Arquivo
         </Button>
         <Button
           variant="ghost"
-          disabled={!siteId || ocupado}
-          onClick={() => siteId && void aplicar(pickAssets(siteId, true))}
+          disabled={!pronto || ocupado}
+          onClick={() => pronto && void aplicar(escolher(true))}
           aria-label={`Escolher pasta para ${label}`}
         >
           <FolderOpen size={13} /> Pasta

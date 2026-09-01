@@ -1,11 +1,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { BrowserWindow } from "electron";
 import { copiavel, empacotar } from "./pacote";
 import { aoMudarPreview, estadoPreview, ipDaRede } from "./preview";
 import { ligarEspelho, pararEspelho, urlDoEspelho } from "./espelho";
 import { readConvite, siteDir, writeConvite } from "./sites";
 import { listarFontes, type Fonte } from "./fontes";
+import { arquivosDe, gravarAsset, importAssets, type AssetImportado } from "./assets";
 
 /**
  * Co-op na LAN: um Studio vira anfitrião e serve o convite por SSE; o outro
@@ -19,6 +22,9 @@ const GRAVA_MS = 400;
 const TENTATIVAS_MAX = 10;
 const CASTIGO_MS = 5 * 60_000;
 const CORPO_MAX = 512 * 1024;
+// Patch é texto curto; asset é uma foto. O limite do corpo tem de ser outro,
+// senão a primeira imagem que a convidada arrasta bate na parede do JSON.
+const ASSET_MAX = 300 * 1024 * 1024;
 
 export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };
@@ -300,6 +306,24 @@ function lerCorpo(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+function lerBytes(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const pedacos: Buffer[] = [];
+    let total = 0;
+    req.on("data", (c: Buffer) => {
+      total += c.byteLength;
+      if (total > ASSET_MAX) {
+        reject(new Error("ficheiro grande demais"));
+        req.destroy();
+        return;
+      }
+      pedacos.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(pedacos)));
+    req.on("error", reject);
+  });
+}
+
 async function atender(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!anfitriao) return recusar(res, 503, "sessão encerrada");
   const ip = req.socket.remoteAddress ?? "?";
@@ -362,6 +386,27 @@ async function atender(req: IncomingMessage, res: ServerResponse): Promise<void>
   const parId = String(req.headers["x-coop-par"] ?? "");
   const par = anfitriao.pares.get(parId);
   if (!par) return recusar(res, 403, "entre primeiro");
+
+  // Bytes crus, não JSON: uma foto em base64 dentro de um `JSON.parse` custa
+  // memória à toa e o nome do ficheiro cabe num cabeçalho.
+  if (url.pathname === "/asset") {
+    const nome = String(req.headers["x-coop-nome"] ?? "").slice(0, 200);
+    if (!nome) return recusar(res, 400, "sem nome de ficheiro");
+    let bytes: Buffer;
+    try {
+      bytes = await lerBytes(req);
+    } catch (e) {
+      return recusar(res, 413, e instanceof Error ? e.message : "corpo inválido");
+    }
+    try {
+      const asset = await gravarAsset(anfitriao.siteId, nome, bytes);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify(asset));
+    } catch (e) {
+      recusar(res, 400, e instanceof Error ? e.message : "não deu pra gravar");
+    }
+    return;
+  }
 
   let corpo: Record<string, unknown>;
   try {
@@ -550,6 +595,39 @@ export async function enviarPatch(patch: Patch): Promise<{ ok: boolean; erro?: s
   if (res.ok) return { ok: true };
   const corpo = (await res.json().catch(() => ({}))) as { erro?: string };
   return { ok: false, erro: corpo.erro ?? `recusado (${res.status})` };
+}
+
+/**
+ * Manda ficheiros do PC do convidado pra `public/assets` do anfitrião. Sem isto
+ * a convidada só conseguia apontar o convite pra um asset que já estivesse lá —
+ * o ficheiro dela tinha de passar por WhatsApp antes.
+ */
+export async function enviarAssets(origens: string[]): Promise<AssetImportado[]> {
+  if (anfitriao) return importAssets(anfitriao.siteId, origens);
+  if (!convidado || !cabecalhoAtual?.["x-coop-par"]) throw new Error("fora de sessão");
+
+  const enviados: AssetImportado[] = [];
+  for (const origem of origens) {
+    for (const arquivo of await arquivosDe(origem)) {
+      const res = await fetch(`http://${convidado.endereco}/asset`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/octet-stream",
+          "x-coop-codigo": cabecalhoAtual["x-coop-codigo"],
+          "x-coop-par": cabecalhoAtual["x-coop-par"],
+          "x-coop-nome": basename(arquivo),
+        },
+        body: await readFile(arquivo),
+      });
+      if (!res.ok) {
+        const corpo = (await res.json().catch(() => ({}))) as { erro?: string };
+        throw new Error(corpo.erro ?? `o anfitrião recusou o ficheiro (${res.status})`);
+      }
+      enviados.push((await res.json()) as AssetImportado);
+    }
+  }
+  if (enviados.length === 0) throw new Error("nenhum arquivo aceito na seleção");
+  return enviados;
 }
 
 /**

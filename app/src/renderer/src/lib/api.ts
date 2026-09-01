@@ -111,6 +111,10 @@ export const coopFechar = () => call(api.coopFechar()) as Promise<EstadoCoop>;
 export const coopEstado = () => call(api.coopEstado()) as Promise<EstadoCoop>;
 export const coopPatch = (patch: Patch) =>
   call(api.coopPatch(patch)) as Promise<{ ok: boolean; erro?: string }>;
+export const coopAsset = (origens: string[]) =>
+  call(api.coopAsset(origens)) as Promise<AssetImportado[]>;
+export const coopPickAsset = (pasta: boolean) =>
+  call(api.coopPickAsset(pasta)) as Promise<AssetImportado[]>;
 export const coopTranca = (secao: string, soltar: boolean) =>
   call(api.coopTranca(secao, soltar)) as Promise<boolean>;
 export const onCoopEstado = api.onCoopEstado;

@@ -1,7 +1,9 @@
 import { type ReactElement } from "react";
+import { RotateCcw } from "lucide-react";
 import { CampoArquivo } from "@/components/CampoArquivo";
 import { LinhaMedida, type Medida } from "@/components/PainelMedidas";
 import { SeletorCor, hexValido } from "@/components/SeletorCor";
+import { ANCORAS_ORNAMENTO } from "@/lib/secoes";
 import { cn } from "@/lib/utils";
 
 const SVG_OU_PNG = /\.(svg|png)$/i;
@@ -40,13 +42,83 @@ const AJUSTES: Medida[] = [
   },
 ];
 
-export const ORNAMENTOS_PADRAO: Record<string, string | number> = {
+export const ORNAMENTOS_PADRAO: Record<string, string | number | boolean> = {
   esquerdo: "",
   direito: "/assets/div-flor.svg",
   cor: "",
   tamanho: 360,
   deslocamento: 0,
+  rodape: true,
 };
+
+/**
+ * Deslocamento só desta arte. Vazio herda o geral em vez de gravar o mesmo
+ * número em dez sítios — mexer no geral continua a mover as que ninguém tocou.
+ */
+function LinhaAncora({
+  ancora,
+  valor,
+  geral,
+  onChange,
+}: {
+  ancora: { id: string; rotulo: string };
+  valor: unknown;
+  geral: number;
+  onChange: (novo: number | undefined) => void;
+}): ReactElement {
+  const proprio = typeof valor === "number" && Number.isFinite(valor);
+  const atual = proprio ? (valor as number) : geral;
+
+  return (
+    <div className="flex items-center gap-3 border-b border-rule py-2 pl-4 pr-2 last:border-b-0 focus-within:bg-surface-2/40">
+      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">
+        {ancora.rotulo}
+      </span>
+      {!proprio && (
+        <span className="shrink-0 font-mono text-serial uppercase tracking-[0.12em] text-muted/50">
+          herda
+        </span>
+      )}
+      <input
+        key={`${ancora.id}-${atual}-${proprio}`}
+        defaultValue={String(atual)}
+        onBlur={(e) => {
+          const limpo = e.target.value.replace(",", ".").trim();
+          const n = Number(limpo);
+          if (limpo === "" || !Number.isFinite(n)) {
+            e.target.value = String(atual);
+            return;
+          }
+          onChange(Math.round(Math.min(200, Math.max(-200, n)) * 100) / 100);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        inputMode="decimal"
+        aria-label={`Subir ou descer a arte de ${ancora.rotulo}, em pixels`}
+        className={cn(
+          "no-drag w-[58px] shrink-0 border border-rule bg-transparent px-1.5 py-1 text-right font-mono text-[12px] tabular-nums",
+          "hover:border-rule-strong focus:border-accent focus:bg-surface-2 focus:outline-none",
+          proprio ? "text-text" : "text-muted/60",
+        )}
+      />
+      <button
+        type="button"
+        onClick={() => onChange(undefined)}
+        disabled={!proprio}
+        aria-label={`Devolver ${ancora.rotulo} ao deslocamento geral`}
+        title="Voltar a herdar o deslocamento geral"
+        className={cn(
+          "no-drag flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-text",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+          "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
+        )}
+      >
+        <RotateCcw size={12} />
+      </button>
+    </div>
+  );
+}
 
 /**
  * Pintar recorta a silhueta da arte e enche-a de uma cor só. Num desenho de
@@ -116,8 +188,15 @@ export function PainelOrnamentos({
   onChange,
 }: {
   ornamentos: Record<string, unknown>;
-  onChange: (chave: string, valor: string | number) => void;
+  onChange: (caminho: (string | number)[], valor: unknown) => void;
 }): ReactElement {
+  const deslocamentos = (ornamentos.deslocamentos ?? {}) as Record<string, unknown>;
+  const geral =
+    typeof ornamentos.deslocamento === "number" && Number.isFinite(ornamentos.deslocamento)
+      ? ornamentos.deslocamento
+      : 0;
+  const noRodape = ornamentos.rodape !== false;
+
   return (
     <div className="max-w-[520px]">
       <p className="mb-7 max-w-[46ch] text-[13px] leading-[1.6] text-muted">
@@ -137,7 +216,7 @@ export function PainelOrnamentos({
               <CampoArquivo
                 label={slot.rotulo}
                 valor={typeof ornamentos[slot.chave] === "string" ? (ornamentos[slot.chave] as string) : ""}
-                onChange={(v) => onChange(slot.chave, v)}
+                onChange={(v) => onChange([slot.chave], v)}
                 aceita={SVG_OU_PNG}
                 aceitaNota="só SVG ou PNG"
               />
@@ -151,12 +230,12 @@ export function PainelOrnamentos({
         <div className="mt-6">
           <LinhaCor
             valor={typeof ornamentos.cor === "string" ? ornamentos.cor : ""}
-            onChange={(v) => onChange("cor", v)}
+            onChange={(v) => onChange(["cor"], v)}
           />
         </div>
       </section>
 
-      <section>
+      <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
           <span className="font-mono text-label uppercase text-text">ajuste</span>
           <span className="font-mono text-serial text-muted/60">02</span>
@@ -168,7 +247,54 @@ export function PainelOrnamentos({
               key={medida.chave}
               medida={medida}
               valor={ornamentos[medida.chave]}
-              onChange={(novo) => onChange(medida.chave, novo)}
+              onChange={(novo) => onChange([medida.chave], novo)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="font-mono text-label uppercase text-text">por secção</span>
+          <span className="font-mono text-serial text-muted/60">
+            {String(ANCORAS_ORNAMENTO.length).padStart(2, "0")}
+          </span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+          Sobe (negativo) ou desce (positivo) só a arte daquela secção. Enquanto
+          diz <span className="font-mono">herda</span>, ela segue o ajuste geral acima.
+        </p>
+
+        <label
+          className={cn(
+            "no-drag mb-4 flex cursor-pointer items-center gap-3 border-y border-rule py-2.5 pl-4 pr-3",
+            "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={noRodape}
+            onChange={(e) => onChange(["rodape"], e.target.checked)}
+            className="no-drag h-3.5 w-3.5 shrink-0 accent-accent"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="font-mono text-[12px] text-text">arte no rodapé</span>
+            <span className="mt-0.5 block max-w-[42ch] text-[11px] leading-[1.5] text-muted/80">
+              É a única que entra por baixo do bloco todo. Desligada, o rodapé fica
+              limpo — o slot continua aqui para o próximo convite.
+            </span>
+          </span>
+        </label>
+
+        <div className="border-t border-rule">
+          {ANCORAS_ORNAMENTO.map((ancora) => (
+            <LinhaAncora
+              key={ancora.id}
+              ancora={ancora}
+              valor={deslocamentos[ancora.id]}
+              geral={geral}
+              onChange={(novo) => onChange(["deslocamentos", ancora.id], novo)}
             />
           ))}
         </div>

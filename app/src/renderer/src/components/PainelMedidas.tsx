@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Minus, Plus, RotateCcw, Upload } from "lucide-react";
 import { instalarFonte, listarFontes, type Fonte } from "@/lib/api";
+import { BLOCOS } from "@/lib/secoes";
 import { cn } from "@/lib/utils";
 
 export type Medida = {
@@ -11,6 +12,8 @@ export type Medida = {
   max: number;
   passo: number;
   padrao: number;
+  /** O que aparece à direita do número. Só rótulo — o site sabe a unidade. */
+  unidade?: string;
 };
 
 /**
@@ -57,14 +60,75 @@ const MEDIDAS: Medida[] = [
   },
 ];
 
+/**
+ * Opacidade em percentagem porque é assim que se pensa nela; o site divide por
+ * 100. São as peças que herdam a cor principal esbatida em vez de cor própria.
+ */
+const OPACIDADES: Medida[] = [
+  {
+    chave: "manualIconeOpacidade",
+    rotulo: "círculo dos ícones",
+    dica: "O disco por trás de cada ícone do manual. Alto fecha o cartão, baixo fica só uma sombra.",
+    min: 0,
+    max: 100,
+    passo: 5,
+    padrao: 20,
+    unidade: "%",
+  },
+  {
+    chave: "musicaBarraOpacidade",
+    rotulo: "barra da música",
+    dica: "A parte já tocada da faixa, dentro da pill.",
+    min: 0,
+    max: 100,
+    passo: 5,
+    padrao: 40,
+    unidade: "%",
+  },
+  {
+    chave: "musicaBaseOpacidade",
+    rotulo: "base da música",
+    dica: "O trilho por baixo da barra. Costuma ficar bem mais fraco que ela.",
+    min: 0,
+    max: 100,
+    passo: 2,
+    padrao: 12,
+    unidade: "%",
+  },
+  {
+    chave: "musicaEqualizadorOpacidade",
+    rotulo: "ondas da música",
+    dica: "Os traços que sobem e descem enquanto toca.",
+    min: 0,
+    max: 100,
+    passo: 5,
+    padrao: 40,
+    unidade: "%",
+  },
+];
+
 /** O que o Studio grava quando o convite.json ainda não tem a seção. */
 export const MEDIDAS_PADRAO: Record<string, number | string> = {
   ...Object.fromEntries(MEDIDAS.map((m) => [m.chave, m.padrao])),
+  ...Object.fromEntries(OPACIDADES.map((m) => [m.chave, m.padrao])),
   noivosFonte: "milton",
 };
 
 function preso(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
+}
+
+/** Duas casas chegam para o que se digita à mão (13,5 / 12,25) e evitam dízima. */
+function arredonda(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Vírgula é o separador do teclado dele; o `Number` só entende ponto. */
+function lerNumero(texto: string): number | null {
+  const limpo = texto.replace(",", ".").trim();
+  if (limpo === "") return null;
+  const n = Number(limpo);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function LinhaMedida({
@@ -79,9 +143,23 @@ export function LinhaMedida({
   const bruto = typeof valor === "number" && Number.isFinite(valor) ? valor : medida.padrao;
   const atual = preso(bruto, medida.min, medida.max);
   const pct = ((atual - medida.min) / (medida.max - medida.min)) * 100;
-  const mexer = (d: number): void => onChange(preso(atual + d, medida.min, medida.max));
+  const mexer = (d: number): void =>
+    onChange(arredonda(preso(atual + d, medida.min, medida.max)));
   const noLimite = (d: number): boolean =>
     d < 0 ? atual <= medida.min : atual >= medida.max;
+  const unidade = medida.unidade ?? "px";
+
+  // O campo guarda o que está a ser escrito, não o valor: sem isto apagar para
+  // reescrever devolvia o número antigo à tecla seguinte. Só ao sair é que vira
+  // número, e texto que não é número volta ao que estava.
+  const [rascunho, setRascunho] = useState<string | null>(null);
+  const fechar = (): void => {
+    if (rascunho !== null) {
+      const n = lerNumero(rascunho);
+      if (n !== null) onChange(arredonda(preso(n, medida.min, medida.max)));
+    }
+    setRascunho(null);
+  };
 
   return (
     <div className="relative border-b border-rule last:border-b-0 focus-within:bg-surface-2/40">
@@ -133,17 +211,31 @@ export function LinhaMedida({
             </button>
           ))}
 
-          <span className="w-[62px] pr-1 text-right font-mono text-[12px] tabular-nums text-text">
-            {atual}
-            <span className="text-muted"> px</span>
+          <span className="flex w-[62px] items-baseline justify-end gap-0.5 pr-1 font-mono text-[12px] tabular-nums text-text">
+            <input
+              value={rascunho ?? String(atual)}
+              onChange={(e) => setRascunho(e.target.value)}
+              onBlur={fechar}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setRascunho(null);
+              }}
+              inputMode="decimal"
+              aria-label={`${medida.rotulo} em ${unidade}`}
+              className={cn(
+                "no-drag w-full min-w-0 bg-transparent text-right font-mono text-[12px] tabular-nums text-text",
+                "focus:bg-surface-2 focus:outline-none",
+              )}
+            />
+            <span className="shrink-0 text-muted">{unidade}</span>
           </span>
 
           <button
             type="button"
             onClick={() => onChange(medida.padrao)}
             disabled={atual === medida.padrao}
-            aria-label={`Voltar ${medida.rotulo} ao padrão de ${medida.padrao} pixels`}
-            title={`Padrão: ${medida.padrao}px`}
+            aria-label={`Voltar ${medida.rotulo} ao padrão de ${medida.padrao}${unidade}`}
+            title={`Padrão: ${medida.padrao}${unidade}`}
             className={cn(
               "no-drag flex h-7 w-7 items-center justify-center text-muted transition-colors hover:text-text",
               "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
@@ -163,16 +255,88 @@ export function LinhaMedida({
   );
 }
 
+/**
+ * Topo e base de uma secção lado a lado. Duas linhas de régua por secção davam
+ * vinte réguas no painel; aqui a secção é a unidade e os dois números ficam
+ * onde se compara um com o outro.
+ */
+function LinhaEspaco({
+  bloco,
+  valores,
+  onChange,
+}: {
+  bloco: (typeof BLOCOS)[number];
+  valores: Record<string, unknown>;
+  onChange: (lado: "topo" | "base", novo: number | undefined) => void;
+}): ReactElement {
+  const tocada = (["topo", "base"] as const).some((l) => typeof valores[l] === "number");
+
+  return (
+    <div className="flex items-center gap-3 border-b border-rule py-2 pl-4 pr-2 last:border-b-0 focus-within:bg-surface-2/40">
+      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">{bloco.rotulo}</span>
+
+      {(["topo", "base"] as const).map((lado) => {
+        const bruto = valores[lado];
+        const atual = typeof bruto === "number" && Number.isFinite(bruto) ? bruto : bloco[lado];
+        return (
+          <label key={lado} className="flex shrink-0 items-baseline gap-1.5">
+            <span className="font-mono text-serial uppercase tracking-[0.12em] text-muted/60">
+              {lado}
+            </span>
+            <input
+              defaultValue={String(atual)}
+              key={`${lado}-${atual}`}
+              onBlur={(e) => {
+                const n = lerNumero(e.target.value);
+                if (n === null) e.target.value = String(atual);
+                else onChange(lado, arredonda(preso(n, 0, 400)));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              inputMode="decimal"
+              aria-label={`${bloco.rotulo}, folga de ${lado} em pixels`}
+              className={cn(
+                "no-drag w-[52px] border border-rule bg-transparent px-1.5 py-1 text-right font-mono text-[12px] tabular-nums text-text",
+                "hover:border-rule-strong focus:border-accent focus:bg-surface-2 focus:outline-none",
+              )}
+            />
+          </label>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={() => {
+          onChange("topo", undefined);
+          onChange("base", undefined);
+        }}
+        disabled={!tocada}
+        aria-label={`Voltar ${bloco.rotulo} às folgas de origem`}
+        title={`Origem: ${bloco.topo} / ${bloco.base}px`}
+        className={cn(
+          "no-drag flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-text",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+          "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
+        )}
+      >
+        <RotateCcw size={12} />
+      </button>
+    </div>
+  );
+}
+
 export function PainelMedidas({
   medidas,
   onChange,
   convidado = false,
 }: {
   medidas: Record<string, unknown>;
-  onChange: (chave: string, valor: string | number) => void;
+  onChange: (caminho: (string | number)[], valor: unknown) => void;
   /** Convidado escolhe do banco do anfitrião, mas não instala nada. */
   convidado?: boolean;
 }): ReactElement {
+  const espacos = (medidas.espacos ?? {}) as Record<string, Record<string, unknown>>;
   const fonte = typeof medidas.noivosFonte === "string" ? medidas.noivosFonte : "milton";
   const [fontes, setFontes] = useState<Fonte[]>([]);
   const [carregando, setCarregando] = useState(false);
@@ -227,7 +391,55 @@ export function PainelMedidas({
               key={medida.chave}
               medida={medida}
               valor={medidas[medida.chave]}
-              onChange={(novo) => onChange(medida.chave, novo)}
+              onChange={(novo) => onChange([medida.chave], novo)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="font-mono text-label uppercase text-text">altura das secções</span>
+          <span className="font-mono text-serial text-muted/60">
+            {String(BLOCOS.length).padStart(2, "0")}
+          </span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+          A folga em cima e a folga embaixo de cada bloco, em pixels. Secção que
+          você não tocar fica com a medida com que o convite foi desenhado.
+        </p>
+        <div className="border-t border-rule">
+          {BLOCOS.map((bloco) => (
+            <LinhaEspaco
+              key={bloco.id}
+              bloco={bloco}
+              valores={espacos[bloco.id] ?? {}}
+              onChange={(lado, novo) => onChange(["espacos", bloco.id, lado], novo)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="font-mono text-label uppercase text-text">opacidades</span>
+          <span className="font-mono text-serial text-muted/60">
+            {String(OPACIDADES.length).padStart(2, "0")}
+          </span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+          Peças que não têm cor própria: saem da cor de destaque, só que esbatidas.
+          Mudar a cor de destaque muda todas de uma vez.
+        </p>
+        <div className="border-t border-rule">
+          {OPACIDADES.map((medida) => (
+            <LinhaMedida
+              key={medida.chave}
+              medida={medida}
+              valor={medidas[medida.chave]}
+              onChange={(novo) => onChange([medida.chave], novo)}
             />
           ))}
         </div>
@@ -294,7 +506,7 @@ export function PainelMedidas({
                   type="radio"
                   name="noivosFonte"
                   checked={f.chave === fonte}
-                  onChange={() => onChange("noivosFonte", f.chave)}
+                  onChange={() => onChange(["noivosFonte"], f.chave)}
                   className="no-drag h-3.5 w-3.5 shrink-0 accent-accent"
                 />
                 <span

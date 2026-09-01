@@ -14,6 +14,7 @@ import { vigiarConvite } from "./vigia";
 import {
   abrirSessao,
   entrarSessao,
+  enviarAssets,
   enviarPatch,
   estadoCoop,
   fecharSessao,
@@ -215,6 +216,26 @@ export function registerIpc(): void {
   handle("coop:fechar", () => fecharSessao());
   handle("coop:estado", () => estadoCoop());
   handle("coop:patch", (_e, patch: unknown) => enviarPatch(asPatch(patch)));
+  // O convidado não tem a pasta do site: o ficheiro dele viaja pela sessão e é o
+  // anfitrião que grava. Como anfitrião, cai no mesmo `importAssets` de sempre.
+  handle("coop:asset", (_e, origens: unknown) => {
+    if (!Array.isArray(origens)) throw new Error("seleção inválida");
+    return enviarAssets(origens.map((o) => asString(o, "caminho")));
+  });
+
+  handle("coop:pickAsset", async (event, pasta: unknown) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const opcoes: Electron.OpenDialogOptions =
+      pasta === true
+        ? { title: "Escolha uma pasta de assets", properties: ["openDirectory"] }
+        : { title: "Escolha os arquivos", properties: ["openFile", "multiSelections"], filters: FILTROS };
+    const escolha = win
+      ? await dialog.showOpenDialog(win, opcoes)
+      : await dialog.showOpenDialog(opcoes);
+    if (escolha.canceled || escolha.filePaths.length === 0) return [];
+    return enviarAssets(escolha.filePaths);
+  });
+
   handle("coop:tranca", (_e, secao: unknown, soltar: unknown) =>
     pedirTranca(asString(secao, "secção"), soltar === true),
   );

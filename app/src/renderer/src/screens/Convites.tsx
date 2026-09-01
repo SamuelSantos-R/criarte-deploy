@@ -97,6 +97,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   // painel guarda envelhece a cada gravação dessas, então um ⌘S daqui bateria na
   // guarda e acusaria conflito com o próprio trabalho.
   const emSessao = coop.ligado;
+  const destino = useMemo(() => ({ siteId: id, convidado }), [id, convidado]);
 
   // A lista chega depois do primeiro render — abre o convite mais recente.
   useEffect(() => {
@@ -380,7 +381,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   };
 
   return (
-    <ProvedorSite value={id}>
+    <ProvedorSite value={destino}>
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       <Topo>
         <SeletorSite

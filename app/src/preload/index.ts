@@ -94,6 +94,8 @@ const api = {
   coopFechar: () => invoke<EstadoCoop>("coop:fechar"),
   coopEstado: () => invoke<EstadoCoop>("coop:estado"),
   coopPatch: (patch: Patch) => invoke<{ ok: boolean; erro?: string }>("coop:patch", patch),
+  coopAsset: (origens: string[]) => invoke<AssetImportado[]>("coop:asset", origens),
+  coopPickAsset: (pasta: boolean) => invoke<AssetImportado[]>("coop:pickAsset", pasta),
   coopTranca: (secao: string, soltar: boolean) => invoke<boolean>("coop:tranca", secao, soltar),
   onCoopEstado: ouvir<EstadoCoop>("coop:estado"),
   onCoopPatch: ouvir<Patch>("coop:patch"),

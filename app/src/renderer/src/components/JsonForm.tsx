@@ -228,7 +228,7 @@ export function JsonForm({
     return (
       <PainelMedidas
         medidas={valor as Record<string, unknown>}
-        onChange={(chave, novo) => alterar([secao, chave], novo)}
+        onChange={(caminho, novo) => alterar([secao, ...caminho], novo)}
         convidado={convidado}
       />
     );
@@ -237,7 +237,7 @@ export function JsonForm({
     return (
       <PainelOrnamentos
         ornamentos={valor as Record<string, unknown>}
-        onChange={(chave, novo) => alterar([secao, chave], novo)}
+        onChange={(caminho, novo) => alterar([secao, ...caminho], novo)}
       />
     );
   }

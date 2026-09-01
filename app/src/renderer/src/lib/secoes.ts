@@ -104,6 +104,37 @@ export function ancoraDe(chave: string): string | null {
 }
 
 /**
+ * Os blocos da página na ordem em que aparecem, com a folga de origem de cada um
+ * e se tem arte no canto. `topo`/`base` são os mesmos números que o componente
+ * passa como fallback — o Studio só grava o que for diferente disto, então uma
+ * secção nunca tocada continua exatamente como foi desenhada.
+ */
+export const BLOCOS: {
+  id: string;
+  rotulo: string;
+  topo: number;
+  base: number;
+  ornamento: boolean;
+}[] = [
+  { id: "countdown", rotulo: "contagem", topo: 50, base: 50, ornamento: false },
+  { id: "galeria", rotulo: "galeria", topo: 80, base: 120, ornamento: true },
+  { id: "versiculo", rotulo: "versículo", topo: 32, base: 32, ornamento: true },
+  { id: "historia", rotulo: "história", topo: 100, base: 100, ornamento: true },
+  { id: "evento", rotulo: "evento", topo: 100, base: 100, ornamento: true },
+  { id: "nosso-dia", rotulo: "nosso dia", topo: 60, base: 60, ornamento: true },
+  { id: "presentes", rotulo: "presentes", topo: 100, base: 100, ornamento: true },
+  { id: "manual", rotulo: "manual", topo: 100, base: 100, ornamento: true },
+  { id: "dresscode", rotulo: "dress code", topo: 100, base: 100, ornamento: true },
+  { id: "mensagens", rotulo: "mural", topo: 70, base: 90, ornamento: true },
+];
+
+/** O rodapé não tem folga configurável, mas tem slot de arte como as outras. */
+export const ANCORAS_ORNAMENTO: { id: string; rotulo: string }[] = [
+  ...BLOCOS.filter((b) => b.ornamento).map((b) => ({ id: b.id, rotulo: b.rotulo })),
+  { id: "footer", rotulo: "rodapé" },
+];
+
+/**
  * Só o que é um bloco inteiro da página. `noivos`, `hero`, `meta` e `tema` ficam
  * de fora: sem eles não sobra convite, é o mesmo que apagar o site.
  */

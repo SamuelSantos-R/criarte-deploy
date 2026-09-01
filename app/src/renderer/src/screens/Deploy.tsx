@@ -4,6 +4,13 @@ import type { Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
 import { Button } from "@/components/ui/primitives";
 import { ConfirmarPublicacao } from "@/components/ConfirmarPublicacao";
+import {
+  OpcoesDeploy,
+  OPCOES_PADRAO,
+  expiresDe,
+  validadeEmPalavras,
+  type Opcoes,
+} from "@/components/OpcoesDeploy";
 import { Console } from "@/components/Console";
 import { SeletorSite } from "@/components/SeletorSite";
 import { Topo } from "@/components/Topo";
@@ -11,6 +18,7 @@ import { Topo } from "@/components/Topo";
 export function Deploy({ sites }: { sites: Site[] }): ReactElement {
   const [id, setId] = useState<string | null>(null);
   const [ensaio, setEnsaio] = useState(true);
+  const [opcoes, setOpcoes] = useState<Opcoes>(OPCOES_PADRAO);
   const [confirmando, setConfirmando] = useState(false);
   const job = useJob();
 
@@ -18,6 +26,23 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
   useEffect(() => {
     if (id === null && sites[0]) setId(sites[0].id);
   }, [id, sites]);
+
+  const expires = expiresDe(opcoes);
+  // Data pela metade trava o botão: melhor não publicar do que publicar com a
+  // validade que o padrão escolheu sozinho.
+  const pronto = id !== null && expires !== null;
+
+  const disparar = (dryRun: boolean): void => {
+    if (!id || expires === null) return;
+    void job.rodar({
+      kind: "deploy",
+      siteId: id,
+      dryRun,
+      expires,
+      ...(opcoes.subdominio.trim() ? { subdomain: opcoes.subdominio.trim() } : {}),
+      ...(opcoes.convidados ? { guestsFile: opcoes.convidados } : {}),
+    });
+  };
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
@@ -55,11 +80,11 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
             <Button
               variant={ensaio ? "primary" : "danger"}
               size="sm"
-              disabled={!id}
+              disabled={!pronto}
+              title={pronto ? undefined : "Preencha a data de validade"}
               onClick={() => {
-                if (!id) return;
                 // O ensaio não toca no que está no ar; a publicação passa pelo modal.
-                if (ensaio) void job.rodar({ kind: "deploy", siteId: id, dryRun: true });
+                if (ensaio) disparar(true);
                 else setConfirmando(true);
               }}
             >
@@ -68,6 +93,8 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
           )}
         </div>
       </Topo>
+
+      <OpcoesDeploy valor={opcoes} onChange={setOpcoes} travado={job.rodando} />
 
       <Console
         linhas={job.linhas}
@@ -79,10 +106,12 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
       {confirmando && id && (
         <ConfirmarPublicacao
           siteId={id}
+          validade={validadeEmPalavras(opcoes)}
+          convidados={opcoes.convidados}
           onCancelar={() => setConfirmando(false)}
           onPublicar={() => {
             setConfirmando(false);
-            void job.rodar({ kind: "deploy", siteId: id, dryRun: false });
+            disparar(false);
           }}
         />
       )}

@@ -27,7 +27,16 @@ export function destinoPublicacao(siteId: string): { url: string | null } {
 }
 
 export type Job =
-  | { kind: "deploy"; siteId: string; dryRun: boolean }
+  | {
+      kind: "deploy";
+      siteId: string;
+      dryRun: boolean;
+      /** Cru como o CLI aceita: "0", meses ("3"), ou DD/MM/AAAA. */
+      expires?: string;
+      subdomain?: string;
+      /** Caminho absoluto do .txt de convidados, já validado dentro do site. */
+      guestsFile?: string;
+    }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }
   | { kind: "doctor" }
@@ -47,8 +56,14 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
   switch (job.kind) {
     case "deploy": {
       const cwd = await siteDir(job.siteId);
+      // Cada opção entra como par nomeado e só depois de passar pelo asJob.
+      // A UI continua sem caminho para inventar flag (--guests-reset queima os
+      // links já enviados).
       const args = ["--yes"];
       if (job.dryRun) args.push("--dry-run");
+      if (job.expires) args.push("--expires", job.expires);
+      if (job.subdomain) args.push("--subdomain", job.subdomain);
+      if (job.guestsFile) args.push("--guests-file", job.guestsFile);
       return { script: cli, args, cwd };
     }
     case "check":

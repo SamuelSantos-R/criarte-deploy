@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { Copy, FolderOpen, Lock, Redo2, RotateCcw, Save, Undo2, Users } from "lucide-react";
+import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
   previewScroll,
@@ -28,6 +28,7 @@ import { PainelCoop } from "@/components/PainelCoop";
 import { useCoop } from "@/lib/useCoop";
 import { ProvedorSite } from "@/components/CampoArquivo";
 import { Divisor, useLarguraPainel } from "@/components/Divisor";
+import { RenomearSite } from "@/components/RenomearSite";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
@@ -47,6 +48,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
+  const [renomeando, setRenomeando] = useState(false);
   const rodando = usarServidor();
   // O dev server é um só no app inteiro: se a tela de Preview levou pra outro
   // site, este painel volta a oferecer "Ligar" em vez de mostrar convite alheio.
@@ -465,6 +467,11 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
             </Button>
           )}
           {id && !convidado && (
+            <Button variant="ghost" onClick={() => setRenomeando(true)}>
+              <PenLine size={13} /> Renomear
+            </Button>
+          )}
+          {id && !convidado && (
             <Button variant="ghost" onClick={() => void reveal(id)}>
               <FolderOpen size={13} /> Abrir pasta
             </Button>
@@ -582,6 +589,20 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           onParar={() => void desligarAoVivo()}
         />
       </div>
+
+      {renomeando && id && (
+        <RenomearSite
+          id={id}
+          onFechar={() => setRenomeando(false)}
+          onPronto={(novo) => {
+            setRenomeando(false);
+            // A pasta mudou debaixo do painel: aponta pro id novo e manda a
+            // lista ser relida, senão o selector fica a mostrar um site morto.
+            setId(novo);
+            recarregar();
+          }}
+        />
+      )}
 
       {duplicando &&
         dados &&

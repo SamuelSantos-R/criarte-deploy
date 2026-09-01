@@ -58,6 +58,7 @@ const api = {
   vigiarConvite: (id: string | null) => invoke<void>("convite:watch", id),
   duplicarSite: (id: string, categoria: string, slug: string) =>
     invoke<Copia>("sites:duplicate", id, categoria, slug),
+  renomearSite: (id: string, slug: string) => invoke<{ id: string }>("sites:rename", id, slug),
   salvarSessaoComoNovo: (categoria: string, slug: string, doc: unknown) =>
     invoke<Copia>("sites:salvarSessao", categoria, slug, doc),
 
@@ -86,6 +87,7 @@ const api = {
   estadoDeps: () => invoke<EstadoDeps>("deps:estado"),
 
   destinoPublicacao: (id: string) => invoke<{ url: string | null }>("deploy:destino", id),
+  pickGuests: () => invoke<string | null>("deploy:pickGuests"),
   startJob: (job: unknown) => invoke<string>("job:start", job),
   cancelJob: (runId: string) => invoke<boolean>("job:cancel", runId),
 

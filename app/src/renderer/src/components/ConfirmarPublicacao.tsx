@@ -11,10 +11,14 @@ import { Button } from "@/components/ui/primitives";
  */
 export function ConfirmarPublicacao({
   siteId,
+  validade,
+  convidados,
   onCancelar,
   onPublicar,
 }: {
   siteId: string;
+  validade: string;
+  convidados: string | null;
   onCancelar: () => void;
   onPublicar: () => void;
 }): ReactElement {
@@ -84,6 +88,15 @@ export function ConfirmarPublicacao({
               mostrar onde isto aterra. Confere antes de seguir.
             </p>
           )}
+
+          <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-[12px]">
+            <dt className="font-mono text-label uppercase text-muted">Validade</dt>
+            <dd className="text-text/85">{validade}</dd>
+            <dt className="font-mono text-label uppercase text-muted">Convidados</dt>
+            <dd className="text-text/85">
+              {convidados ? convidados.split("/").pop() : "sem lista — sobe em prévia"}
+            </dd>
+          </dl>
 
           <p className="mt-5 text-[12px] leading-[1.7] text-muted">
             O convite que está no ar é apagado e reconstruído na VPS. Quem já tem

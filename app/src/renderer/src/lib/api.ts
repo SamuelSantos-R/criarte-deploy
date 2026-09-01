@@ -12,7 +12,14 @@ export type Site = {
 export type AssetImportado = { nome: string; web: string; bytes: number };
 
 export type Job =
-  | { kind: "deploy"; siteId: string; dryRun: boolean }
+  | {
+      kind: "deploy";
+      siteId: string;
+      dryRun: boolean;
+      expires?: string;
+      subdomain?: string;
+      guestsFile?: string;
+    }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }
   | { kind: "doctor" }
@@ -42,6 +49,8 @@ export const onConviteMudou = api.onConviteMudou;
 export type Copia = { id: string; siteId: string; faltam: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
+export const renomearSite = (id: string, slug: string) =>
+  call(api.renomearSite(id, slug)) as Promise<{ id: string }>;
 export const salvarSessaoComoNovo = (categoria: string, slug: string, doc: unknown) =>
   call(api.salvarSessaoComoNovo(categoria, slug, doc)) as Promise<Copia>;
 
@@ -127,6 +136,7 @@ export const estadoDeps = () => call(api.estadoDeps()) as Promise<EstadoDeps>;
 
 export const destinoPublicacao = (id: string) =>
   call(api.destinoPublicacao(id)) as Promise<{ url: string | null }>;
+export const pickGuests = () => call(api.pickGuests()) as Promise<string | null>;
 export const startJob = (job: Job) => call(api.startJob(job));
 export const cancelJob = (runId: string) => call(api.cancelJob(runId));
 export const reveal = (id: string) => call(api.reveal(id));

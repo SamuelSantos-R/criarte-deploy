@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -128,4 +128,58 @@ export async function salvarSessaoComoNovo(
   await writeFile(join(destino, "convite.json"), `${JSON.stringify(doc, null, 2)}\n`, "utf8");
 
   return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+}
+
+/**
+ * Renomear é mover a pasta e avisar o Supabase — o uuid do mural não muda, então
+ * os recados já deixados continuam a aparecer no convite renomeado. O que fica
+ * para trás é o que já está publicado no endereço antigo: a VPS não sabe deste
+ * rename e continua a servir o slug velho até alguém o apagar no painel.
+ */
+export async function renomearSite(origemId: string, slug: string): Promise<{ id: string }> {
+  const origem = await siteDir(origemId);
+  const categoria = origemId.split("/")[0] ?? "";
+  if (!NOME.test(slug)) throw new Error("nome inválido — minúsculas e hífen");
+  if (slug === origemId.split("/")[1]) return { id: origemId };
+  const destino = await destinoLivre(categoria, slug);
+
+  await rename(origem, destino);
+
+  // A pasta já mudou; daqui para a frente uma falha é cosmética e não pode
+  // desfazer a mudança, por isso o aviso vai em erro só se o rename falhar.
+  await renomearNoSupabase(origemId.split("/")[1] ?? "", slug);
+  await gravarSlugLocal(destino, slug);
+  return { id: `${categoria}/${slug}` };
+}
+
+/** O `site.json` guarda o slug com que o CLI publica; sem isto o deploy subiria
+ * outra vez com o nome antigo mesmo depois de a pasta mudar. */
+async function gravarSlugLocal(destino: string, slug: string): Promise<void> {
+  const arquivo = join(destino, "site.json");
+  if (!existsSync(arquivo)) return;
+  try {
+    const meta = JSON.parse(await readFile(arquivo, "utf8")) as Record<string, unknown>;
+    meta.slug = slug;
+    await writeFile(arquivo, `${JSON.stringify(meta, null, 2)}\n`, "utf8");
+  } catch {
+    // site.json ilegível não impede o rename — o CLI regrava-o no próximo deploy.
+  }
+}
+
+async function renomearNoSupabase(antigo: string, novo: string): Promise<void> {
+  if (!antigo) return;
+  const { url, serviceKey } = credenciais();
+  const r = await fetch(`${url}/rest/v1/cr_sites?slug=eq.${encodeURIComponent(antigo)}`, {
+    method: "PATCH",
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${serviceKey}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({ slug: novo }),
+  });
+  if (!r.ok) {
+    throw new Error(`pasta renomeada, mas o Supabase recusou o slug novo (${r.status})`);
+  }
 }

@@ -4,7 +4,7 @@ import { loadSettings, saveSettings } from "./paths";
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, destinoPublicacao, startJob, type Job } from "./cli";
 import { estadoDeps } from "./deps";
-import { duplicarSite, salvarSessaoComoNovo } from "./duplicar";
+import { duplicarSite, renomearSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
@@ -62,12 +62,33 @@ async function abrir(
   return r.canceled ? null : (r.filePaths[0] ?? null);
 }
 
+/** "0" (permanente), meses de 1 a 120, ou DD/MM/AAAA. Nada mais passa. */
+function asExpires(v: unknown): string {
+  const t = asString(v, "expires").trim();
+  const ok = /^(0|[1-9][0-9]?|1[01][0-9]|120)$/.test(t) || /^\d{2}\/\d{2}\/\d{4}$/.test(t);
+  if (!ok) throw new Error("validade inválida");
+  return t;
+}
+
+function asSubdominio(v: unknown): string {
+  const t = asString(v, "subdomain").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(t)) throw new Error("subdomínio inválido");
+  return t;
+}
+
 function asJob(v: unknown): Job {
   if (!v || typeof v !== "object") throw new Error("job inválido");
   const j = v as Record<string, unknown>;
   switch (j.kind) {
     case "deploy":
-      return { kind: "deploy", siteId: asString(j.siteId, "siteId"), dryRun: j.dryRun === true };
+      return {
+        kind: "deploy",
+        siteId: asString(j.siteId, "siteId"),
+        dryRun: j.dryRun === true,
+        ...(j.expires === undefined ? {} : { expires: asExpires(j.expires) }),
+        ...(j.subdomain === undefined ? {} : { subdomain: asSubdominio(j.subdomain) }),
+        ...(j.guestsFile === undefined ? {} : { guestsFile: asString(j.guestsFile, "guestsFile") }),
+      };
     case "check":
       return { kind: "check", siteId: asString(j.siteId, "siteId") };
     case "fotos":
@@ -126,6 +147,10 @@ export function registerIpc(): void {
 
   handle("sites:duplicate", (_e, id: unknown, categoria: unknown, slug: unknown) =>
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
+  );
+
+  handle("sites:rename", (_e, id: unknown, slug: unknown) =>
+    renomearSite(asString(id, "id"), asString(slug, "nome")),
   );
 
   handle("sites:salvarSessao", (_e, categoria: unknown, slug: unknown, doc: unknown) =>
@@ -243,6 +268,17 @@ export function registerIpc(): void {
   handle("deps:estado", () => estadoDeps());
 
   handle("deploy:destino", (_e, id: unknown) => destinoPublicacao(asString(id, "id")));
+
+  // O ficheiro entra por diálogo nativo, nunca por caminho digitado no
+  // renderer: quem escolhe é o Heatz, no Finder, e o main só repassa o que ele
+  // apontou.
+  handle("deploy:pickGuests", (event) =>
+    abrir(event, {
+      title: "Lista de convidados (.txt)",
+      properties: ["openFile"],
+      filters: [{ name: "Lista de convidados", extensions: ["txt"] }],
+    }),
+  );
 
   handle("job:start", (event, job: unknown) => startJob(event.sender, asJob(job)));
   handle("job:cancel", (_e, runId: unknown) => cancelJob(runId));

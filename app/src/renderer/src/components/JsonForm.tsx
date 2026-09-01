@@ -1,11 +1,12 @@
-import { type ReactElement } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useState, type ReactElement } from "react";
+import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
 import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
 import { PainelTema } from "@/components/PainelTema";
 import { PainelMedidas } from "@/components/PainelMedidas";
 import { PainelOrnamentos } from "@/components/PainelOrnamentos";
 import { rotulo } from "@/lib/secoes";
+import { cn } from "@/lib/utils";
 
 export type Caminho = (string | number)[];
 
@@ -57,9 +58,87 @@ function CampoTexto({ valor, caminho, onChange, label }: Props & { valor: string
   );
 }
 
+/**
+ * Fora do `Lista` de proposito: definida la dentro, era um tipo de componente
+ * novo a cada render, e o React desmontava o botao a meio do arrasto — o
+ * `dragend` nunca chegava e a lista ficava presa em "a arrastar".
+ */
+function Pega({
+  i,
+  label,
+  pegado,
+  onPegar,
+  onLargar,
+  onMover,
+}: {
+  i: number;
+  label: string;
+  pegado: number | null;
+  onPegar: (i: number) => void;
+  onLargar: () => void;
+  onMover: (de: number, para: number) => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      draggable
+      onDragStart={(e) => {
+        onPegar(i);
+        e.dataTransfer.effectAllowed = "move";
+        // Sem carga nenhuma o Chromium cancela o arrasto ao primeiro movimento.
+        e.dataTransfer.setData("text/plain", String(i));
+      }}
+      onDragEnd={onLargar}
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+        e.preventDefault();
+        onMover(i, e.key === "ArrowUp" ? i - 1 : i + 1);
+      }}
+      aria-label={`Mover ${label} ${i + 1} — arraste, ou use as setas`}
+      title="Arraste para trocar a ordem (ou setas ↑ ↓)"
+      className={cn(
+        "no-drag flex h-7 w-5 shrink-0 cursor-grab items-center justify-center text-muted/60",
+        "transition-colors hover:text-text active:cursor-grabbing",
+        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage",
+        pegado === i && "text-accent",
+      )}
+    >
+      <GripVertical size={13} />
+    </button>
+  );
+}
+
+/**
+ * Ordem por arrasto. Antes, mudar a ordem dos eventos obrigava a apagar um e
+ * voltar a escrevê-lo no sítio certo — o formulário só sabia acrescentar no fim.
+ *
+ * A pega também responde às setas com o foco em cima: arrastar é o gesto rápido,
+ * mas quem chega pelo teclado não pode ficar sem caminho.
+ */
 function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; label: string }): ReactElement {
   const base = valor[0];
   const deObjetos = base !== null && typeof base === "object" && !Array.isArray(base);
+  const [pegado, setPegado] = useState<number | null>(null);
+  const [alvo, setAlvo] = useState<number | null>(null);
+
+  const mover = (de: number, para: number): void => {
+    // Os dois extremos: uma origem fora da lista fazia o splice devolver vazio e
+    // um `undefined` entrava na lista no lugar do item. Acontece se o item for
+    // apagado com o arrasto ainda a decorrer.
+    if (de === para) return;
+    if (de < 0 || de >= valor.length || para < 0 || para >= valor.length) return;
+    const copia = [...valor];
+    const [item] = copia.splice(de, 1);
+    copia.splice(para, 0, item);
+    onChange(caminho, copia);
+  };
+
+  const largar = (): void => {
+    if (pegado !== null && alvo !== null) mover(pegado, alvo);
+    setPegado(null);
+    setAlvo(null);
+  };
+
   return (
     <section className="mt-6">
       <div className="mb-3 flex items-center gap-3">
@@ -78,17 +157,34 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
         {valor.map((item, i) => (
           <div
             key={i}
-            className={
+            onDragOver={(e) => {
+              if (pegado === null) return;
+              e.preventDefault();
+              setAlvo(i);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              largar();
+            }}
+            className={cn(
               deObjetos
                 ? "relative border-l-2 border-rule-strong bg-surface/60 py-4 pl-5 pr-4"
-                : "flex items-center gap-2"
-            }
+                : "flex items-center gap-2",
+              // A marca do destino é uma linha, não um realce do bloco inteiro:
+              // o que interessa saber é entre que dois itens ele vai cair.
+              pegado !== null && alvo === i && pegado !== i &&
+                (i < pegado ? "border-t-2 border-t-accent" : "border-b-2 border-b-accent"),
+              pegado === i && "opacity-50",
+            )}
           >
             {deObjetos ? (
               <>
                 <span className="absolute -left-[9px] top-4 bg-ground px-1 font-mono text-serial text-muted">
                   {String(i + 1).padStart(2, "0")}
                 </span>
+                <div className="absolute right-9 top-3">
+                  <Pega i={i} label={label} pegado={pegado} onPegar={setPegado} onLargar={largar} onMover={mover} />
+                </div>
                 <div className="grid grid-cols-2 gap-x-5 gap-y-3">
                   <Nos valor={item} caminho={[...caminho, i]} onChange={onChange} />
                 </div>
@@ -103,6 +199,7 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
               </>
             ) : (
               <>
+                <Pega i={i} label={label} pegado={pegado} onPegar={setPegado} onLargar={largar} onMover={mover} />
                 <span className="w-6 shrink-0 font-mono text-serial text-muted">{String(i + 1).padStart(2, "0")}</span>
                 <Input value={String(item ?? "")} onChange={(e) => onChange([...caminho, i], e.target.value)} />
                 <button

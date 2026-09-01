@@ -23,6 +23,17 @@ export const PAPEIS: Grupo[] = [
     ],
   },
   {
+    titulo: "a capa",
+    nota: "O nome do casal é branco por desenho; o que dá para trocar é o símbolo entre os dois.",
+    papeis: [
+      {
+        chave: "e",
+        rotulo: "O & do meio",
+        onde: "Só o & entre o nome da noiva e o do noivo, na capa. Vazio deixa o creme de sempre.",
+      },
+    ],
+  },
+  {
     titulo: "fundo das secções",
     nota: "As duas alternam de cima a baixo — é o que dá o contraste entre um bloco e o seguinte.",
     papeis: [
@@ -188,6 +199,8 @@ export function PainelTema({
 /** O que o Studio grava quando o convite.json ainda não tem tema nenhum. */
 export const TEMA_PADRAO: Record<string, string> = {
   destaque: "#7A7F4B",
+  // O creme da capa: é a cor que o & sempre teve cravada no componente.
+  e: "#FDFAF4",
   "fundo-1": "#FDFAF4",
   "fundo-2": "#F8F0E0",
   chapeu: "#B08A4A",

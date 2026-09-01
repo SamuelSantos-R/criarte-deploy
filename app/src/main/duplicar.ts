@@ -58,19 +58,28 @@ async function registrar(slug: string, titulo: string): Promise<string> {
   return linha.id;
 }
 
-async function trocarSiteId(destino: string, siteId: string): Promise<boolean> {
+/** Sem uma destas o mural de recados não fala com o Supabase e falha calado. */
+const CHAVES_MURAL = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+
+/**
+ * O uuid do mural é sempre escrito, mesmo que o `.env.local` não tenha vindo na
+ * cópia — antes, ficheiro em falta era um `false` que ninguém lia e o convite
+ * novo nascia a escrever no mural do casal anterior. As outras duas chaves não
+ * dá para inventar (a anon key não está no config do CLI), então voltam como
+ * aviso em vez de ficarem em silêncio.
+ */
+async function gravarSiteId(destino: string, siteId: string): Promise<string[]> {
   const arquivo = join(destino, ".env.local");
-  if (!existsSync(arquivo)) return false;
-  const antes = await readFile(arquivo, "utf8");
+  const antes = existsSync(arquivo) ? await readFile(arquivo, "utf8") : "";
   const linha = `NEXT_PUBLIC_SITE_ID=${siteId}`;
   const depois = /^NEXT_PUBLIC_SITE_ID=.*$/m.test(antes)
     ? antes.replace(/^NEXT_PUBLIC_SITE_ID=.*$/m, linha)
-    : `${antes.replace(/\n*$/, "\n")}${linha}\n`;
+    : `${antes ? antes.replace(/\n*$/, "\n") : ""}${linha}\n`;
   await writeFile(arquivo, depois, "utf8");
-  return true;
+  return CHAVES_MURAL.filter((c) => !new RegExp(`^${c}=.+$`, "m").test(depois));
 }
 
-export type Copia = { id: string; siteId: string; envTrocado: boolean };
+export type Copia = { id: string; siteId: string; faltam: string[] };
 
 async function destinoLivre(categoria: string, slug: string): Promise<string> {
   if (!NOME.test(categoria)) throw new Error("categoria inválida — minúsculas e hífen");
@@ -94,7 +103,7 @@ export async function duplicarSite(origemId: string, categoria: string, slug: st
 
   await cp(origem, destino, { recursive: true, filter: (src) => copiavel(src, origem) });
 
-  return { id: `${categoria}/${slug}`, siteId, envTrocado: await trocarSiteId(destino, siteId) };
+  return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
 }
 
 /**
@@ -118,5 +127,5 @@ export async function salvarSessaoComoNovo(
   await desempacotar(pacote, destino);
   await writeFile(join(destino, "convite.json"), `${JSON.stringify(doc, null, 2)}\n`, "utf8");
 
-  return { id: `${categoria}/${slug}`, siteId, envTrocado: await trocarSiteId(destino, siteId) };
+  return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
 }

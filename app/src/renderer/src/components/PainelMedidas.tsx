@@ -155,11 +155,85 @@ const ESPACAMENTOS: Medida[] = [
   },
 ];
 
+/**
+ * O nome no rodapé usa a fonte dos noivos mas não o tamanho deles: lá em cima é
+ * um clamp que acompanha a tela, aqui é número fixo. Os padrões são o que estava
+ * cravado no componente.
+ */
+const RODAPE: Medida[] = [
+  {
+    chave: "rodapeTamanho",
+    rotulo: "nome do casal",
+    dica: "Tamanho fixo, o mesmo no telemóvel e no computador.",
+    min: 20,
+    max: 140,
+    passo: 1,
+    padrao: 55,
+  },
+  {
+    chave: "rodapeEspacamento",
+    rotulo: "letras do nome",
+    dica: "Afasta as letras umas das outras. Zero é a fonte como veio.",
+    min: -0.05,
+    max: 0.4,
+    passo: 0.01,
+    padrao: 0,
+    unidade: "em",
+  },
+  {
+    chave: "rodapeAltura",
+    rotulo: "altura da linha",
+    dica: "Multiplica o tamanho do nome. Só se vê quando o nome parte em duas linhas.",
+    min: 0.7,
+    max: 1.6,
+    passo: 0.05,
+    padrao: 1,
+    unidade: "×",
+  },
+  {
+    chave: "rodapeDataTamanho",
+    rotulo: "data",
+    dica: "A linha em maiúsculas por baixo do nome.",
+    min: 8,
+    max: 24,
+    passo: 1,
+    padrao: 12,
+  },
+  {
+    chave: "rodapeDataEspacamento",
+    rotulo: "letras da data",
+    dica: "Texto em maiúsculas pede folga entre as letras; por isso o número é em pixels e não acompanha o tamanho.",
+    min: 0,
+    max: 12,
+    passo: 0.5,
+    padrao: 3,
+  },
+  {
+    chave: "rodapeTopo",
+    rotulo: "folga em cima",
+    dica: "Entre o fim da página e o nome.",
+    min: 0,
+    max: 200,
+    passo: 2,
+    padrao: 36,
+  },
+  {
+    chave: "rodapeBase",
+    rotulo: "folga embaixo",
+    dica: "Entre a assinatura da Criarte e o fim do convite.",
+    min: 0,
+    max: 200,
+    passo: 2,
+    padrao: 36,
+  },
+];
+
 /** O que o Studio grava quando o convite.json ainda não tem a seção. */
 export const MEDIDAS_PADRAO: Record<string, number | string> = {
   ...Object.fromEntries(MEDIDAS.map((m) => [m.chave, m.padrao])),
   ...Object.fromEntries(OPACIDADES.map((m) => [m.chave, m.padrao])),
   ...Object.fromEntries(ESPACAMENTOS.map((m) => [m.chave, m.padrao])),
+  ...Object.fromEntries(RODAPE.map((m) => [m.chave, m.padrao])),
   noivosFonte: "milton",
 };
 
@@ -461,6 +535,30 @@ export function PainelMedidas({
         </p>
         <div className="border-t border-rule">
           {ESPACAMENTOS.map((medida) => (
+            <LinhaMedida
+              key={medida.chave}
+              medida={medida}
+              valor={medidas[medida.chave]}
+              onChange={(novo) => onChange([medida.chave], novo)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="font-mono text-label uppercase text-text">rodapé</span>
+          <span className="font-mono text-serial text-muted/60">
+            {String(RODAPE.length).padStart(2, "0")}
+          </span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+          O nome do casal fecha o convite na mesma fonte do topo, mas em tamanho
+          próprio: aqui não é um clamp, é um número fixo.
+        </p>
+        <div className="border-t border-rule">
+          {RODAPE.map((medida) => (
             <LinhaMedida
               key={medida.chave}
               medida={medida}

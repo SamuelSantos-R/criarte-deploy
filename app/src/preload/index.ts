@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "ele
 type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 type AssetImportado = { nome: string; web: string; bytes: number };
 type Servidor = { siteId: string; url: string; lan: string | null };
-type Copia = { id: string; siteId: string; envTrocado: boolean };
+type Copia = { id: string; siteId: string; faltam: string[] };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
 type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };

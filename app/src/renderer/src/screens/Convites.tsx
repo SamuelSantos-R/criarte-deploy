@@ -363,8 +363,13 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
    * o antigo volta ao que estava salvo. Sem isso a edição ficaria nos dois, que
    * é justamente o que suja a base de onde sai o deploy.
    */
-  const aoDuplicar = async (copia: { id: string }): Promise<void> => {
+  const aoDuplicar = async (copia: { id: string; faltam: string[] }): Promise<void> => {
     setDuplicando(false);
+    // O uuid do mural já foi escrito; estas o Studio não tem de onde tirar. Sem
+    // elas o correio do amor abre vazio e não diz porquê.
+    if (copia.faltam.length > 0) {
+      setErro(`convite criado, mas falta no .env.local: ${copia.faltam.join(", ")}`);
+    }
     try {
       // O convidado não tinha convite aberto do próprio disco pra devolver ao
       // estado salvo, e o convite.json dele já foi escrito com o doc da sessão.

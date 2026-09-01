@@ -39,7 +39,7 @@ export const writeConvite = (id: string, data: unknown, marca?: number) =>
 export const vigiarConvite = (id: string | null) => call(api.vigiarConvite(id));
 export const onConviteMudou = api.onConviteMudou;
 
-export type Copia = { id: string; siteId: string; envTrocado: boolean };
+export type Copia = { id: string; siteId: string; faltam: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
 export const salvarSessaoComoNovo = (categoria: string, slug: string, doc: unknown) =>

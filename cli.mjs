@@ -874,7 +874,40 @@ async function applyFix(kind, cwd, category, slug) {
 // ============================================================================
 // EXPIRAÇÃO — pergunta quanto tempo o site fica no ar
 // ============================================================================
-async function askExpiration(siteJsonPath) {
+/**
+ * Traduz o que veio em `--expires` sem perguntar nada. Aceita o mesmo
+ * vocabulário do menu: `0`/`none` para permanente, número de meses, ou uma data
+ * em DD/MM/AAAA ou ISO. Devolve `undefined` quando não reconhece — aí o deploy
+ * pára e pede em vez de inventar uma validade que ninguém escolheu.
+ */
+function resolverExpiracao(bruto) {
+  const raw = String(bruto ?? "").trim().toLowerCase();
+  if (!raw) return undefined;
+  if (raw === "0" || raw === "n" || raw === "none" || raw === "sem" || raw === "permanente") return null;
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  const iso = br ? `${br[3]}-${br[2]}-${br[1]}` : raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    // Ida e volta: o Date aceita 30/02 e devolve 2 de março calado. Comparar o
+    // ISO reconstruído apanha o dia que não existe em vez de o silenciar.
+    const d = new Date(iso + "T00:00:00Z");
+    return isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== iso ? undefined : iso;
+  }
+  const meses = parseInt(raw, 10);
+  if (Number.isFinite(meses) && meses > 0 && String(meses) === raw) return monthsFromNow(meses);
+  return undefined;
+}
+
+async function askExpiration(siteJsonPath, forcado) {
+  if (forcado !== null && forcado !== undefined) {
+    const resolvido = resolverExpiracao(forcado);
+    if (resolvido === undefined) {
+      err(`--expires não reconhecido: "${forcado}". Use 0, um número de meses, ou DD/MM/AAAA.`);
+      process.exitCode = 1;
+      throw new Error("--expires inválido");
+    }
+    info(`Validade vinda de --expires: ${resolvido ? fmtDateBR(resolvido) : "sem expiração"}`);
+    return resolvido;
+  }
   let current = null;
   if (existsSync(siteJsonPath)) {
     try { current = JSON.parse(readFileSync(siteJsonPath, "utf8")).expires_at || null; }
@@ -1834,6 +1867,19 @@ const ALWAYS_USED = new Set([
 ]);
 
 /**
+ * Pastas de public/ resolvidas em runtime pelo nome do ficheiro, nunca por um
+ * caminho escrito no source. `src/lib/fontes.ts` lê a pasta e monta o
+ * `@font-face` com `url("/fonts/" + ficheiro)`, então uma fonte que o layout
+ * não importe por caminho literal parece órfã e era varrida — o convite subia
+ * com o @font-face declarado e o .woff2 em 404, e o nome dos noivos caía no
+ * Georgia sem ninguém perceber até abrir no telemóvel.
+ */
+const ALWAYS_USED_DIRS = ["fonts"];
+
+const emPastaIntocavel = (publicRel) =>
+  ALWAYS_USED_DIRS.some((d) => publicRel === d || publicRel.startsWith(d + "/"));
+
+/**
  * Detecta arquivos em public/ que NUNCA são referenciados pelo source.
  * Filename match (basename) — pega tanto `/assets/X` quanto `../../public/X`
  * e variantes em CSS url(). É conservador: se o nome aparece em qualquer
@@ -1883,7 +1929,7 @@ function detectOrphanAssets(siteCopyPath) {
   const used = new Set();
   const orphans = [];
   for (const f of publicFiles) {
-    if (ALWAYS_USED.has(f.basename)) {
+    if (ALWAYS_USED.has(f.basename) || emPastaIntocavel(f.publicRel)) {
       used.add(f.basename);
       continue;
     }
@@ -2709,6 +2755,7 @@ async function cmdDirectDeploy(argv) {
   const flagDomain = takeFlag("--domain");
   const flagRsvpEmail = takeFlag("--rsvp-email");
   const flagGuestsFile = takeFlag("--guests-file");
+  const flagExpires = takeFlag("--expires");
 
   argv = argv.filter((a) => !a.startsWith("--") && !(a === "-v"));
 
@@ -2875,7 +2922,7 @@ async function cmdDirectDeploy(argv) {
 
   // Expiração
   screen.phase("⏳ Validade", fullSlug);
-  const expires_at = await askExpiration(join(cwd, "site.json"));
+  const expires_at = await askExpiration(join(cwd, "site.json"), flagExpires);
 
   // Resumo
   screen.phase("📋 Resumo", fullSlug);
@@ -4119,6 +4166,7 @@ const FLAGS_DEPLOY = new Set([
   "--yes", "-y", "--dry-run", "--validate-only", "--no-wait", "--skip-upload",
   "--skip-typecheck", "--guests-reset", "--verbose",
   "--subdomain", "--category", "--slug", "--domain", "--rsvp-email", "--guests-file",
+  "--expires",
 ]);
 
 (async () => {

@@ -3629,21 +3629,37 @@ async function cmdSshSetup() {
   if (!host) { err("Host é obrigatório."); process.exit(1); }
   const user = (await ask(`Usuário SSH ${c.dim}(root)${c.reset} ${cur.user ? `[${cur.user}]` : ""}: `)).trim() || cur.user || "root";
   const path = (await ask(`Caminho remoto ${c.dim}(/srv/builds)${c.reset} ${cur.path ? `[${cur.path}]` : ""}: `)).trim() || cur.path || "/srv/builds";
+  const identity = (await ask(`Chave SSH ${c.dim}(vazio = deixa o ssh escolher)${c.reset} ${cur.identity ? `[${cur.identity}]` : ""}: `)).trim() || cur.identity || "";
 
   const sp = new Spinner("Testando conexão SSH...").start();
   try {
-    execSync(`ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=accept-new ${user}@${host} "test -d ${path} && echo ok || (mkdir -p ${path} && echo created)"`, { stdio: "pipe", timeout: 15000 });
+    execSync(`ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=accept-new${sshIdentity({ rsync: { identity } })} ${user}@${host} "test -d ${path} && echo ok || (mkdir -p ${path} && echo created)"`, { stdio: "pipe", timeout: 15000 });
     sp.succeed("SSH funcionando + diretório remoto pronto");
   } catch (e) {
     sp.fail("Falha SSH");
     err(e.stderr?.toString() || e.message);
     warn("Verifica: 1) chave SSH no ~/.ssh/authorized_keys do VPS  2) firewall liberando porta 22 pro teu IP");
+    warn("Se a chave só existe sob um alias no ~/.ssh/config, aponta o ficheiro dela aqui — o rsync usa o IP cru e não lê o alias.");
     process.exit(1);
   }
 
-  saveConfig({ ...existing, rsync: { host, user, path } });
+  saveConfig({ ...existing, rsync: { host, user, path, ...(identity ? { identity } : {}) } });
   ok(`Config salva. Deploys futuros vão usar rsync automaticamente.`);
   info(`${c.dim}Pra desativar: edite ${CONFIG_FILE} e remova o bloco "rsync".${c.reset}`);
+}
+
+/**
+ * Chave SSH explícita, se o config apontar uma. O bloco `Host` do ~/.ssh/config
+ * só casa com o nome escrito na linha de comando, e aqui vai sempre o IP cru —
+ * quem tiver a chave só sob um alias fica sem identidade nenhuma e o rsync morre
+ * com 255 e "connection unexpectedly closed", que não diz nada sobre chave.
+ * Sem `identity` no config nada muda: o ssh resolve como sempre resolveu.
+ */
+function sshIdentity(config) {
+  const bruto = config?.rsync?.identity;
+  if (typeof bruto !== "string" || !bruto.trim()) return "";
+  const caminho = bruto.startsWith("~") ? join(homedir(), bruto.slice(1)) : bruto;
+  return ` -i '${caminho}' -o IdentitiesOnly=yes`;
 }
 
 async function deployViaRsync(config, stagingDir, fullSlug, name, category, subdomain, expires_at) {
@@ -3656,7 +3672,7 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
   try {
     execSync(
       `rsync -az --partial --partial-dir=.rsync-partial --delete ` +
-      `-e "ssh -o ConnectTimeout=15 -o ServerAliveInterval=20 -o ServerAliveCountMax=10" ` +
+      `-e "ssh -o ConnectTimeout=15 -o ServerAliveInterval=20 -o ServerAliveCountMax=10${sshIdentity(config)}" ` +
       `"${stagingDir}/" "${user}@${host}:${remoteDir}/"`,
       { stdio: "pipe", timeout: 30 * 60 * 1000 }
     );

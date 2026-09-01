@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 import { Rocket, Square, Stethoscope } from "lucide-react";
 import type { Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
+import { useSiteValido } from "@/lib/useSiteValido";
 import { Button } from "@/components/ui/primitives";
 import { ConfirmarPublicacao } from "@/components/ConfirmarPublicacao";
 import {
@@ -22,10 +23,7 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
   const [confirmando, setConfirmando] = useState(false);
   const job = useJob();
 
-  // A lista chega depois do primeiro render.
-  useEffect(() => {
-    if (id === null && sites[0]) setId(sites[0].id);
-  }, [id, sites]);
+  useSiteValido(sites, id, setId);
 
   const expires = expiresDe(opcoes);
   // Data pela metade trava o botão: melhor não publicar do que publicar com a

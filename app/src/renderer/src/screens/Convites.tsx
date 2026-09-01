@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useSiteValido } from "@/lib/useSiteValido";
 import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
@@ -101,10 +102,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   const emSessao = coop.ligado;
   const destino = useMemo(() => ({ siteId: id, convidado }), [id, convidado]);
 
-  // A lista chega depois do primeiro render — abre o convite mais recente.
-  useEffect(() => {
-    if (id === null && comConvite[0]) setId(comConvite[0].id);
-  }, [id, comConvite]);
+  useSiteValido(comConvite, id, setId);
 
   // Entrar numa secção pede a tranca; sair devolve. Sem isto duas pessoas
   // digitavam no mesmo campo e a última tecla ganhava.

@@ -57,6 +57,17 @@ export async function siteDir(id: string): Promise<string> {
   return containedPath(root, categoria, slug);
 }
 
+/**
+ * O mesmo caminho, mas exigindo que exista. O `spawn` com um cwd que sumiu
+ * falha com ENOENT nomeando o binário do Electron — mensagem que manda procurar
+ * no sítio errado. Renomear um convite deixava exatamente esse rasto.
+ */
+export async function siteDirExistente(id: string): Promise<string> {
+  const dir = await siteDir(id);
+  if (!existsSync(dir)) throw new Error(`o site "${id}" já não existe nesta pasta — foi renomeado ou apagado?`);
+  return dir;
+}
+
 export async function conviteFile(id: string): Promise<string> {
   return containedPath(await siteDir(id), "convite.json");
 }

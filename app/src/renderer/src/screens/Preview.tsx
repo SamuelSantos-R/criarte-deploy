@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useState, type ReactElement } from "react";
+import { useSiteValido } from "@/lib/useSiteValido";
 import { QrCode, RefreshCw, RotateCw, Square } from "lucide-react";
 import { type Site } from "@/lib/api";
 import { derrubarServidor, subirServidor, usarServidor } from "@/lib/servidor";
@@ -25,9 +26,7 @@ export function Preview({ sites }: { sites: Site[] }): ReactElement {
   const [erro, setErro] = useState<string | null>(null);
   const [recarga, setRecarga] = useState(0);
 
-  useEffect(() => {
-    if (id === null && sites[0]) setId(sites[0].id);
-  }, [id, sites]);
+  useSiteValido(sites, id, setId);
 
   const largura = deitado ? aparelho.a : aparelho.l;
   const altura = deitado ? aparelho.l : aparelho.a;

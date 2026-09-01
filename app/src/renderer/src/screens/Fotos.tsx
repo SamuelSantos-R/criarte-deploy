@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { ImageDown, Square } from "lucide-react";
 import { trocarPorWebp, type RelatorioWebp, type Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
+import { useSiteValido } from "@/lib/useSiteValido";
 import { Button, Input } from "@/components/ui/primitives";
 import { Console } from "@/components/Console";
 import { SeletorSite } from "@/components/SeletorSite";
@@ -38,10 +39,7 @@ export function Fotos({ sites }: { sites: Site[] }): ReactElement {
   // "ok" dispararia de novo.
   const trocou = useRef(false);
 
-  // A lista chega depois do primeiro render.
-  useEffect(() => {
-    if (id === null && sites[0]) setId(sites[0].id);
-  }, [id, sites]);
+  useSiteValido(sites, id, setId);
 
   // Converter e não trocar deixava o site servindo o pesado: o `.webp` nascia
   // ao lado e ninguém apontava pra ele.

@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { acharNpm, prepararRaiz } from "./deps";
 import { cliPath, requireSitesRoot } from "./paths";
-import { siteDir } from "./sites";
+import { siteDirExistente } from "./sites";
 
 /**
  * Para onde o botão Publicar aponta. Sai daqui e não do renderer porque o
@@ -55,7 +55,7 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
   const cli = cliPath();
   switch (job.kind) {
     case "deploy": {
-      const cwd = await siteDir(job.siteId);
+      const cwd = await siteDirExistente(job.siteId);
       // Cada opção entra como par nomeado e só depois de passar pelo asJob.
       // A UI continua sem caminho para inventar flag (--guests-reset queima os
       // links já enviados).
@@ -67,14 +67,14 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
       return { script: cli, args, cwd };
     }
     case "check":
-      return { script: cli, args: ["check"], cwd: await siteDir(job.siteId) };
+      return { script: cli, args: ["check"], cwd: await siteDirExistente(job.siteId) };
     case "fotos": {
       const max = Math.min(Math.max(Math.trunc(job.max), 200), 6000);
       const q = Math.min(Math.max(Math.trunc(job.qualidade), 1), 100);
       return {
         script: cli,
         args: ["fotos", ".", "--max", String(max), "--q", String(q)],
-        cwd: await siteDir(job.siteId),
+        cwd: await siteDirExistente(job.siteId),
       };
     }
     case "doctor":

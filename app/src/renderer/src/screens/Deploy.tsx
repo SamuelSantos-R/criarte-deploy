@@ -3,6 +3,7 @@ import { Rocket, Square, Stethoscope } from "lucide-react";
 import type { Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
 import { Button } from "@/components/ui/primitives";
+import { ConfirmarPublicacao } from "@/components/ConfirmarPublicacao";
 import { Console } from "@/components/Console";
 import { SeletorSite } from "@/components/SeletorSite";
 import { Topo } from "@/components/Topo";
@@ -10,6 +11,7 @@ import { Topo } from "@/components/Topo";
 export function Deploy({ sites }: { sites: Site[] }): ReactElement {
   const [id, setId] = useState<string | null>(null);
   const [ensaio, setEnsaio] = useState(true);
+  const [confirmando, setConfirmando] = useState(false);
   const job = useJob();
 
   // A lista chega depois do primeiro render.
@@ -51,10 +53,15 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
             </Button>
           ) : (
             <Button
-              variant="primary"
+              variant={ensaio ? "primary" : "danger"}
               size="sm"
               disabled={!id}
-              onClick={() => id && void job.rodar({ kind: "deploy", siteId: id, dryRun: ensaio })}
+              onClick={() => {
+                if (!id) return;
+                // O ensaio não toca no que está no ar; a publicação passa pelo modal.
+                if (ensaio) void job.rodar({ kind: "deploy", siteId: id, dryRun: true });
+                else setConfirmando(true);
+              }}
             >
               <Rocket size={13} /> {ensaio ? "Ensaiar" : "Publicar"}
             </Button>
@@ -68,6 +75,17 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
         erro={job.erro}
         vazio="Escolha um site e rode o ensaio primeiro."
       />
+
+      {confirmando && id && (
+        <ConfirmarPublicacao
+          siteId={id}
+          onCancelar={() => setConfirmando(false)}
+          onPublicar={() => {
+            setConfirmando(false);
+            void job.rodar({ kind: "deploy", siteId: id, dryRun: false });
+          }}
+        />
+      )}
     </div>
   );
 }

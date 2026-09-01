@@ -1,10 +1,30 @@
 import { app, type WebContents } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { dirname } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { acharNpm, prepararRaiz } from "./deps";
 import { cliPath, requireSitesRoot } from "./paths";
 import { siteDir } from "./sites";
+
+/**
+ * Para onde o botão Publicar aponta. Sai daqui e não do renderer porque o
+ * config do CLI é o mesmo ficheiro que guarda as chaves — sobe só o endereço.
+ * Sem config devolve null, e o aviso diz que não sabe o destino em vez de
+ * inventar um que o Heatz leria como confirmado.
+ */
+export function destinoPublicacao(siteId: string): { url: string | null } {
+  const arquivo = join(homedir(), ".criarte-deploy", "config.json");
+  if (!existsSync(arquivo)) return { url: null };
+  try {
+    const bruto = JSON.parse(readFileSync(arquivo, "utf8")) as { panel_url?: unknown };
+    const base = typeof bruto.panel_url === "string" ? bruto.panel_url.replace(/\/+$/, "") : "";
+    return { url: base ? `${base}/${siteId}` : null };
+  } catch {
+    return { url: null };
+  }
+}
 
 export type Job =
   | { kind: "deploy"; siteId: string; dryRun: boolean }

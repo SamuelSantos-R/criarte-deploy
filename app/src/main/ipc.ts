@@ -2,7 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "
 import { existsSync } from "node:fs";
 import { loadSettings, saveSettings } from "./paths";
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
-import { cancelJob, startJob, type Job } from "./cli";
+import { cancelJob, destinoPublicacao, startJob, type Job } from "./cli";
 import { estadoDeps } from "./deps";
 import { duplicarSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
@@ -241,6 +241,8 @@ export function registerIpc(): void {
   );
 
   handle("deps:estado", () => estadoDeps());
+
+  handle("deploy:destino", (_e, id: unknown) => destinoPublicacao(asString(id, "id")));
 
   handle("job:start", (event, job: unknown) => startJob(event.sender, asJob(job)));
   handle("job:cancel", (_e, runId: unknown) => cancelJob(runId));

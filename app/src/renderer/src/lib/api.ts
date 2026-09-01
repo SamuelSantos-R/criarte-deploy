@@ -125,6 +125,8 @@ export const onCoopCaiu = api.onCoopCaiu;
 
 export const estadoDeps = () => call(api.estadoDeps()) as Promise<EstadoDeps>;
 
+export const destinoPublicacao = (id: string) =>
+  call(api.destinoPublicacao(id)) as Promise<{ url: string | null }>;
 export const startJob = (job: Job) => call(api.startJob(job));
 export const cancelJob = (runId: string) => call(api.cancelJob(runId));
 export const reveal = (id: string) => call(api.reveal(id));

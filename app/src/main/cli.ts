@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { acharNpm, prepararRaiz } from "./deps";
 import { cliPath, requireSitesRoot } from "./paths";
 import { siteDirExistente } from "./sites";
+import { converterFotos } from "./fotos";
 
 /**
  * Para onde o botão Publicar aponta. Sai daqui e não do renderer porque o
@@ -68,15 +69,6 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
     }
     case "check":
       return { script: cli, args: ["check"], cwd: await siteDirExistente(job.siteId) };
-    case "fotos": {
-      const max = Math.min(Math.max(Math.trunc(job.max), 200), 6000);
-      const q = Math.min(Math.max(Math.trunc(job.qualidade), 1), 100);
-      return {
-        script: cli,
-        args: ["fotos", ".", "--max", String(max), "--q", String(q)],
-        cwd: await siteDirExistente(job.siteId),
-      };
-    }
     case "doctor":
       return { script: cli, args: ["doctor"], cwd: app.getPath("home") };
     case "deps": {
@@ -94,7 +86,40 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
   }
 }
 
+/** Jobs que correm aqui dentro em vez de num processo filho. */
+const internos = new Set<string>();
+
+/**
+ * A conversão de fotos deixou de sair para o `cwebp` do Homebrew: encoda com o
+ * Chromium que já vem no app. Continua a falar pelos mesmos canais do CLI, para
+ * a consola e o botão Parar não saberem a diferença.
+ */
+async function correrInterno(sender: WebContents, job: Job, runId: string): Promise<void> {
+  const diz = (linha: string): void => {
+    if (!sender.isDestroyed()) sender.send("cli:output", { runId, stream: "out", text: `${linha}\n` });
+  };
+  const fim = (code: number, erro: string | null): void => {
+    internos.delete(runId);
+    if (!sender.isDestroyed()) sender.send("cli:done", { runId, code, erro });
+  };
+  try {
+    if (job.kind !== "fotos") throw new Error("job interno desconhecido");
+    const max = Math.min(Math.max(Math.trunc(job.max), 200), 6000);
+    const q = Math.min(Math.max(Math.trunc(job.qualidade), 1), 100);
+    await converterFotos(job.siteId, max, q, diz, () => !internos.has(runId));
+    fim(internos.has(runId) ? 0 : 1, null);
+  } catch (e) {
+    fim(1, e instanceof Error ? e.message : "falhou");
+  }
+}
+
 export async function startJob(sender: WebContents, job: Job): Promise<string> {
+  if (job.kind === "fotos") {
+    const runId = randomUUID();
+    internos.add(runId);
+    void correrInterno(sender, job, runId);
+    return runId;
+  }
   const { script, args, cwd } = await plan(job);
   const runId = randomUUID();
 
@@ -133,6 +158,7 @@ export async function startJob(sender: WebContents, job: Job): Promise<string> {
 
 export function cancelJob(runId: unknown): boolean {
   if (typeof runId !== "string") return false;
+  if (internos.delete(runId)) return true;
   const child = running.get(runId);
   if (!child) return false;
   child.kill("SIGTERM");

@@ -6,6 +6,7 @@ type Servidor = { siteId: string; url: string; lan: string | null };
 type Copia = { id: string; siteId: string; envTrocado: boolean };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
+type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };
 type Convite = { dados: unknown; marca: number };
 type Gravacao = { conflito: boolean; marca: number };
 type ConviteMudou = { id: string; marca: number };
@@ -64,6 +65,10 @@ const api = {
     invoke<AssetImportado[]>("assets:import", id, origens),
   pickAssets: (id: string, pasta: boolean) => invoke<AssetImportado[]>("assets:pick", id, pasta),
   trocarPorWebp: (id: string) => invoke<unknown>("assets:webp", id),
+
+  listarFontes: () => invoke<Fonte[]>("fontes:listar"),
+  instalarFonte: () => invoke<Fonte[] | null>("fontes:instalar"),
+
   // O File do drag-and-drop não carrega mais o caminho no renderer isolado.
   caminhoDe: (file: File) => webUtils.getPathForFile(file),
 

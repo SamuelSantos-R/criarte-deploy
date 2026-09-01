@@ -59,6 +59,11 @@ export type RelatorioWebp = {
   parqueadas: number;
 };
 export const trocarPorWebp = (id: string) => call(api.trocarPorWebp(id)) as Promise<RelatorioWebp>;
+
+export type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };
+export const listarFontes = () => call(api.listarFontes()) as Promise<Fonte[]>;
+export const instalarFonte = () => call(api.instalarFonte()) as Promise<Fonte[] | null>;
+
 export type Servidor = { siteId: string; url: string; lan: string | null };
 
 export const previewStart = (id: string) => call(api.previewStart(id)) as Promise<Servidor>;

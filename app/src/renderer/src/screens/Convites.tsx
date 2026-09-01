@@ -545,7 +545,13 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
                     aria-disabled={bloqueio ? true : undefined}
                     className={cn(bloqueio && "pointer-events-none select-none opacity-40")}
                   >
-                    <JsonForm dados={dados} secao={secao} onChange={setDados} onPatch={publicar} />
+                    <JsonForm
+                      dados={dados}
+                      secao={secao}
+                      onChange={setDados}
+                      onPatch={publicar}
+                      convidado={convidado}
+                    />
                   </div>
                 </>
               )}

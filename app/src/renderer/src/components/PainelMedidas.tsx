@@ -1,5 +1,6 @@
-import { type ReactElement } from "react";
-import { Minus, Plus, RotateCcw } from "lucide-react";
+import { useEffect, useState, type ReactElement } from "react";
+import { Minus, Plus, RotateCcw, Upload } from "lucide-react";
+import { instalarFonte, listarFontes, type Fonte } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export type Medida = {
@@ -61,15 +62,6 @@ export const MEDIDAS_PADRAO: Record<string, number | string> = {
   ...Object.fromEntries(MEDIDAS.map((m) => [m.chave, m.padrao])),
   noivosFonte: "milton",
 };
-
-const FONTES = [
-  { valor: "milton", nome: "Milton One", nota: "display encorpada" },
-  { valor: "manstein", nome: "Manstein", nota: "manuscrita" },
-  { valor: "noah", nome: "Noah", nota: "sem serifa" },
-  { valor: "garamond", nome: "Cormorant Garamond", nota: "serifa clássica" },
-  { valor: "infant", nome: "Cormorant Infant", nota: "serifa suave" },
-  { valor: "medium", nome: "Cormorant Medium", nota: "serifa densa" },
-];
 
 function preso(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n));
@@ -174,11 +166,45 @@ export function LinhaMedida({
 export function PainelMedidas({
   medidas,
   onChange,
+  convidado = false,
 }: {
   medidas: Record<string, unknown>;
   onChange: (chave: string, valor: string | number) => void;
+  /** Convidado escolhe do banco do anfitrião, mas não instala nada. */
+  convidado?: boolean;
 }): ReactElement {
   const fonte = typeof medidas.noivosFonte === "string" ? medidas.noivosFonte : "milton";
+  const [fontes, setFontes] = useState<Fonte[]>([]);
+  const [carregando, setCarregando] = useState(false);
+  const [erroFonte, setErroFonte] = useState<string | null>(null);
+
+  // Entrar ou sair de uma sessão troca o banco debaixo dos pés: como convidado a
+  // lista é a do anfitrião, sozinho é a local.
+  useEffect(() => {
+    void listarFontes()
+      .then(setFontes)
+      .catch((e) => setErroFonte(e instanceof Error ? e.message : "não deu pra ler o banco"));
+  }, [convidado]);
+
+  const carregar = async (): Promise<void> => {
+    setCarregando(true);
+    setErroFonte(null);
+    try {
+      const nova = await instalarFonte();
+      if (nova) setFontes(nova);
+    } catch (e) {
+      setErroFonte(e instanceof Error ? e.message : "não deu pra instalar");
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  // A escolha gravada pode ser de uma fonte que ainda não chegou nesta máquina.
+  // Some-la da lista faria o radio ficar sem nenhum marcado e o valor virar
+  // mistério — melhor mostrá-la e dizer que o ficheiro não está aqui.
+  const lista: (Fonte & { ausente?: boolean })[] = fontes.some((f) => f.chave === fonte)
+    ? fontes
+    : [...fontes, { chave: fonte, nome: fonte, ficheiro: "", bytes: 0, ausente: true }];
 
   return (
     <div className="max-w-[520px]">
@@ -210,45 +236,82 @@ export function PainelMedidas({
       <section>
         <div className="mb-3 flex items-baseline gap-3">
           <span className="font-mono text-label uppercase text-text">fonte dos noivos</span>
+          <span className="font-mono text-serial text-muted/60">
+            {String(fontes.length).padStart(2, "0")}
+          </span>
           <span className="h-px flex-1 bg-rule" />
+          {!convidado && (
+            <button
+              type="button"
+              onClick={() => void carregar()}
+              disabled={carregando}
+              className={cn(
+                "no-drag flex shrink-0 items-center gap-1.5 self-center border border-rule px-2.5 py-1 font-mono text-serial uppercase tracking-[0.12em] text-muted transition-colors",
+                "hover:border-rule-strong hover:text-text",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+                "disabled:cursor-not-allowed disabled:opacity-40",
+              )}
+            >
+              <Upload size={11} strokeWidth={1.8} aria-hidden />
+              {carregando ? "a instalar" : "carregar fonte"}
+            </button>
+          )}
         </div>
         {/* Sem amostra visual de propósito: o Studio não carrega as fontes do site,
             e um preview desenhado com a fonte errada mente mais do que ajuda. */}
         <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
           Vale para os dois nomes e o <span className="font-mono">&amp;</span> do meio. A
-          amostra de verdade é o preview ao lado.
+          amostra de verdade é o preview ao lado.{" "}
+          {convidado
+            ? "O banco é o do anfitrião — é ele quem instala fonte nova."
+            : "Fonte nova entra no banco e fica disponível em todos os convites."}
         </p>
-        <div className="border-y border-rule">
-          {FONTES.map((f) => (
-            <label
-              key={f.valor}
-              className={cn(
-                "no-drag flex cursor-pointer items-center gap-3 border-b border-rule py-2.5 pl-4 pr-3 last:border-b-0",
-                "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent",
-                f.valor === fonte ? "bg-accent/10" : "hover:bg-surface-2/40",
-              )}
-            >
-              <input
-                type="radio"
-                name="noivosFonte"
-                checked={f.valor === fonte}
-                onChange={() => onChange("noivosFonte", f.valor)}
-                className="no-drag h-3.5 w-3.5 shrink-0 accent-accent"
-              />
-              <span
+
+        {erroFonte && (
+          <p className="mb-3 border-l-2 border-accent pl-3 font-mono text-[11px] leading-[1.6] text-text">
+            {erroFonte}
+          </p>
+        )}
+
+        {lista.length === 0 ? (
+          <p className="border-y border-rule py-4 pl-4 text-[12px] leading-[1.6] text-muted/70">
+            O banco está vazio. Carregue um <span className="font-mono">.ttf</span>,{" "}
+            <span className="font-mono">.otf</span>, <span className="font-mono">.woff</span> ou{" "}
+            <span className="font-mono">.woff2</span>.
+          </p>
+        ) : (
+          <div className="border-y border-rule">
+            {lista.map((f) => (
+              <label
+                key={f.chave}
                 className={cn(
-                  "font-mono text-[12px]",
-                  f.valor === fonte ? "text-text" : "text-muted",
+                  "no-drag flex cursor-pointer items-center gap-3 border-b border-rule py-2.5 pl-4 pr-3 last:border-b-0",
+                  "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent",
+                  f.chave === fonte ? "bg-accent/10" : "hover:bg-surface-2/40",
                 )}
               >
-                {f.nome}
-              </span>
-              <span className="ml-auto shrink-0 font-mono text-serial uppercase text-muted/60">
-                {f.nota}
-              </span>
-            </label>
-          ))}
-        </div>
+                <input
+                  type="radio"
+                  name="noivosFonte"
+                  checked={f.chave === fonte}
+                  onChange={() => onChange("noivosFonte", f.chave)}
+                  className="no-drag h-3.5 w-3.5 shrink-0 accent-accent"
+                />
+                <span
+                  className={cn(
+                    "min-w-0 truncate font-mono text-[12px]",
+                    f.chave === fonte ? "text-text" : "text-muted",
+                  )}
+                >
+                  {f.nome}
+                </span>
+                <span className="ml-auto shrink-0 font-mono text-serial uppercase tabular-nums text-muted/60">
+                  {f.ausente ? "não está no banco" : `${Math.round(f.bytes / 1024)} kb`}
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

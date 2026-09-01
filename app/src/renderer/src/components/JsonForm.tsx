@@ -198,12 +198,15 @@ export function JsonForm({
   secao,
   onChange,
   onPatch,
+  convidado = false,
 }: {
   dados: Record<string, unknown>;
   secao: string;
   onChange: (proximo: Record<string, unknown>) => void;
   /** Só o galho que mudou. É o que o co-op manda pela rede — o objeto inteiro não. */
   onPatch?: (caminho: Caminho, valor: unknown) => void;
+  /** Convidado só mexe nos formulários: instalar fonte é do anfitrião. */
+  convidado?: boolean;
 }): ReactElement {
   const alterar = (caminho: Caminho, valor: unknown): void => {
     onChange(setIn(dados, caminho, valor) as Record<string, unknown>);
@@ -226,6 +229,7 @@ export function JsonForm({
       <PainelMedidas
         medidas={valor as Record<string, unknown>}
         onChange={(chave, novo) => alterar([secao, chave], novo)}
+        convidado={convidado}
       />
     );
   }

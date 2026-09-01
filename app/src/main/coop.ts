@@ -5,6 +5,7 @@ import { copiavel, empacotar } from "./pacote";
 import { aoMudarPreview, estadoPreview, ipDaRede } from "./preview";
 import { ligarEspelho, pararEspelho, urlDoEspelho } from "./espelho";
 import { readConvite, siteDir, writeConvite } from "./sites";
+import { listarFontes, type Fonte } from "./fontes";
 
 /**
  * Co-op na LAN: um Studio vira anfitrião e serve o convite por SSE; o outro
@@ -55,6 +56,8 @@ let convidado: {
   parar: AbortController;
   /** Porta do `next dev` do anfitrião. Nula quer dizer: lá o preview está desligado. */
   portaAoVivo: number | null;
+  /** Banco de fontes do anfitrião. Só nomes: quem instala fonte é ele. */
+  fontes: Fonte[];
 } | null = null;
 
 /** Cabeçalhos do convidado. O `x-coop-par` só é preenchido quando o `bemvindo` chega. */
@@ -85,6 +88,32 @@ function mesmoCodigo(a: string, b: string): boolean {
 /** Vem da rede: só passa porta alta inteira, que é onde o `next dev` nasce. */
 function portaValida(v: unknown): number | null {
   return typeof v === "number" && Number.isInteger(v) && v >= 1024 && v <= 65535 ? v : null;
+}
+
+/**
+ * A lista vem da rede e vai parar num radio do formulário: fica só o que tem a
+ * cara de uma chave de fonte, e o nome é cortado pra não esticar o painel.
+ */
+function fontesValidas(v: unknown): Fonte[] {
+  if (!Array.isArray(v)) return [];
+  const lista: Fonte[] = [];
+  for (const f of v.slice(0, 200)) {
+    if (!f || typeof f !== "object") continue;
+    const { chave, nome, ficheiro, bytes } = f as Record<string, unknown>;
+    if (typeof chave !== "string" || !/^[a-z0-9-]{1,64}$/.test(chave)) continue;
+    lista.push({
+      chave,
+      nome: typeof nome === "string" ? nome.slice(0, 64) : chave,
+      ficheiro: typeof ficheiro === "string" ? ficheiro.slice(0, 128) : "",
+      bytes: typeof bytes === "number" && Number.isFinite(bytes) ? bytes : 0,
+    });
+  }
+  return lista;
+}
+
+/** Fontes do anfitrião, quando este Studio é convidado. `null` = usar o banco local. */
+export function fontesDaSessao(): Fonte[] | null {
+  return convidado ? convidado.fontes : null;
 }
 
 function caminhoValido(v: unknown): v is (string | number)[] {
@@ -292,8 +321,11 @@ async function atender(req: IncomingMessage, res: ServerResponse): Promise<void>
       "cache-control": "no-cache",
       connection: "keep-alive",
     });
+    // O banco de fontes vai junto: o convidado escolhe pelo nome, mas o ficheiro
+    // fica do lado do anfitrião — é ele quem instala e quem grava o convite.
+    const fontes = await listarFontes().catch(() => []);
     res.write(
-      `event: bemvindo\ndata: ${JSON.stringify({ parId: par.id, siteId: anfitriao.siteId, doc: anfitriao.doc, porta: portaAoVivoDoAnfitriao() })}\n\n`,
+      `event: bemvindo\ndata: ${JSON.stringify({ parId: par.id, siteId: anfitriao.siteId, doc: anfitriao.doc, porta: portaAoVivoDoAnfitriao(), fontes })}\n\n`,
     );
     anfitriao.pares.set(par.id, par);
     avisarEstado();
@@ -445,7 +477,7 @@ export async function entrarSessao(
   // O mesmo objeto vai pro consumidor e pro `enviarPatch`: quando o `bemvindo`
   // chegar com o parId, ele é preenchido no lugar e os dois lados enxergam.
   cabecalhoAtual = { "content-type": "application/json", "x-coop-codigo": codigo, "x-coop-par": "" };
-  convidado = { siteId: "", endereco, nome, parar, portaAoVivo: null };
+  convidado = { siteId: "", endereco, nome, parar, portaAoVivo: null, fontes: [] };
   void consumir(res.body, cabecalhoAtual, endereco);
   return estadoCoop();
 }
@@ -475,6 +507,7 @@ async function consumir(
           if (convidado) {
             convidado.siteId = String(carga.siteId ?? "");
             convidado.portaAoVivo = portaValida(carga.porta);
+            convidado.fontes = fontesValidas(carga.fontes);
           }
           await acertarEspelho();
           emitir("coop:cheio", { doc: carga.doc });

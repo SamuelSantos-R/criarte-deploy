@@ -1,7 +1,8 @@
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { assertSiteId, containedPath, requireSitesRoot } from "./paths";
+import { levarFonteParaSite } from "./fontes";
 
 export type Site = {
   id: string;
@@ -90,6 +91,11 @@ export async function writeConvite(id: string, data: unknown, marca?: number): P
     if (noDisco !== null && noDisco !== marca) return { conflito: true, marca: noDisco };
   }
   await writeFile(file, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  // A fonte escolhida tem de viajar do banco para o site, senão o convite
+  // publicado sai com a fonte de recurso. Falha aqui não desfaz a gravação: o
+  // convite ficou bom, só a fonte é que não foi.
+  const escolhida = (data as { medidas?: Record<string, unknown> }).medidas?.noivosFonte;
+  await levarFonteParaSite(dirname(file), escolhida).catch(() => false);
   const nova = (await stat(file)).mtimeMs;
   gravadas.set(id, nova);
   return { conflito: false, marca: nova };

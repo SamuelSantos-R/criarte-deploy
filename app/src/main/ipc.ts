@@ -6,6 +6,7 @@ import { cancelJob, startJob, type Job } from "./cli";
 import { estadoDeps } from "./deps";
 import { duplicarSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
+import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, iniciarServidor, pararServidor, rolarPreview } from "./preview";
 import { trocarPorWebp } from "./webp";
@@ -16,6 +17,7 @@ import {
   enviarPatch,
   estadoCoop,
   fecharSessao,
+  fontesDaSessao,
   pedirTranca,
   type Patch,
 } from "./coop";
@@ -148,6 +150,20 @@ export function registerIpc(): void {
       : await dialog.showOpenDialog(opcoes);
     if (escolha.canceled || escolha.filePaths.length === 0) return [];
     return importAssets(siteId, escolha.filePaths);
+  });
+
+  // Como convidado o banco que vale é o do anfitrião: é ele quem grava o convite
+  // e quem tem o ficheiro. O banco local aqui não diria nada sobre aquele site.
+  handle("fontes:listar", () => fontesDaSessao() ?? listarFontes());
+
+  handle("fontes:instalar", async (event) => {
+    if (fontesDaSessao()) throw new Error("quem instala fontes é o anfitrião");
+    const escolha = await abrir(event, {
+      title: "Escolha o ficheiro da fonte",
+      properties: ["openFile"],
+      filters: [{ name: "Fonte", extensions: ["ttf", "otf", "woff2", "woff"] }],
+    });
+    return escolha ? instalarFonte(escolha) : null;
   });
 
   handle("preview:start", (_e, id: unknown) => iniciarServidor(asString(id, "id")));

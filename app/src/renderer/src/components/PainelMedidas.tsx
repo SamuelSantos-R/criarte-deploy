@@ -143,6 +143,16 @@ const ESPACAMENTOS: Medida[] = [
     padrao: 0,
     unidade: "em",
   },
+  {
+    chave: "noivosAltura",
+    rotulo: "altura da linha",
+    dica: "A folga entre a noiva, o & e o noivo. Multiplica o tamanho do nome, então abre igual no telemóvel e no computador.",
+    min: 0.7,
+    max: 1.6,
+    passo: 0.05,
+    padrao: 0.9,
+    unidade: "×",
+  },
 ];
 
 /** O que o Studio grava quando o convite.json ainda não tem a seção. */
@@ -438,16 +448,16 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">espaçamento das letras</span>
+          <span className="font-mono text-label uppercase text-text">nome dos noivos</span>
           <span className="font-mono text-serial text-muted/60">
             {String(ESPACAMENTOS.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>
         <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
-          Fonte de desenho costuma colar as letras umas nas outras. Aqui abre-se o
-          nome sem mexer no tamanho — e cada linha tem o seu número, porque não
-          apertam todas igual.
+          Fonte de desenho costuma colar as letras umas nas outras e as linhas umas
+          por cima das outras. Aqui abre-se o nome sem mexer no tamanho — de lado
+          por linha, porque não apertam todas igual, e de cima a baixo de uma vez.
         </p>
         <div className="border-t border-rule">
           {ESPACAMENTOS.map((medida) => (

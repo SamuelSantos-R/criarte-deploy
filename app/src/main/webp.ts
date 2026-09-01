@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, dirname, extname, join, relative } from "node:path";
-import { siteDir } from "./sites";
+import { readConvite, siteDir } from "./sites";
 
 // Onde os originais vão parar. O ponto no nome faz o `crd fotos` pular a pasta
 // na próxima varredura, e por estar fora de `public/` ela não entra no build.
@@ -58,8 +58,25 @@ function trocarRefs(texto: string, de: string, para: string): { texto: string; n
  * A ordem importa: reescrever antes de mover. Se a mudança de pasta falhar no
  * meio, as referências já apontam pro `.webp`, que existe — o site não quebra.
  */
+/**
+ * A capa da música fica de fora da troca. O Now Playing do iPhone recebe a arte
+ * por outro caminho que o do <img> da página e não a mostra em webp — a capa
+ * trocada desaparecia da tela de bloqueio sem erro nenhum, e o resto do convite
+ * continuava certo, o que torna isto impossível de adivinhar depois.
+ */
+async function capaDaMusica(siteId: string): Promise<string | null> {
+  try {
+    const { dados } = await readConvite(siteId);
+    const capa = (dados as { musica?: { capa?: unknown } })?.musica?.capa;
+    return typeof capa === "string" && capa.trim() !== "" ? basename(capa) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function trocarPorWebp(siteId: string): Promise<Relatorio> {
   const raiz = await siteDir(siteId);
+  const capa = await capaDaMusica(siteId);
   const publico = join(raiz, "public");
   if (!existsSync(publico)) return { trocas: [], arquivos: [], semPar: [], parqueadas: 0 };
 
@@ -68,6 +85,7 @@ export async function trocarPorWebp(siteId: string): Promise<Relatorio> {
 
   for (const arquivo of await varrer(raiz, publico)) {
     if (!CONVERSIVEIS.has(extname(arquivo).toLowerCase())) continue;
+    if (capa && basename(arquivo) === capa) continue;
     const webp = arquivo.replace(/\.(png|jpe?g)$/i, ".webp");
     if (!existsSync(webp)) {
       semPar.push(basename(arquivo));

@@ -1,5 +1,5 @@
 import { type ReactElement } from "react";
-import { RotateCcw } from "lucide-react";
+import { AlignLeft, AlignRight, RotateCcw } from "lucide-react";
 import { CampoArquivo } from "@/components/CampoArquivo";
 import { LinhaMedida, type Medida } from "@/components/PainelMedidas";
 import { SeletorCor, hexValido } from "@/components/SeletorCor";
@@ -52,28 +52,53 @@ export const ORNAMENTOS_PADRAO: Record<string, string | number | boolean> = {
 };
 
 /**
- * Deslocamento só desta arte. Vazio herda o geral em vez de gravar o mesmo
+ * Deslocamento e lado só desta arte. Vazio herda o geral em vez de gravar o mesmo
  * número em dez sítios — mexer no geral continua a mover as que ninguém tocou.
  */
 function LinhaAncora({
   ancora,
   valor,
+  lado,
   geral,
   onChange,
+  onLado,
 }: {
-  ancora: { id: string; rotulo: string };
+  ancora: { id: string; rotulo: string; lado: "left" | "right" };
   valor: unknown;
+  lado: unknown;
   geral: number;
   onChange: (novo: number | undefined) => void;
+  onLado: (novo: "left" | "right") => void;
 }): ReactElement {
   const proprio = typeof valor === "number" && Number.isFinite(valor);
   const atual = proprio ? (valor as number) : geral;
+  const ladoAtual = lado === "left" || lado === "right" ? lado : ancora.lado;
 
   return (
     <div className="flex items-center gap-3 border-b border-rule py-2 pl-4 pr-2 last:border-b-0 focus-within:bg-surface-2/40">
       <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">
         {ancora.rotulo}
       </span>
+      <div className="flex shrink-0 border border-rule" role="group" aria-label={`Lado da arte de ${ancora.rotulo}`}>
+        {(["left", "right"] as const).map((l) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => onLado(l)}
+            aria-pressed={ladoAtual === l}
+            title={l === "left" ? "Arte no canto esquerdo" : "Arte no canto direito"}
+            className={cn(
+              "no-drag flex h-7 w-7 items-center justify-center transition-colors",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+              ladoAtual === l
+                ? "bg-accent/15 text-text"
+                : "text-muted/50 hover:text-text",
+            )}
+          >
+            {l === "left" ? <AlignLeft size={12} /> : <AlignRight size={12} />}
+          </button>
+        ))}
+      </div>
       {!proprio && (
         <span className="shrink-0 font-mono text-serial uppercase tracking-[0.12em] text-muted/50">
           herda
@@ -191,6 +216,7 @@ export function PainelOrnamentos({
   onChange: (caminho: (string | number)[], valor: unknown) => void;
 }): ReactElement {
   const deslocamentos = (ornamentos.deslocamentos ?? {}) as Record<string, unknown>;
+  const lados = (ornamentos.lados ?? {}) as Record<string, unknown>;
   const geral =
     typeof ornamentos.deslocamento === "number" && Number.isFinite(ornamentos.deslocamento)
       ? ornamentos.deslocamento
@@ -264,6 +290,7 @@ export function PainelOrnamentos({
         <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
           Sobe (negativo) ou desce (positivo) só a arte daquela secção. Enquanto
           diz <span className="font-mono">herda</span>, ela segue o ajuste geral acima.
+          O par de setas troca o canto em que a arte se encosta.
         </p>
 
         <label
@@ -293,8 +320,10 @@ export function PainelOrnamentos({
               key={ancora.id}
               ancora={ancora}
               valor={deslocamentos[ancora.id]}
+              lado={lados[ancora.id]}
               geral={geral}
               onChange={(novo) => onChange(["deslocamentos", ancora.id], novo)}
+              onLado={(novo) => onChange(["lados", ancora.id], novo)}
             />
           ))}
         </div>

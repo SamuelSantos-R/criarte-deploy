@@ -128,11 +128,29 @@ export const BLOCOS: {
   { id: "mensagens", rotulo: "mural", topo: 70, base: 90, ornamento: true },
 ];
 
+/**
+ * O lado com que cada arte foi desenhada, alternando pela página abaixo. É o que
+ * o componente passa como `side`, então enquanto ninguém escolher no Studio a
+ * página sai igual ao que sempre foi.
+ */
+const LADO_DESENHO: Record<string, "left" | "right"> = {
+  galeria: "right",
+  versiculo: "left",
+  historia: "right",
+  evento: "left",
+  "nosso-dia": "right",
+  presentes: "left",
+  manual: "right",
+  dresscode: "left",
+  mensagens: "right",
+  footer: "left",
+};
+
 /** O rodapé não tem folga configurável, mas tem slot de arte como as outras. */
-export const ANCORAS_ORNAMENTO: { id: string; rotulo: string }[] = [
+export const ANCORAS_ORNAMENTO: { id: string; rotulo: string; lado: "left" | "right" }[] = [
   ...BLOCOS.filter((b) => b.ornamento).map((b) => ({ id: b.id, rotulo: b.rotulo })),
   { id: "footer", rotulo: "rodapé" },
-];
+].map((a) => ({ ...a, lado: LADO_DESENHO[a.id] ?? "right" }));
 
 /**
  * Só o que é um bloco inteiro da página. `noivos`, `hero`, `meta` e `tema` ficam

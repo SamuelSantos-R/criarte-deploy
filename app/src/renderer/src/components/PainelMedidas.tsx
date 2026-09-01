@@ -107,10 +107,49 @@ const OPACIDADES: Medida[] = [
   },
 ];
 
+/**
+ * Espaçamento em `em`, não em px: o nome dos noivos encolhe no telemóvel e um px
+ * cravado abriria lá o dobro do que abre aqui. Fonte de desenho aperta as letras
+ * à sua maneira, por isso cada linha tem o seu número.
+ */
+const ESPACAMENTOS: Medida[] = [
+  {
+    chave: "noivaEspacamento",
+    rotulo: "nome da noiva",
+    dica: "Afasta as letras umas das outras. Zero é a fonte como veio.",
+    min: -0.05,
+    max: 0.4,
+    passo: 0.01,
+    padrao: 0,
+    unidade: "em",
+  },
+  {
+    chave: "eEspacamento",
+    rotulo: "o & do meio",
+    dica: "Vale só para o & entre os dois nomes.",
+    min: -0.05,
+    max: 0.4,
+    passo: 0.01,
+    padrao: 0,
+    unidade: "em",
+  },
+  {
+    chave: "noivoEspacamento",
+    rotulo: "nome do noivo",
+    dica: "Afasta as letras umas das outras. Zero é a fonte como veio.",
+    min: -0.05,
+    max: 0.4,
+    passo: 0.01,
+    padrao: 0,
+    unidade: "em",
+  },
+];
+
 /** O que o Studio grava quando o convite.json ainda não tem a seção. */
 export const MEDIDAS_PADRAO: Record<string, number | string> = {
   ...Object.fromEntries(MEDIDAS.map((m) => [m.chave, m.padrao])),
   ...Object.fromEntries(OPACIDADES.map((m) => [m.chave, m.padrao])),
+  ...Object.fromEntries(ESPACAMENTOS.map((m) => [m.chave, m.padrao])),
   noivosFonte: "milton",
 };
 
@@ -387,6 +426,31 @@ export function PainelMedidas({
         </div>
         <div className="border-t border-rule">
           {MEDIDAS.map((medida) => (
+            <LinhaMedida
+              key={medida.chave}
+              medida={medida}
+              valor={medidas[medida.chave]}
+              onChange={(novo) => onChange([medida.chave], novo)}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="font-mono text-label uppercase text-text">espaçamento das letras</span>
+          <span className="font-mono text-serial text-muted/60">
+            {String(ESPACAMENTOS.length).padStart(2, "0")}
+          </span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+          Fonte de desenho costuma colar as letras umas nas outras. Aqui abre-se o
+          nome sem mexer no tamanho — e cada linha tem o seu número, porque não
+          apertam todas igual.
+        </p>
+        <div className="border-t border-rule">
+          {ESPACAMENTOS.map((medida) => (
             <LinhaMedida
               key={medida.chave}
               medida={medida}

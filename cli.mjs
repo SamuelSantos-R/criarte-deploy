@@ -1887,9 +1887,19 @@ const emPastaIntocavel = (publicRel) =>
  *
  * Retorna { used: Set<basename>, orphans: Array<{publicRel, sz, fullPath}> }
  */
+/** Como o nome aparece escrito no source, para o aviso mostrar os dois lados. */
+function acharCitacao(blob, basename) {
+  const re = new RegExp(escapeRegExpNome(basename), "i");
+  return blob.match(re)?.[0] ?? null;
+}
+
+function escapeRegExpNome(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function detectOrphanAssets(siteCopyPath) {
   const publicDir = join(siteCopyPath, "public");
-  if (!existsSync(publicDir)) return { used: new Set(), orphans: [] };
+  if (!existsSync(publicDir)) return { used: new Set(), orphans: [], trocados: [] };
 
   // 1) Coleta TODOS os arquivos de public/ com seu nome-base
   const publicFiles = []; // { basename, publicRel, fullPath, sz }
@@ -1908,7 +1918,7 @@ function detectOrphanAssets(siteCopyPath) {
   }
   walkPub(publicDir);
 
-  if (publicFiles.length === 0) return { used: new Set(), orphans: [] };
+  if (publicFiles.length === 0) return { used: new Set(), orphans: [], trocados: [] };
 
   // 2) Concatena todo o source em uma string gigante e procura cada basename
   const SOURCE_EXTS = /\.(tsx?|jsx?|css|scss|sass|html|mjs|cjs|json|md|svg)$/i;
@@ -1926,26 +1936,56 @@ function detectOrphanAssets(siteCopyPath) {
   walkSrc(siteCopyPath);
 
   // 3) Pra cada arquivo de public/, checa se o nome aparece no source
+  //
+  // A comparação ignora maiúsculas de propósito. O disco do Mac também as
+  // ignora, então `Corte-do-Bolo.svg` referenciado como `corte-do-bolo.svg`
+  // funciona na máquina e o ficheiro parecia órfão aqui — era apagado do
+  // staging e o ícone dava 404 no ar, só nesse ícone, sem erro nenhum.
+  //
+  // Mas passar não chega: o VPS é Linux e distingue maiúsculas, então um nome
+  // que só bate por acaso vai dar 404 na mesma. Esses voltam em `trocados`,
+  // para o deploy avisar em vez de deixar acontecer.
+  const blobBaixo = sourceBlob.toLowerCase();
   const used = new Set();
   const orphans = [];
+  const trocados = [];
   for (const f of publicFiles) {
     if (ALWAYS_USED.has(f.basename) || emPastaIntocavel(f.publicRel)) {
       used.add(f.basename);
       continue;
     }
-    // Match por basename — mais permissivo (evita falsos positivos)
-    // Aceita: foo.png, /foo.png, "foo.png", "/path/foo.png", etc.
     if (sourceBlob.includes(f.basename)) {
       used.add(f.basename);
+    } else if (blobBaixo.includes(f.basename.toLowerCase())) {
+      used.add(f.basename);
+      const citado = acharCitacao(sourceBlob, f.basename);
+      trocados.push({ disco: f.basename, source: citado ?? f.basename.toLowerCase() });
     } else {
       orphans.push(f);
     }
   }
-  return { used, orphans };
+  return { used, orphans, trocados };
+}
+
+/**
+ * Nome que só bate por acaso. O disco do Mac ignora maiúsculas, o VPS não: o
+ * ficheiro sobe, e a página pede-o com outra grafia e recebe 404 — num ícone
+ * só, sem nada a queixar-se. É barato avisar e caro descobrir depois.
+ */
+function avisarTrocados(trocados) {
+  if (!trocados || trocados.length === 0) return;
+  console.log();
+  warn(`${trocados.length} arquivo(s) com maiúsculas diferentes do que o source pede:`);
+  for (const t of trocados) {
+    console.log(`   · disco: ${c.bold}${t.disco}${c.reset}  ${c.dim}vs${c.reset}  source: ${c.bold}${t.source}${c.reset}`);
+  }
+  info("No teu Mac funciona; no VPS (Linux) dá 404. Acerta o nome nos dois lados antes de publicar.");
+  console.log();
 }
 
 async function maybeCleanOrphans(siteCopyPath) {
-  const { orphans } = detectOrphanAssets(siteCopyPath);
+  const { orphans, trocados } = detectOrphanAssets(siteCopyPath);
+  avisarTrocados(trocados);
   if (orphans.length === 0) return { removed: 0, savedBytes: 0 };
 
   const totalBytes = orphans.reduce((a, o) => a + o.sz, 0);

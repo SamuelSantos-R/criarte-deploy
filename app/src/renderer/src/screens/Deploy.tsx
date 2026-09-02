@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Rocket, Square, Stethoscope } from "lucide-react";
 import type { Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
@@ -30,8 +30,25 @@ export function Deploy({ sites }: { sites: Site[] }): ReactElement {
   // validade que o padrão escolheu sozinho.
   const pronto = id !== null && expires !== null;
 
+  // O ensaio termina com o mesmo "concluído" de uma publicação a sério, e o
+  // "--dry-run" fica dez ecrãs acima no log. Dá para sair daqui convencido de
+  // que se publicou — e o site no ar continua o de ontem.
+  const foiEnsaio = useRef(false);
+  useEffect(() => {
+    if (job.estado !== "ok" || !foiEnsaio.current) return;
+    foiEnsaio.current = false;
+    job.anexar([
+      "",
+      "──────────────────────────────────────────────",
+      "  ISTO FOI UM ENSAIO — nada foi publicado.",
+      "  Desmarque «Ensaio» e carregue em Publicar.",
+      "──────────────────────────────────────────────",
+    ]);
+  }, [job.estado, job]);
+
   const disparar = (dryRun: boolean): void => {
     if (!id || expires === null) return;
+    foiEnsaio.current = dryRun;
     void job.rodar({
       kind: "deploy",
       siteId: id,

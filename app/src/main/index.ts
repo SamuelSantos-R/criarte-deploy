@@ -7,6 +7,16 @@ import { origensDoPreview, pararServidor } from "./preview";
 import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 
+/**
+ * A raiz do bundle. Era `__dirname`, que não existe quando o main sai em ESM —
+ * e quando saiu, o `loadFile` rebentou antes de a janela chegar a carregar: o
+ * processo ficava vivo, sem janela nenhuma, sem erro visível.
+ *
+ * `app.getAppPath()` dá o mesmo sítio nos dois formatos: a pasta do projeto em
+ * desenvolvimento, o `app.asar` depois de empacotado.
+ */
+const RAIZ = app.getAppPath();
+
 const DEV_URL = process.env["ELECTRON_RENDERER_URL"];
 
 function csp(): string {
@@ -56,7 +66,7 @@ function createWindow(): void {
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 18, y: 22 },
     webPreferences: {
-      preload: join(__dirname, "../preload/index.cjs"),
+      preload: join(RAIZ, "out", "preload", "index.cjs"),
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -85,7 +95,7 @@ function createWindow(): void {
   win.webContents.on("will-attach-webview", (event) => event.preventDefault());
 
   if (DEV_URL) void win.loadURL(DEV_URL);
-  else void win.loadFile(join(__dirname, "../renderer/index.html"));
+  else void win.loadFile(join(RAIZ, "out", "renderer", "index.html"));
 }
 
 // Vale pra qualquer janela futura, não só a que o createWindow monta.

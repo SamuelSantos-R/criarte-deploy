@@ -88,6 +88,11 @@ export const PAPEIS: Grupo[] = [
       { chave: "nosso-dia", rotulo: "Nosso Dia", onde: "Hora e acontecimento." },
       { chave: "presentes", rotulo: "Presentes", onde: "Frase sobre os presentes e o IBAN." },
       {
+        chave: "iban-fundo",
+        rotulo: "Presentes — caixa do IBAN",
+        onde: "Só o fundo da caixa onde o IBAN aparece. Vazio deixa o creme de sempre.",
+      },
+      {
         chave: "manual",
         rotulo: "Manual",
         onde: "As orientações dos cartões e o agradecimento no fim.",
@@ -201,6 +206,8 @@ export const TEMA_PADRAO: Record<string, string> = {
   destaque: "#7A7F4B",
   // O creme da capa: é a cor que o & sempre teve cravada no componente.
   e: "#FDFAF4",
+  // O mesmo creme, que era o `bg-cream` cravado na caixa do IBAN.
+  "iban-fundo": "#FDFAF4",
   "fundo-1": "#FDFAF4",
   "fundo-2": "#F8F0E0",
   chapeu: "#B08A4A",

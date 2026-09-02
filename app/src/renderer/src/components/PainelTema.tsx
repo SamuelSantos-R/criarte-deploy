@@ -93,6 +93,11 @@ export const PAPEIS: Grupo[] = [
         onde: "Só o fundo da caixa onde o IBAN aparece. Vazio deixa o creme de sempre.",
       },
       {
+        chave: "recado-fundo",
+        rotulo: "Correio do Amor — cartão",
+        onde: "Só o fundo do cartão onde cada recado aparece. Vazio deixa o branco de sempre.",
+      },
+      {
         chave: "manual",
         rotulo: "Manual",
         onde: "As orientações dos cartões e o agradecimento no fim.",
@@ -208,6 +213,8 @@ export const TEMA_PADRAO: Record<string, string> = {
   e: "#FDFAF4",
   // O mesmo creme, que era o `bg-cream` cravado na caixa do IBAN.
   "iban-fundo": "#FDFAF4",
+  // O branco que estava cravado no cartão de cada recado.
+  "recado-fundo": "#FFFFFF",
   "fundo-1": "#FDFAF4",
   "fundo-2": "#F8F0E0",
   chapeu: "#B08A4A",

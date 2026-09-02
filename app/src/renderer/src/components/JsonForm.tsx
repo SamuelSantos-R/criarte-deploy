@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
 import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
@@ -45,14 +45,48 @@ function molde(exemplo: unknown): unknown {
 
 type Props = { valor: unknown; caminho: Caminho; onChange: (caminho: Caminho, valor: unknown) => void };
 
+/**
+ * Campo curto é `input`, e num `input` não existe Enter: não havia como pôr uma
+ * quebra no título de um evento sem ir ao ficheiro à mão. Agora o Enter insere
+ * a quebra no sítio do cursor — o valor passa a ter `\n`, o campo vira caixa de
+ * texto e o cursor continua onde estava, em vez de saltar para o fim.
+ */
 function CampoTexto({ valor, caminho, onChange, label }: Props & { valor: string; label: string }): ReactElement {
   const longo = valor.length > 72 || valor.includes("\n");
+  const [cursor, setCursor] = useState<number | null>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (cursor === null || !area.current) return;
+    area.current.focus();
+    area.current.setSelectionRange(cursor, cursor);
+    setCursor(null);
+  }, [cursor]);
+
   return (
     <Field label={label}>
       {longo ? (
-        <Textarea rows={Math.min(8, valor.split("\n").length + 1)} value={valor} onChange={(e) => onChange(caminho, e.target.value)} />
+        <Textarea
+          ref={area}
+          rows={Math.min(8, valor.split("\n").length + 1)}
+          value={valor}
+          onChange={(e) => onChange(caminho, e.target.value)}
+        />
       ) : (
-        <Input value={valor} onChange={(e) => onChange(caminho, e.target.value)} />
+        <Input
+          value={valor}
+          title="Enter quebra a linha"
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || e.shiftKey) return;
+            e.preventDefault();
+            const el = e.currentTarget;
+            const ini = el.selectionStart ?? valor.length;
+            const fim = el.selectionEnd ?? ini;
+            onChange(caminho, `${valor.slice(0, ini)}\n${valor.slice(fim)}`);
+            setCursor(ini + 1);
+          }}
+          onChange={(e) => onChange(caminho, e.target.value)}
+        />
       )}
     </Field>
   );

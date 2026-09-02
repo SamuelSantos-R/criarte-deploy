@@ -49,6 +49,10 @@ export const onConviteMudou = api.onConviteMudou;
 export type Copia = { id: string; siteId: string; faltam: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
+export type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
+export const tokenEstado = (id: string) => call(api.tokenEstado(id)) as Promise<EstadoToken>;
+export const tokenInjetar = (id: string) => call(api.tokenInjetar(id)) as Promise<EstadoToken>;
+
 export const renomearSite = (id: string, slug: string) =>
   call(api.renomearSite(id, slug)) as Promise<{ id: string }>;
 export const salvarSessaoComoNovo = (categoria: string, slug: string, doc: unknown) =>

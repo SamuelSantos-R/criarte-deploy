@@ -7,6 +7,7 @@ type Copia = { id: string; siteId: string; faltam: string[] };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
 type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };
+type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
 type Convite = { dados: unknown; marca: number };
 type Gravacao = { conflito: boolean; marca: number };
 type ConviteMudou = { id: string; marca: number };
@@ -58,6 +59,8 @@ const api = {
   vigiarConvite: (id: string | null) => invoke<void>("convite:watch", id),
   duplicarSite: (id: string, categoria: string, slug: string) =>
     invoke<Copia>("sites:duplicate", id, categoria, slug),
+  tokenEstado: (id: string) => invoke<EstadoToken>("token:estado", id),
+  tokenInjetar: (id: string) => invoke<EstadoToken>("token:injetar", id),
   renomearSite: (id: string, slug: string) => invoke<{ id: string }>("sites:rename", id, slug),
   salvarSessaoComoNovo: (categoria: string, slug: string, doc: unknown) =>
     invoke<Copia>("sites:salvarSessao", categoria, slug, doc),

@@ -23,6 +23,9 @@ extraResources:
     to: cli/src
   - from: ../templates
     to: cli/templates
+  # Peças da tokenização, copiadas para o convite quando o Heatz manda injetar.
+  - from: resources/token
+    to: token
   - from: ../node_modules
     to: cli/node_modules
     filter:

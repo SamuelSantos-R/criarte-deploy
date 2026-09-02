@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useSiteValido } from "@/lib/useSiteValido";
-import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Undo2, Users } from "lucide-react";
+import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
   previewRepintar,
@@ -31,6 +31,7 @@ import { useCoop } from "@/lib/useCoop";
 import { ProvedorSite } from "@/components/CampoArquivo";
 import { Divisor, useLarguraPainel } from "@/components/Divisor";
 import { RenomearSite } from "@/components/RenomearSite";
+import { Tokenizar } from "@/components/Tokenizar";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
@@ -51,6 +52,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
   const [salvando, setSalvando] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
+  const [tokenizando, setTokenizando] = useState(false);
   const rodando = usarServidor();
   // O dev server é um só no app inteiro: se a tela de Preview levou pra outro
   // site, este painel volta a oferecer "Ligar" em vez de mostrar convite alheio.
@@ -476,6 +478,11 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
             </Button>
           )}
           {id && !convidado && (
+            <Button variant="ghost" onClick={() => setTokenizando(true)}>
+              <Ticket size={13} /> Tokenizar
+            </Button>
+          )}
+          {id && !convidado && (
             <Button variant="ghost" onClick={() => void reveal(id)}>
               <FolderOpen size={13} /> Abrir pasta
             </Button>
@@ -592,6 +599,14 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           onParar={() => void desligarAoVivo()}
         />
       </div>
+
+      {tokenizando && id && (
+        <Tokenizar
+          id={id}
+          onFechar={() => setTokenizando(false)}
+          onPronto={() => recarregar()}
+        />
+      )}
 
       {renomeando && id && (
         <RenomearSite

@@ -9,6 +9,7 @@ import { FILTROS, importAssets } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, iniciarServidor, pararServidor, repintarPreview, rolarPreview } from "./preview";
+import { estadoToken, tokenizar } from "./tokenizar";
 import { trocarPorWebp } from "./webp";
 import { vigiarConvite } from "./vigia";
 import {
@@ -148,6 +149,9 @@ export function registerIpc(): void {
   handle("sites:duplicate", (_e, id: unknown, categoria: unknown, slug: unknown) =>
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
   );
+
+  handle("token:estado", (_e, id: unknown) => estadoToken(asString(id, "id")));
+  handle("token:injetar", (_e, id: unknown) => tokenizar(asString(id, "id")));
 
   handle("sites:rename", (_e, id: unknown, slug: unknown) =>
     renomearSite(asString(id, "id"), asString(slug, "nome")),

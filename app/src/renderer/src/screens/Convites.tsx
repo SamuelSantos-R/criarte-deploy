@@ -44,7 +44,13 @@ import { Topo } from "@/components/Topo";
 const REPOUSO = 400;
 
 
-export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () => void }): ReactElement {
+export function Convites({
+  sites,
+  recarregar,
+}: {
+  sites: Site[];
+  recarregar: () => Promise<void>;
+}): ReactElement {
   const comConvite = useMemo(() => sites.filter((s) => s.temConvite), [sites]);
   const [id, setId] = useState<string | null>(null);
   const [original, setOriginal] = useState<string>("");
@@ -386,9 +392,13 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
         if (dados) await writeConvite(copia.id, dados);
         await desfazerNoDisco();
         await derrubarServidor();
-        setId(copia.id);
       }
-      recarregar();
+      // A lista tem de já conhecer o convite novo antes de o escolher: enquanto
+      // ele não estiver lá, `useSiteValido` devolve o id ao primeiro da lista e
+      // a troca de projeto bate de volta sem dizer nada — quem continua a
+      // escrever escreve no convite antigo.
+      await recarregar();
+      if (!convidado) setId(copia.id);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     }
@@ -615,10 +625,10 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           onFechar={() => setRenomeando(false)}
           onPronto={(novo) => {
             setRenomeando(false);
-            // A pasta mudou debaixo do painel: aponta pro id novo e manda a
-            // lista ser relida, senão o selector fica a mostrar um site morto.
-            setId(novo);
-            recarregar();
+            // A pasta mudou debaixo do painel: relê a lista primeiro e só então
+            // aponta pro id novo, senão o selector fica a mostrar um site morto
+            // ou salta pro primeiro da lista por o id novo ainda não estar lá.
+            void recarregar().then(() => setId(novo));
           }}
         />
       )}

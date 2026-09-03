@@ -87,14 +87,16 @@ export default function App(): ReactElement {
     setVisitadas((v) => (v.includes(destino) ? v : [...v, destino]));
   };
 
-  const recarregar = useCallback(() => {
-    listSites()
-      .then((s) => {
-        setSites(s);
-        setErro(null);
-      })
-      .catch((e: Error) => setErro(e.message));
-  }, []);
+  const recarregar = useCallback(
+    () =>
+      listSites()
+        .then((s) => {
+          setSites(s);
+          setErro(null);
+        })
+        .catch((e: Error) => setErro(e.message)),
+    [],
+  );
 
   useEffect(() => {
     getSettings()

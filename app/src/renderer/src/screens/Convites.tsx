@@ -47,12 +47,17 @@ const REPOUSO = 400;
 export function Convites({
   sites,
   recarregar,
+  id,
+  setId,
+  ativa,
 }: {
   sites: Site[];
   recarregar: () => Promise<void>;
+  id: string | null;
+  setId: (novo: string | null) => void;
+  ativa: boolean;
 }): ReactElement {
   const comConvite = useMemo(() => sites.filter((s) => s.temConvite), [sites]);
-  const [id, setId] = useState<string | null>(null);
   const [original, setOriginal] = useState<string>("");
   const [secao, setSecao] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -111,7 +116,10 @@ export function Convites({
   const emSessao = coop.ligado;
   const destino = useMemo(() => ({ siteId: id, convidado }), [id, convidado]);
 
-  useSiteValido(comConvite, id, setId);
+  // Agora a escolha é do app inteiro, então este ecrã só a pode estreitar aos
+  // que têm convite enquanto for ele o que está à frente. Escondido, limita-se a
+  // exigir que o site exista — senão arrastava as outras abas atrás de si.
+  useSiteValido(ativa ? comConvite : sites, id, setId);
 
   // Entrar numa secção pede a tranca; sair devolve. Sem isto duas pessoas
   // digitavam no mesmo campo e a última tecla ganhava.

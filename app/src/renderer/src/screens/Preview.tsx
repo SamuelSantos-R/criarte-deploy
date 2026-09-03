@@ -11,8 +11,15 @@ import { SeletorAparelho } from "@/components/SeletorAparelho";
 import { SeletorSite } from "@/components/SeletorSite";
 import { Topo } from "@/components/Topo";
 
-export function Preview({ sites }: { sites: Site[] }): ReactElement {
-  const [id, setId] = useState<string | null>(null);
+export function Preview({
+  sites,
+  id,
+  setId,
+}: {
+  sites: Site[];
+  id: string | null;
+  setId: (novo: string | null) => void;
+}): ReactElement {
   // Abre no desktop: o convite nasce largo e o telefone é a conferência
   // depois. Abrir num iPhone deixava o site como uma tira creme no meio do nada.
   const [aparelho, setAparelho] = useState<Aparelho>(APARELHOS[APARELHOS.length - 1]);

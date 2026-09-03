@@ -30,8 +30,15 @@ function relatar(r: RelatorioWebp): string[] {
   ];
 }
 
-export function Fotos({ sites }: { sites: Site[] }): ReactElement {
-  const [id, setId] = useState<string | null>(null);
+export function Fotos({
+  sites,
+  id,
+  setId,
+}: {
+  sites: Site[];
+  id: string | null;
+  setId: (novo: string | null) => void;
+}): ReactElement {
   const [max, setMax] = useState(2200);
   const [qualidade, setQualidade] = useState(82);
   const job = useJob();

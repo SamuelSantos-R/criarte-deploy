@@ -16,8 +16,15 @@ import { Console } from "@/components/Console";
 import { SeletorSite } from "@/components/SeletorSite";
 import { Topo } from "@/components/Topo";
 
-export function Deploy({ sites }: { sites: Site[] }): ReactElement {
-  const [id, setId] = useState<string | null>(null);
+export function Deploy({
+  sites,
+  id,
+  setId,
+}: {
+  sites: Site[];
+  id: string | null;
+  setId: (novo: string | null) => void;
+}): ReactElement {
   const [ensaio, setEnsaio] = useState(true);
   const [opcoes, setOpcoes] = useState<Opcoes>(OPCOES_PADRAO);
   const [confirmando, setConfirmando] = useState(false);

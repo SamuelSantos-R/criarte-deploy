@@ -79,6 +79,10 @@ export default function App(): ReactElement {
   const [sites, setSites] = useState<Site[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [tela, setTela] = useState<Tela>("convites");
+  // Um site escolhido para o app inteiro. Cada ecrã tinha o seu, e daí saía o
+  // pior erro possível sem nada em cena a denunciá-lo: editar um convite a olhar
+  // para o preview de outro, a recarregar uma página que nunca ia mudar.
+  const [site, setSite] = useState<string | null>(null);
   // Monta na primeira visita e nunca mais desmonta. Ver <Aba>.
   const [visitadas, setVisitadas] = useState<Tela[]>(["convites"]);
 
@@ -153,22 +157,28 @@ export default function App(): ReactElement {
         )}
         {pronto && !semRaiz && visitadas.includes("convites") && (
           <Aba ativa={tela === "convites"}>
-            <Convites sites={sites} recarregar={recarregar} />
+            <Convites
+              sites={sites}
+              recarregar={recarregar}
+              id={site}
+              setId={setSite}
+              ativa={tela === "convites"}
+            />
           </Aba>
         )}
         {pronto && !semRaiz && visitadas.includes("preview") && (
           <Aba ativa={tela === "preview"}>
-            <Preview sites={sites} />
+            <Preview sites={sites} id={site} setId={setSite} />
           </Aba>
         )}
         {pronto && !semRaiz && visitadas.includes("deploy") && (
           <Aba ativa={tela === "deploy"}>
-            <Deploy sites={sites} />
+            <Deploy sites={sites} id={site} setId={setSite} />
           </Aba>
         )}
         {pronto && !semRaiz && visitadas.includes("fotos") && (
           <Aba ativa={tela === "fotos"}>
-            <Fotos sites={sites} />
+            <Fotos sites={sites} id={site} setId={setSite} />
           </Aba>
         )}
         {pronto && tela === "envelope" && <Envelope />}

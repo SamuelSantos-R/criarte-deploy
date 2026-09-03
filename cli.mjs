@@ -146,6 +146,26 @@ const info  = (s) => console.log(`${c.accent}ℹ${c.reset} ${s}`);
 const warn  = (s) => console.log(`${c.warnFg}⚠${c.reset}  ${s}`);
 const err   = (s) => console.log(`${c.errFg}✗${c.reset} ${s}`);
 const hr    = ()  => console.log(`${c.dim}${"─".repeat(56)}${c.reset}`);
+
+/**
+ * A causa de um `fetch failed` de TLS traz a cadeia de certificados, e cada
+ * certificado aponta de volta para o emissor: `JSON.stringify` rebenta com
+ * "circular structure" e engole justamente o motivo que se queria ler.
+ */
+function descreverCausa(causa) {
+  if (!causa) return null;
+  if (typeof causa === "string") return causa;
+  const partes = [causa.code, causa.message].filter(Boolean);
+  if (causa.code === "ECONNREFUSED" || causa.code === "ETIMEDOUT") {
+    partes.push(`${causa.address ?? "?"}:${causa.port ?? "?"}`);
+  }
+  if (partes.length > 0) return partes.join(" — ");
+  try {
+    return JSON.stringify(causa);
+  } catch {
+    return String(causa);
+  }
+}
 const heading = (s) => console.log(`\n${c.bold}${c.brand}${s}${c.reset}\n`);
 
 // Box estilo Claude Code — para destacar painéis curtos sem poluir
@@ -3128,7 +3148,7 @@ async function cmdDirectDeploy(argv) {
     } catch (e) {
       rmSync(stagingDir, { recursive: true, force: true });
       err(`Falha no deploy via rsync: ${e.message}`);
-      if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
+      if (e.cause) err(`Causa: ${descreverCausa(e.cause)}`);
       process.exit(1);
     }
   } else {
@@ -3199,7 +3219,7 @@ async function cmdDirectDeploy(argv) {
       err(`Erro: ${e.message}`);
       err(`Tipo: ${e.constructor?.name || "desconhecido"}`);
       err(`URL: ${uploadUrl}`);
-      if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
+      if (e.cause) err(`Causa: ${descreverCausa(e.cause)}`);
       if (tmpZip && existsSync(tmpZip)) rmSync(tmpZip);
       process.exit(1);
     }
@@ -3302,7 +3322,7 @@ async function cmdDirectDeploy(argv) {
     const mPath = saveManifest(manifest);
     printSummary(manifest, { manifestPath: mPath });
     err(`Erro pós-deploy: ${e.message}`);
-    if (e.cause) err(`Causa: ${JSON.stringify(e.cause)}`);
+    if (e.cause) err(`Causa: ${descreverCausa(e.cause)}`);
     process.exit(1);
   }
 }
@@ -3770,10 +3790,11 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
     throw e;
   }
 
-  // Usa HTTP direto pra VPS — o rsync já provou que o host é alcançável via SSH,
-  // e a VPS só escuta HTTP (porta 80). Cloudflare faz o TLS externo.
-  const apiUrl = `http://${host}/api/sites/build-from-path`;
-  const hostHeader = new URL(targetUrl).hostname;
+  // Pelo nome, não pelo IP. `Host` é header proibido no fetch: o undici deita-o
+  // fora e pede ao IP, o vhost por omissão responde 301 para https://<ip>/, e o
+  // certificado não cobre IP nenhum. O que chegava ao ecrã era "fetch failed" —
+  // por baixo, ERR_TLS_CERT_ALTNAME_INVALID (medido).
+  const apiUrl = `${targetUrl}/api/sites/build-from-path`;
   const sp2 = new Spinner("Disparando build no servidor...").start();
   const MAX_ATTEMPTS = 3;
   let lastErr;
@@ -3784,7 +3805,6 @@ async function deployViaRsync(config, stagingDir, fullSlug, name, category, subd
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${config.admin_api_token}`,
-          Host: hostHeader,
         },
         body: JSON.stringify({ slug: fullSlug, buildId, name, category, subdomain, expires_at }),
         signal: AbortSignal.timeout(30000),

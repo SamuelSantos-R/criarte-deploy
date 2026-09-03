@@ -9,6 +9,7 @@ import { ligarEspelho, pararEspelho, urlDoEspelho } from "./espelho";
 import { readConvite, siteDir, writeConvite } from "./sites";
 import { listarFontes, type Fonte } from "./fontes";
 import { arquivosDe, gravarAsset, importAssets, type AssetImportado } from "./assets";
+import { anunciar, pararAnuncio } from "./vizinhos";
 
 /**
  * Co-op na LAN: um Studio vira anfitrião e serve o convite por SSE; o outro
@@ -485,6 +486,7 @@ export async function abrirSessao(siteId: string): Promise<EstadoCoop> {
     gravacao: null,
     faltas: new Map(),
   };
+  anunciar(siteId, PORTA);
   avisarEstado();
   return estadoCoop();
 }
@@ -659,6 +661,7 @@ export async function pedirTranca(secao: string, soltar: boolean): Promise<boole
 
 export async function fecharSessao(): Promise<EstadoCoop> {
   if (anfitriao) {
+    pararAnuncio();
     if (anfitriao.gravacao) clearTimeout(anfitriao.gravacao);
     difundir("adeus", {});
     for (const par of anfitriao.pares.values()) par.res.end();

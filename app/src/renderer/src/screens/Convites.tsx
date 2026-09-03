@@ -3,6 +3,7 @@ import { useSiteValido } from "@/lib/useSiteValido";
 import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
+  previewRecarregar,
   previewRepintar,
   previewScroll,
   readConvite,
@@ -594,7 +595,7 @@ export function Convites({ sites, recarregar }: { sites: Site[]; recarregar: () 
           ligando={ligando}
           podeLigar={!!id}
           emprestado={convidado}
-          onRecarregar={() => void previewRepintar()}
+          onRecarregar={() => void previewRecarregar()}
           onLigar={() => void ligarAoVivo()}
           onParar={() => void desligarAoVivo()}
         />

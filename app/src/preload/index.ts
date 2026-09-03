@@ -13,6 +13,7 @@ type Gravacao = { conflito: boolean; marca: number };
 type ConviteMudou = { id: string; marca: number };
 type Patch = { caminho: (string | number)[]; valor: unknown };
 type Tranca = { secao: string; nome: string };
+type Vizinho = { endereco: string; nome: string; siteId: string };
 type EstadoDeps = {
   raiz: string | null;
   temManifesto: boolean;
@@ -81,6 +82,7 @@ const api = {
   previewState: () => invoke<Servidor | null>("preview:state"),
   previewScroll: (ancora: string) => invoke<boolean>("preview:scroll", ancora),
   previewRepintar: () => invoke<boolean>("preview:repintar"),
+  previewRecarregar: () => invoke<boolean>("preview:recarregar"),
 
   envelopeModelo: () => invoke<unknown>("envelope:modelo"),
   envelopeLista: () => invoke<unknown>("envelope:lista"),
@@ -104,6 +106,8 @@ const api = {
   coopAsset: (origens: string[]) => invoke<AssetImportado[]>("coop:asset", origens),
   coopPickAsset: (pasta: boolean) => invoke<AssetImportado[]>("coop:pickAsset", pasta),
   coopTranca: (secao: string, soltar: boolean) => invoke<boolean>("coop:tranca", secao, soltar),
+  coopVizinhos: () => invoke<Vizinho[]>("coop:vizinhos"),
+  onCoopVizinhos: ouvir<Vizinho[]>("coop:vizinhos"),
   onCoopEstado: ouvir<EstadoCoop>("coop:estado"),
   onCoopPatch: ouvir<Patch>("coop:patch"),
   onCoopCheio: ouvir<{ doc: Record<string, unknown> }>("coop:cheio"),

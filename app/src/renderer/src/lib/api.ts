@@ -84,6 +84,7 @@ export const previewStop = () => call(api.previewStop());
 export const previewState = () => call(api.previewState()) as Promise<Servidor | null>;
 export const previewScroll = (ancora: string) => call(api.previewScroll(ancora)) as Promise<boolean>;
 export const previewRepintar = () => call(api.previewRepintar()) as Promise<boolean>;
+export const previewRecarregar = () => call(api.previewRecarregar()) as Promise<boolean>;
 
 export type Convidado = { url: string; nome: string };
 export type Modelo = { nome: string; largura: number; altura: number; dataUrl: string };
@@ -106,6 +107,8 @@ export const envelopeAbrirSaida = () => call(api.envelopeAbrirSaida());
 
 export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };
+/** Anfitrião que anda a gritar na rede local. Só diz onde bater — não abre a porta. */
+export type Vizinho = { endereco: string; nome: string; siteId: string };
 export type EstadoCoop = {
   papel: "anfitriao" | "convidado" | null;
   siteId: string | null;
@@ -131,6 +134,8 @@ export const coopPickAsset = (pasta: boolean) =>
   call(api.coopPickAsset(pasta)) as Promise<AssetImportado[]>;
 export const coopTranca = (secao: string, soltar: boolean) =>
   call(api.coopTranca(secao, soltar)) as Promise<boolean>;
+export const coopVizinhos = () => call(api.coopVizinhos()) as Promise<Vizinho[]>;
+export const onCoopVizinhos = api.onCoopVizinhos;
 export const onCoopEstado = api.onCoopEstado;
 export const onCoopPatch = api.onCoopPatch;
 export const onCoopCheio = api.onCoopCheio;

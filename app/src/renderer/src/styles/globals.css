@@ -12,33 +12,36 @@
 
 @layer base {
   :root {
-    /* 70% — o chão. Verde-tinta da sálvia da marca, escurecido até virar
-       bancada: puxa da identidade sem competir com o creme do convite. */
-    --ground: #1a1e16;
-    --surface: #222719;
-    --surface-2: #2b3120;
+    /* 70% — o chão. Bancada de papel bege, quase branco. Três degraus curtos:
+       em fundo claro a hierarquia vem da régua, não do contraste de fundos. */
+    --ground: #f3f0e6;
+    --surface: #ede9db;
+    --surface-2: #e2ddc9;
 
     /* 20% — estrutura. Réguas, texto secundário, divisórias. */
-    --rule: #3b422e;
-    --rule-strong: #55603f;
-    --muted: #9a9782;
-    --text: #f0ebdd;
+    --rule: #d2ccb4;
+    --rule-strong: #b0a98c;
+    --muted: #6b6853;
+    --text: #232719;
 
-    /* 10% — dois acentos com trabalhos diferentes, nunca no mesmo lugar:
-       o dourado suave da marca é AÇÃO (botão, serial), a sálvia é LUGAR
-       (marcador de ativo, foco). Ninguém confunde onde clicar com onde está. */
-    --accent: #b08d57;
-    --sage: #869b7e;
+    /* 10% — dois acentos com trabalhos diferentes, nunca no mesmo lugar: a
+       oliva é AÇÃO (botão, régua, serial) e a oliva profunda é LUGAR (foco,
+       marcador de ativo). Mesma família, luminosidades distantes — em fundo
+       claro é o valor que separa os dois, não o matiz.
+       Sobre o chão: oliva 4,99:1, oliva profunda 8,3:1, texto 13,5:1. */
+    --accent: #5b6e33;
+    --sage: #3e4a26;
     /* Sálvia profunda — só vive sobre o papel creme da prova. */
     --accent-deep: #4f6249;
 
-    /* Semântico — carrega estado, não é o acento. */
-    --ok: #a3bd93;
-    --bad: #e0806a;
+    /* Semântico — carrega estado, não é o acento. Escurecidos: o verde e o
+       coral claros do tema antigo sumiam num fundo bege. */
+    --ok: #4f7a3a;
+    --bad: #b23c22;
 
-    /* A prova. Único lugar onde o creme do convite aparece: é a peça sendo
-       trabalhada em cima da mesa, não a pele da ferramenta. */
-    --paper: #f5ede0;
+    /* A prova. Agora é a peça mais clara da tela — o papel do convite em cima
+       da bancada bege, e não o contrário. */
+    --paper: #fdfaf4;
     --paper-ink: #3d2b1a;
     --paper-muted: #6b5d4c;
   }

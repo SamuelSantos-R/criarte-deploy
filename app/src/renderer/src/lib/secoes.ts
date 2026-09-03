@@ -40,6 +40,7 @@ const APELIDOS: Record<string, string> = {
   dresscode: "Dress code",
   eyebrow: "Chapéu",
   pretoEBranco: "Foto em preto e branco",
+  centrarNomes: "Centrar nomes com a divisória",
 };
 
 export function rotulo(chave: string): string {

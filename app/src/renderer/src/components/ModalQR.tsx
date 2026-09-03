@@ -22,7 +22,7 @@ export function ModalQR({
   useEffect(() => {
     if (!lan) return setQr(null);
     let vivo = true;
-    QRCode.toDataURL(lan, { margin: 1, width: 640, color: { dark: "#1a1e16", light: "#f5ede0" } })
+    QRCode.toDataURL(lan, { margin: 1, width: 640, color: { dark: "#232719", light: "#fdfaf4" } })
       .then((d) => vivo && setQr(d))
       .catch(() => vivo && setQr(null));
     return () => {

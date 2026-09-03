@@ -1,5 +1,6 @@
 import { type WebContents } from "electron";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 import { existsSync } from "node:fs";
@@ -107,6 +108,9 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
   }
 
   servidor = { siteId, url, lan: lanIp ? `http://${lanIp}:${porta}` : null, child };
+  // Ponto de partida do repinte: sem esta leitura a primeira gravação achava
+  // que a página tinha mudado e recarregava com o conteúdo ainda velho.
+  assinatura = await assinaturaServida(url, AbortSignal.timeout(20_000));
   for (const ouvinte of ouvintes) ouvinte();
   return { siteId, url: servidor.url, lan: servidor.lan };
 }
@@ -114,6 +118,9 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
 export function pararServidor(): void {
   servidor?.child.kill("SIGTERM");
   servidor = null;
+  espera?.abort();
+  espera = null;
+  assinatura = null;
   for (const ouvinte of ouvintes) ouvinte();
 }
 
@@ -142,23 +149,84 @@ export function origensDoPreview(): string[] {
   return [`http://localhost:${port}`, `http://127.0.0.1:${port}`, ...(servidor.lan ? [servidor.lan] : [])];
 }
 
+const TIQUE_MS = 250;
+const ESPERA_MAX_MS = 15_000;
+
 /**
- * Recarrega o preview sem destruir o iframe. Medido: o `next dev` serve o
- * convite.json novo em ~3s, mas a página já aberta nunca repinta sozinha — 20s
- * de observação e nada. O HMR não propaga a mudança do json, ao contrário do
- * que se assumia. Então quem manda recarregar somos nós.
- *
- * Recarregar por dentro do frame, e não trocando a `key` do elemento no React,
- * mantém a posição do scroll (o Chromium restaura-a no reload) e evita o branco
- * de montar um iframe do zero.
+ * Assinatura da página que o preview já está a mostrar. O `?v=<timestamp>` que o
+ * `next dev` carimba nos scripts muda a cada pedido — sem o tirar, duas leituras
+ * seguidas da mesma página dão hashes diferentes (medido) e nada disto funciona.
  */
-export async function repintarPreview(wc: WebContents): Promise<boolean> {
+let assinatura: string | null = null;
+let espera: AbortController | null = null;
+
+async function assinaturaServida(url: string, sinal: AbortSignal): Promise<string | null> {
+  const r = await fetch(url, { signal: sinal, headers: { "cache-control": "no-cache" } }).catch(
+    () => null,
+  );
+  if (!r?.ok) return null;
+  const html = await r.text().catch(() => null);
+  if (html === null) return null;
+  return createHash("sha1").update(html.replace(/\?v=\d+/g, "")).digest("hex");
+}
+
+function frameDoPreview(wc: WebContents): ReturnType<typeof wc.mainFrame.framesInSubtree.find> {
   const origens = origensDoPreview();
-  if (origens.length === 0) return false;
-  const frame = wc.mainFrame.framesInSubtree.find(
+  if (origens.length === 0) return undefined;
+  return wc.mainFrame.framesInSubtree.find(
     (f) => f !== wc.mainFrame && origens.some((o) => f.url.startsWith(o)),
   );
+}
+
+/**
+ * Recarrega o preview quando — e só quando — o servidor já está a servir a
+ * alteração. O HMR não propaga a mudança do convite.json (20s de observação e a
+ * página aberta nunca repinta), mas recarregar na hora da gravação também não
+ * servia: medido, o `next dev` demora ~2,9s a recompilar, e o reload no meio da
+ * recompilação apanhava chunks a meio de serem reescritos — daí a página em
+ * branco e sem texto que só um reload à mão resolvia.
+ *
+ * Então sonda-se a página servida até a assinatura mudar, e só aí se recarrega:
+ * uma vez, com o conteúdo novo garantido. Alteração que não muda o HTML não
+ * recarrega nada — é o que tira o pisca-pisca.
+ *
+ * Recarregar por dentro do frame, e não trocando a `key` do elemento no React,
+ * mantém a posição do scroll e evita o branco de montar um iframe do zero.
+ */
+export async function repintarPreview(wc: WebContents): Promise<boolean> {
+  const alvo = servidor;
+  if (!alvo || !frameDoPreview(wc)) return false;
+
+  // Tecla nova enquanto a anterior ainda espera: fica a última. Sem isto uma
+  // frase digitada devagar enfileirava um reload por pausa.
+  espera?.abort();
+  const meu = new AbortController();
+  espera = meu;
+
+  const limite = Date.now() + ESPERA_MAX_MS;
+  while (Date.now() < limite && !meu.signal.aborted) {
+    const agora = await assinaturaServida(alvo.url, meu.signal);
+    if (agora && agora !== assinatura) {
+      assinatura = agora;
+      if (espera === meu) espera = null;
+      const frame = frameDoPreview(wc);
+      if (!frame) return false;
+      await frame.executeJavaScript("location.reload()");
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, TIQUE_MS));
+  }
+  if (espera === meu) espera = null;
+  return false;
+}
+
+/** Botão de recarregar: é ordem direta, não espera por assinatura nenhuma. */
+export async function forcarRepinte(wc: WebContents): Promise<boolean> {
+  espera?.abort();
+  espera = null;
+  const frame = frameDoPreview(wc);
   if (!frame) return false;
+  if (servidor) assinatura = await assinaturaServida(servidor.url, AbortSignal.timeout(4000));
   await frame.executeJavaScript("location.reload()");
   return true;
 }

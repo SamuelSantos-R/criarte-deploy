@@ -76,8 +76,20 @@ export type Convite = { dados: unknown; marca: number };
 /** `conflito` verdadeiro quer dizer que nada foi gravado. */
 export type Gravacao = { conflito: boolean; marca: number };
 
-/** mtime da última gravação feita pelo próprio Studio, por site. */
-const gravadas = new Map<string, number>();
+/**
+ * mtimes das últimas gravações feitas pelo próprio Studio, por site.
+ *
+ * Lista e não um número só: a digitação grava de 400 em 400ms e o vigia só vem
+ * perguntar 150ms depois do evento. Com um valor só, a gravação seguinte já
+ * tinha apagado a marca da anterior e o vigia dava o ficheiro por mexido de
+ * fora — que é o "conflito" que aparecia do nada.
+ */
+const LEMBRA = 8;
+const gravadas = new Map<string, number[]>();
+
+function anotar(id: string, marca: number): void {
+  gravadas.set(id, [...(gravadas.get(id) ?? []), marca].slice(-LEMBRA));
+}
 
 export async function readConvite(id: string): Promise<Convite> {
   const file = await conviteFile(id);
@@ -102,16 +114,19 @@ export async function writeConvite(id: string, data: unknown, marca?: number): P
     if (noDisco !== null && noDisco !== marca) return { conflito: true, marca: noDisco };
   }
   await writeFile(file, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  // Anotar antes de qualquer outro `await`: a cópia da fonte demora mais que os
+  // 150ms de repique do vigia, e ele chegava a perguntar enquanto a marca nova
+  // ainda não existia.
+  const nova = (await stat(file)).mtimeMs;
+  anotar(id, nova);
   // A fonte escolhida tem de viajar do banco para o site, senão o convite
   // publicado sai com a fonte de recurso. Falha aqui não desfaz a gravação: o
   // convite ficou bom, só a fonte é que não foi.
   const escolhida = (data as { medidas?: Record<string, unknown> }).medidas?.noivosFonte;
   await levarFonteParaSite(dirname(file), escolhida).catch(() => false);
-  const nova = (await stat(file)).mtimeMs;
-  gravadas.set(id, nova);
   return { conflito: false, marca: nova };
 }
 
 export function gravadaPeloStudio(id: string, marca: number): boolean {
-  return gravadas.get(id) === marca;
+  return gravadas.get(id)?.includes(marca) ?? false;
 }

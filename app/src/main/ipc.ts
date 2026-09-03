@@ -8,7 +8,7 @@ import { duplicarSite, renomearSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
-import { estadoPreview, iniciarServidor, pararServidor, repintarPreview, rolarPreview } from "./preview";
+import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, repintarPreview, rolarPreview } from "./preview";
 import { estadoToken, tokenizar } from "./tokenizar";
 import { trocarPorWebp } from "./webp";
 import { vigiarConvite } from "./vigia";
@@ -23,6 +23,7 @@ import {
   pedirTranca,
   type Patch,
 } from "./coop";
+import { aoMudarVizinhos, vizinhos } from "./vizinhos";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 
@@ -120,6 +121,12 @@ function asPatch(v: unknown): Patch {
 }
 
 export function registerIpc(): void {
+  // Vizinho que entra ou sai não pode depender de o painel estar a perguntar: a
+  // lista é empurrada, senão só aparece quando alguém reabre o separador.
+  aoMudarVizinhos(() => {
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send("coop:vizinhos", vizinhos());
+  });
+
   handle("settings:get", () => loadSettings());
 
   handle("settings:pickRoot", async (event) => {
@@ -268,10 +275,12 @@ export function registerIpc(): void {
   handle("coop:tranca", (_e, secao: unknown, soltar: unknown) =>
     pedirTranca(asString(secao, "secção"), soltar === true),
   );
+  handle("coop:vizinhos", () => vizinhos());
 
   handle("deps:estado", () => estadoDeps());
 
   handle("preview:repintar", (event) => repintarPreview(event.sender));
+  handle("preview:recarregar", (event) => forcarRepinte(event.sender));
 
   handle("deploy:destino", (_e, id: unknown) => destinoPublicacao(asString(id, "id")));
 

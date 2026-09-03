@@ -1,7 +1,7 @@
-import { useState, type ReactElement } from "react";
-import { Lock, Radio, Unplug, Users } from "lucide-react";
+import { useEffect, useState, type ReactElement } from "react";
+import { Laptop, Lock, Radio, Unplug, Users } from "lucide-react";
 import { Button, Input } from "@/components/ui/primitives";
-import type { EstadoCoop, Tranca } from "@/lib/api";
+import { coopVizinhos, onCoopVizinhos, type EstadoCoop, type Tranca, type Vizinho } from "@/lib/api";
 
 /** O código é feito pra ser lido em voz alta atravessando a sala. Daí o tamanho. */
 function Codigo({ valor }: { valor: string }): ReactElement {
@@ -53,6 +53,50 @@ function Pares({ pares, trancas }: { pares: string[]; trancas: Tranca[] }): Reac
   );
 }
 
+/**
+ * Quem está a servir agora, ouvido pelo farol UDP. Clicar só preenche o
+ * endereço: o código continua a ser dito em voz alta, porque estar na mesma rede
+ * não é o mesmo que ter sido convidado.
+ */
+function PertoDaqui({
+  lista,
+  escolhido,
+  escolher,
+}: {
+  lista: Vizinho[];
+  escolhido: string;
+  escolher: (endereco: string) => void;
+}): ReactElement {
+  if (lista.length === 0) {
+    return (
+      <p className="mb-3 text-[12px] text-muted">
+        Ninguém a servir por aqui — escreve o endereço, ou pede pra abrirem a sessão.
+      </p>
+    );
+  }
+  return (
+    <ul className="mb-3 space-y-1">
+      {lista.map((v) => (
+        <li key={v.endereco}>
+          <button
+            type="button"
+            onClick={() => escolher(v.endereco)}
+            className={`no-drag flex w-full items-center gap-2 border-l-2 py-1.5 pl-2.5 pr-2 text-left transition-colors ${
+              escolhido === v.endereco
+                ? "border-accent bg-surface-2 text-text"
+                : "border-transparent text-muted hover:border-rule-strong hover:bg-surface"
+            }`}
+          >
+            <Laptop size={13} className="shrink-0 text-accent" aria-hidden />
+            <span className="truncate text-[13px] text-text">{v.nome}</span>
+            <span className="ml-auto truncate font-mono text-[11px] text-muted">{v.siteId}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function PainelCoop({
   estado,
   erro,
@@ -73,6 +117,15 @@ export function PainelCoop({
   const [endereco, setEndereco] = useState("");
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
+  const [perto, setPerto] = useState<Vizinho[]>([]);
+
+  // Só quando não há sessão: dentro de uma, a lista não leva a lado nenhum.
+  const livre = estado.papel === null;
+  useEffect(() => {
+    if (!livre) return;
+    void coopVizinhos().then(setPerto).catch(() => undefined);
+    return onCoopVizinhos(setPerto);
+  }, [livre]);
 
   return (
     <div className="max-w-[520px]">
@@ -143,6 +196,7 @@ export function PainelCoop({
               <span className="font-mono text-serial text-muted/60">02</span>
               <span className="h-px flex-1 bg-rule" />
             </div>
+            <PertoDaqui lista={perto} escolhido={endereco} escolher={setEndereco} />
             <div className="space-y-3">
               <Input
                 placeholder="192.168.1.20:7412"

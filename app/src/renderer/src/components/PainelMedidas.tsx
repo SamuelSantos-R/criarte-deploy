@@ -41,6 +41,15 @@ const MEDIDAS: Medida[] = [
     padrao: 13,
   },
   {
+    chave: "versiculoTamanho",
+    rotulo: "versículo",
+    dica: "Teto no computador. Versículo comprido ocupa meia página — baixe aqui em vez de partir o texto à mão.",
+    min: 12,
+    max: 28,
+    passo: 1,
+    padrao: 22,
+  },
+  {
     chave: "noivosTamanho",
     rotulo: "nomes dos noivos",
     dica: "Teto no computador. No telemóvel o nome continua acompanhando a largura da tela.",

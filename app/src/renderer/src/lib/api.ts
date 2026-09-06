@@ -83,8 +83,11 @@ export const previewStart = (id: string) => call(api.previewStart(id)) as Promis
 export const previewStop = () => call(api.previewStop());
 export const previewState = () => call(api.previewState()) as Promise<Servidor | null>;
 export const previewScroll = (ancora: string) => call(api.previewScroll(ancora)) as Promise<boolean>;
-export const previewRepintar = () => call(api.previewRepintar()) as Promise<boolean>;
+export const previewRepintar = (doc?: unknown) =>
+  call(api.previewRepintar(doc)) as Promise<boolean>;
 export const previewRecarregar = () => call(api.previewRecarregar()) as Promise<boolean>;
+/** Cor e medida no quadro, no mesmo instante. Devolve quantas vars entraram. */
+export const previewPintar = (doc: unknown) => call(api.previewPintar(doc)) as Promise<number>;
 
 export type Convidado = { url: string; nome: string };
 export type Modelo = { nome: string; largura: number; altura: number; dataUrl: string };

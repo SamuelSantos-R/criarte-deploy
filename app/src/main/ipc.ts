@@ -8,7 +8,7 @@ import { duplicarSite, renomearSite, salvarSessaoComoNovo } from "./duplicar";
 import { FILTROS, importAssets } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
-import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, repintarPreview, rolarPreview } from "./preview";
+import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
 import { estadoToken, tokenizar } from "./tokenizar";
 import { trocarPorWebp } from "./webp";
 import { vigiarConvite } from "./vigia";
@@ -280,8 +280,9 @@ export function registerIpc(): void {
 
   handle("deps:estado", () => estadoDeps());
 
-  handle("preview:repintar", (event) => repintarPreview(event.sender));
+  handle("preview:repintar", (event, doc: unknown) => repintarPreview(event.sender, doc));
   handle("preview:recarregar", (event) => forcarRepinte(event.sender));
+  handle("preview:pintar", (event, doc: unknown) => pintarPreview(event.sender, doc));
 
   handle("deploy:destino", (_e, id: unknown) => destinoPublicacao(asString(id, "id")));
 

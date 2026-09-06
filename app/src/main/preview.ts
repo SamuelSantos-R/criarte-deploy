@@ -6,6 +6,7 @@ import { networkInterfaces } from "node:os";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { siteDir } from "./sites";
+import { urlDoEspelho } from "./espelho";
 
 export type Servidor = { siteId: string; url: string; lan: string | null };
 
@@ -121,6 +122,7 @@ export function pararServidor(): void {
   espera?.abort();
   espera = null;
   assinatura = null;
+  ultimoDoc = null;
   for (const ouvinte of ouvintes) ouvinte();
 }
 
@@ -170,12 +172,28 @@ async function assinaturaServida(url: string, sinal: AbortSignal): Promise<strin
   return createHash("sha1").update(html.replace(/\?v=\d+/g, "")).digest("hex");
 }
 
-function frameDoPreview(wc: WebContents): ReturnType<typeof wc.mainFrame.framesInSubtree.find> {
-  const origens = origensDoPreview();
+function acharFrame(
+  wc: WebContents,
+  origens: string[],
+): ReturnType<typeof wc.mainFrame.framesInSubtree.find> {
   if (origens.length === 0) return undefined;
   return wc.mainFrame.framesInSubtree.find(
     (f) => f !== wc.mainFrame && origens.some((o) => f.url.startsWith(o)),
   );
+}
+
+function frameDoPreview(wc: WebContents): ReturnType<typeof wc.mainFrame.framesInSubtree.find> {
+  return acharFrame(wc, origensDoPreview());
+}
+
+/**
+ * O convidado do À Dois não tem servidor nenhum: vê o preview do anfitrião pelo
+ * espelho, em `127.0.0.1`. Para pintar tanto faz de quem é o `next dev` do outro
+ * lado — o que interessa é o quadro que está mesmo na janela.
+ */
+function frameDoQuadro(wc: WebContents): ReturnType<typeof wc.mainFrame.framesInSubtree.find> {
+  const espelho = urlDoEspelho();
+  return acharFrame(wc, [...origensDoPreview(), ...(espelho ? [espelho] : [])]);
 }
 
 /**
@@ -193,9 +211,17 @@ function frameDoPreview(wc: WebContents): ReturnType<typeof wc.mainFrame.framesI
  * Recarregar por dentro do frame, e não trocando a `key` do elemento no React,
  * mantém a posição do scroll e evita o branco de montar um iframe do zero.
  */
-export async function repintarPreview(wc: WebContents): Promise<boolean> {
+export async function repintarPreview(wc: WebContents, doc?: unknown): Promise<boolean> {
   const alvo = servidor;
   if (!alvo || !frameDoPreview(wc)) return false;
+
+  // Cor e medida já foram pintadas por fora; se foi só isso que mudou, o reload
+  // seria o pisca-pisca por nada. A assinatura tem de ser acertada na mesma:
+  // ela mudou (o `<html>` traz o tema inline), e deixá-la velha faria a próxima
+  // edição de texto recarregar de imediato, ainda a meio da recompilação — a
+  // página em branco que este ficheiro já teve uma vez.
+  const soPintura = doc !== undefined && ultimoDoc !== null && semVars(doc) === semVars(ultimoDoc);
+  if (doc !== undefined) ultimoDoc = doc;
 
   // Tecla nova enquanto a anterior ainda espera: fica a última. Sem isto uma
   // frase digitada devagar enfileirava um reload por pausa.
@@ -209,6 +235,7 @@ export async function repintarPreview(wc: WebContents): Promise<boolean> {
     if (agora && agora !== assinatura) {
       assinatura = agora;
       if (espera === meu) espera = null;
+      if (soPintura) return true;
       const frame = frameDoPreview(wc);
       if (!frame) return false;
       await frame.executeJavaScript("location.reload()");
@@ -218,6 +245,102 @@ export async function repintarPreview(wc: WebContents): Promise<boolean> {
   }
   if (espera === meu) espera = null;
   return false;
+}
+
+/** Último convite pintado, para saber o que mudou desde então. */
+let ultimoDoc: unknown = null;
+
+/**
+ * O convite sem nada do que é só variável CSS, em texto comparável.
+ *
+ * Chaves ordenadas porque a comparação é entre dois JSON e a ordem em que o
+ * editor as escreve não é promessa nenhuma. `noivosFonte` fica de fora da
+ * amnistia: a var aponta para um `@font-face` que o layout emite a partir da
+ * pasta, e uma fonte acabada de instalar só existe depois de recompilar —
+ * pintar sem recarregar dava Georgia calado.
+ */
+/** Lista, não filtro ao contrário: uma medida nova que ninguém pintou cai aqui de
+ *  fora e volta a recarregar, que é o comportamento certo enquanto não tiver var. */
+const PINTADAS = [
+  "espacos",
+  "manualIconeOpacidade",
+  "musicaBarraOpacidade",
+  "musicaBaseOpacidade",
+  "musicaEqualizadorOpacidade",
+  "monogramaAltura",
+  "monogramaTopo",
+  "monogramaFolga",
+  "paisTamanho",
+  "versiculoTamanho",
+  "noivosTamanho",
+  "noivaEspacamento",
+  "noivoEspacamento",
+  "eEspacamento",
+  "noivosAltura",
+  "rodapeTamanho",
+  "rodapeAltura",
+  "rodapeEspacamento",
+  "rodapeDataTamanho",
+  "rodapeDataEspacamento",
+  "rodapeTopo",
+  "rodapeBase",
+  "vasoLargura",
+];
+
+function semVars(doc: unknown): string {
+  if (!doc || typeof doc !== "object") return "";
+  const c = { ...(doc as Record<string, unknown>) };
+  delete c.tema;
+  const medidas = c.medidas as Record<string, unknown> | undefined;
+  if (medidas && typeof medidas === "object") {
+    const resto = { ...medidas };
+    for (const k of PINTADAS) delete resto[k];
+    c.medidas = resto;
+  }
+  const orn = c.ornamentos as Record<string, unknown> | undefined;
+  if (orn && typeof orn === "object") {
+    const resto = { ...orn };
+    delete resto.tamanho;
+    delete resto.deslocamento;
+    delete resto.deslocamentos;
+    c.ornamentos = resto;
+  }
+  return estavel(c);
+}
+
+function estavel(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(estavel).join(",")}]`;
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${estavel(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(v) ?? "null";
+}
+
+/**
+ * Escreve as custom properties do convite direto no `<html>` do quadro, sem
+ * passar pelo disco nem pelo compilador. Quem faz a conta é o próprio site (o
+ * `varsDe` que o build também usa), então o que se vê ao vivo é o que vai sair.
+ *
+ * Devolve quantas vars foram postas — `0` quer dizer que aquele convite ainda
+ * não tem o pincel (site antigo, ou build de produção), e aí quem chamou volta
+ * ao caminho de recarregar.
+ */
+export async function pintarPreview(wc: WebContents, doc: unknown): Promise<number> {
+  const frame = frameDoQuadro(wc);
+  if (!frame) return 0;
+  // Passa como texto e é o próprio quadro que faz o parse: assim nada do convite
+  // é interpretado como código, por mais estranho que venha no json.
+  const carga = JSON.stringify(JSON.stringify(doc));
+  const posto = await frame
+    .executeJavaScript(
+      `(() => (typeof window.__crPintar === "function" ? window.__crPintar(JSON.parse(${carga})) : 0))()`,
+    )
+    .catch(() => 0);
+  return typeof posto === "number" ? posto : 0;
 }
 
 /** Botão de recarregar: é ordem direta, não espera por assinatura nenhuma. */

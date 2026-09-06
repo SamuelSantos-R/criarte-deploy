@@ -4,6 +4,7 @@ import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Undo2,
 import {
   onConviteMudou,
   previewRecarregar,
+  previewPintar,
   previewRepintar,
   previewScroll,
   readConvite,
@@ -284,6 +285,25 @@ export function Convites({
     await derrubarServidor();
   };
 
+  /**
+   * Cor e medida não esperam por disco nenhum: são custom properties no `<html>`
+   * do convite, e o Studio escreve-as direto no quadro. O que se vê é o que o
+   * build vai dar, porque quem faz a conta é o `varsDe` do próprio site.
+   *
+   * Corre também em sessão, e é aí que mais rende: com o À Dois aberto ninguém
+   * grava em disco, então sem isto o convidado arrastava um cursor e não via
+   * absolutamente nada mudar até a sessão fechar.
+   *
+   * Os 60ms são para o cursor arrastado: uma pintura por quadro em vez de uma
+   * por pixel. Texto e estrutura não passam por aqui — esses ainda pedem
+   * recompilação, e é o `previewRepintar` que decide.
+   */
+  useEffect(() => {
+    if (!dados) return;
+    const t = setTimeout(() => void previewPintar(dados).catch(() => undefined), 60);
+    return () => clearTimeout(t);
+  }, [dados]);
+
   // Gravar o rascunho não chega. Medido: o `next dev` serve o convite.json novo
   // em ~3s, mas a página já aberta nunca repinta — 20s de observação e nada. O
   // HMR não propaga a mudança do json. Então mandamos recarregar nós, por
@@ -298,14 +318,14 @@ export function Convites({
       if (!rascunho.current) return;
       rascunho.current = false;
       void gravar(id, dados)
-        .then(() => previewRepintar())
+        .then(() => previewRepintar(dados))
         .catch((e: Error) => setErro(e.message));
       return;
     }
     const t = setTimeout(() => {
       rascunho.current = true;
       void gravar(id, dados)
-        .then(() => previewRepintar())
+        .then(() => previewRepintar(dados))
         .catch((e: Error) => setErro(e.message));
     }, REPOUSO);
     return () => clearTimeout(t);

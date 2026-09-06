@@ -109,6 +109,8 @@ export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };
 /** Anfitrião que anda a gritar na rede local. Só diz onde bater — não abre a porta. */
 export type Vizinho = { endereco: string; nome: string; siteId: string };
+/** `vivo: false` = a difusão não sai desta máquina; a lista vazia não é culpa de ninguém. */
+export type Perto = { lista: Vizinho[]; vivo: boolean };
 export type EstadoCoop = {
   papel: "anfitriao" | "convidado" | null;
   siteId: string | null;
@@ -134,7 +136,7 @@ export const coopPickAsset = (pasta: boolean) =>
   call(api.coopPickAsset(pasta)) as Promise<AssetImportado[]>;
 export const coopTranca = (secao: string, soltar: boolean) =>
   call(api.coopTranca(secao, soltar)) as Promise<boolean>;
-export const coopVizinhos = () => call(api.coopVizinhos()) as Promise<Vizinho[]>;
+export const coopVizinhos = () => call(api.coopVizinhos()) as Promise<Perto>;
 export const onCoopVizinhos = api.onCoopVizinhos;
 export const onCoopEstado = api.onCoopEstado;
 export const onCoopPatch = api.onCoopPatch;

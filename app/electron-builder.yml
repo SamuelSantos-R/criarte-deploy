@@ -46,6 +46,13 @@ mac:
   # runtime quebraria o ELECTRON_RUN_AS_NODE que roda o CLI.
   identity: null
   hardenedRuntime: false
+  # Sem esta chave o macOS 14 deita fora a difusão UDP do farol sem avisar, e o
+  # "perto daqui" fica eternamente vazio. É ela que faz aparecer o pedido de
+  # Rede Local com o nosso texto, em vez do genérico que passa despercebido.
+  extendInfo:
+    NSLocalNetworkUsageDescription: >-
+      O Criarte Studio procura outros Studios na rede de casa para vocês
+      editarem o mesmo convite a dois.
 
 dmg:
   title: Criarte Studio

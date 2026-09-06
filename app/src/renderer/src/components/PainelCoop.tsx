@@ -1,7 +1,14 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Laptop, Lock, Radio, Unplug, Users } from "lucide-react";
 import { Button, Input } from "@/components/ui/primitives";
-import { coopVizinhos, onCoopVizinhos, type EstadoCoop, type Tranca, type Vizinho } from "@/lib/api";
+import {
+  coopVizinhos,
+  onCoopVizinhos,
+  type EstadoCoop,
+  type Perto,
+  type Tranca,
+  type Vizinho,
+} from "@/lib/api";
 
 /** O código é feito pra ser lido em voz alta atravessando a sala. Daí o tamanho. */
 function Codigo({ valor }: { valor: string }): ReactElement {
@@ -60,13 +67,27 @@ function Pares({ pares, trancas }: { pares: string[]; trancas: Tranca[] }): Reac
  */
 function PertoDaqui({
   lista,
+  vivo,
   escolhido,
   escolher,
 }: {
   lista: Vizinho[];
+  vivo: boolean;
   escolhido: string;
   escolher: (endereco: string) => void;
 }): ReactElement {
+  // Lista vazia tem duas causas opostas e o remédio de cada uma é o contrário do
+  // outro: ou ninguém abriu sessão, ou o macOS está a engolir a difusão e nunca
+  // vai aparecer nada por mais que se espere.
+  if (lista.length === 0 && !vivo) {
+    return (
+      <p className="mb-3 border-l-2 border-bad bg-bad/5 py-2 pl-3 text-[12px] leading-[1.5] text-bad">
+        A rede local está bloqueada para o Studio — nada é ouvido nem anunciado. Abre
+        Ajustes do Sistema › Privacidade e Segurança › Rede Local e liga o Criarte
+        Studio. Até lá, dá para entrar escrevendo o endereço à mão.
+      </p>
+    );
+  }
   if (lista.length === 0) {
     return (
       <p className="mb-3 text-[12px] text-muted">
@@ -117,14 +138,24 @@ export function PainelCoop({
   const [endereco, setEndereco] = useState("");
   const [codigo, setCodigo] = useState("");
   const [nome, setNome] = useState("");
-  const [perto, setPerto] = useState<Vizinho[]>([]);
+  const [perto, setPerto] = useState<Perto>({ lista: [], vivo: true });
 
   // Só quando não há sessão: dentro de uma, a lista não leva a lado nenhum.
   const livre = estado.papel === null;
   useEffect(() => {
     if (!livre) return;
-    void coopVizinhos().then(setPerto).catch(() => undefined);
-    return onCoopVizinhos(setPerto);
+    const puxar = (): void => {
+      void coopVizinhos().then(setPerto).catch(() => undefined);
+    };
+    puxar();
+    // O empurrão do main só sai quando a lista muda, e ficar bloqueado é
+    // justamente o caso em que ela nunca muda. Daí perguntar de vez em quando.
+    const relogio = setInterval(puxar, 3_000);
+    const largar = onCoopVizinhos(setPerto);
+    return () => {
+      clearInterval(relogio);
+      largar();
+    };
   }, [livre]);
 
   return (
@@ -196,7 +227,12 @@ export function PainelCoop({
               <span className="font-mono text-serial text-muted/60">02</span>
               <span className="h-px flex-1 bg-rule" />
             </div>
-            <PertoDaqui lista={perto} escolhido={endereco} escolher={setEndereco} />
+            <PertoDaqui
+              lista={perto.lista}
+              vivo={perto.vivo}
+              escolhido={endereco}
+              escolher={setEndereco}
+            />
             <div className="space-y-3">
               <Input
                 placeholder="192.168.1.20:7412"

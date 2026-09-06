@@ -23,7 +23,7 @@ import {
   pedirTranca,
   type Patch,
 } from "./coop";
-import { aoMudarVizinhos, vizinhos } from "./vizinhos";
+import { aoMudarVizinhos, farolVivo, vizinhos } from "./vizinhos";
 
 export type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 
@@ -124,7 +124,8 @@ export function registerIpc(): void {
   // Vizinho que entra ou sai não pode depender de o painel estar a perguntar: a
   // lista é empurrada, senão só aparece quando alguém reabre o separador.
   aoMudarVizinhos(() => {
-    for (const win of BrowserWindow.getAllWindows()) win.webContents.send("coop:vizinhos", vizinhos());
+    const perto = { lista: vizinhos(), vivo: farolVivo() };
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send("coop:vizinhos", perto);
   });
 
   handle("settings:get", () => loadSettings());
@@ -275,7 +276,7 @@ export function registerIpc(): void {
   handle("coop:tranca", (_e, secao: unknown, soltar: unknown) =>
     pedirTranca(asString(secao, "secção"), soltar === true),
   );
-  handle("coop:vizinhos", () => vizinhos());
+  handle("coop:vizinhos", () => ({ lista: vizinhos(), vivo: farolVivo() }));
 
   handle("deps:estado", () => estadoDeps());
 

@@ -50,7 +50,11 @@ function meusIps(): Set<string> {
 let soquete: Socket | null = null;
 let farol: NodeJS.Timeout | null = null;
 let varredura: NodeJS.Timeout | null = null;
+let sonda: NodeJS.Timeout | null = null;
 let anunciando: { siteId: string; porta: number } | null = null;
+/** Quando o nosso próprio pacote nos voltou pela última vez. Ver `farolVivo`. */
+let eco = 0;
+let abertoEm = 0;
 
 const vistos = new Map<string, Vizinho & { visto: number }>();
 const ouvintes: (() => void)[] = [];
@@ -109,8 +113,12 @@ function abrir(): void {
   });
   s.on("message", (carga, rinfo) => {
     // O próprio grito volta pela difusão. Filtrar aqui, e não na lista, é o que
-    // impede o Studio de se oferecer a si mesmo como vizinho.
-    if (meusIps().has(rinfo.address)) return;
+    // impede o Studio de se oferecer a si mesmo como vizinho — e a volta é a
+    // prova de que o caminho está aberto, então fica registada antes de sair.
+    if (meusIps().has(rinfo.address)) {
+      eco = Date.now();
+      return;
+    }
     ler(carga, rinfo.address);
   });
   s.bind(PORTA_FAROL, () => {
@@ -119,9 +127,44 @@ function abrir(): void {
     } catch {
       /* sem difusão nesta placa: ainda dá pra ouvir */
     }
+    abertoEm = Date.now();
+    sondar();
   });
   varredura ??= setInterval(varrer, VARRER_MS);
   varredura.unref?.();
+  sonda ??= setInterval(sondar, ANUNCIO_MS);
+  sonda.unref?.();
+}
+
+/**
+ * A difusão volta sempre à placa que a emitiu — foi medido: cinco enviados, cinco
+ * recebidos. Quem não se ouve a si mesmo não tem vizinho nenhum a quem ouvir, e
+ * a lista vazia deixa de ser "ninguém abriu sessão" para ser "não estou a sair".
+ *
+ * Vai à parte do anúncio porque quem entra numa sessão não anuncia nada, e
+ * precisa na mesma de saber se a rede está cortada. O `t` não é o do farol, então
+ * o `ler` deita fora e ninguém aparece como vizinho por causa da sonda.
+ */
+function sondar(): void {
+  if (!soquete) return;
+  const carga = Buffer.from('{"t":"criarte-eco"}');
+  for (const destino of enderecosDeDifusao()) {
+    soquete.send(carga, PORTA_FAROL, destino, () => {
+      /* placa sem difusão: o `farolVivo` conta a história a seguir */
+    });
+  }
+}
+
+/**
+ * `false` quer dizer que a difusão não sai desta máquina. No macOS 14 é quase
+ * sempre a autorização de Rede Local por dar; também pode ser AP isolation no
+ * router. Enquanto o soquete é novo devolve `true`: sem isso o painel acusava
+ * bloqueio no instante em que abre, antes de haver tempo para o primeiro eco.
+ */
+export function farolVivo(): boolean {
+  if (!soquete) return true;
+  if (Date.now() - abertoEm < VALIDADE_MS) return true;
+  return Date.now() - eco < VALIDADE_MS;
 }
 
 function gritar(): void {

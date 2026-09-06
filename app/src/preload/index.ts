@@ -14,6 +14,7 @@ type ConviteMudou = { id: string; marca: number };
 type Patch = { caminho: (string | number)[]; valor: unknown };
 type Tranca = { secao: string; nome: string };
 type Vizinho = { endereco: string; nome: string; siteId: string };
+type Perto = { lista: Vizinho[]; vivo: boolean };
 type EstadoDeps = {
   raiz: string | null;
   temManifesto: boolean;
@@ -106,8 +107,8 @@ const api = {
   coopAsset: (origens: string[]) => invoke<AssetImportado[]>("coop:asset", origens),
   coopPickAsset: (pasta: boolean) => invoke<AssetImportado[]>("coop:pickAsset", pasta),
   coopTranca: (secao: string, soltar: boolean) => invoke<boolean>("coop:tranca", secao, soltar),
-  coopVizinhos: () => invoke<Vizinho[]>("coop:vizinhos"),
-  onCoopVizinhos: ouvir<Vizinho[]>("coop:vizinhos"),
+  coopVizinhos: () => invoke<Perto>("coop:vizinhos"),
+  onCoopVizinhos: ouvir<Perto>("coop:vizinhos"),
   onCoopEstado: ouvir<EstadoCoop>("coop:estado"),
   onCoopPatch: ouvir<Patch>("coop:patch"),
   onCoopCheio: ouvir<{ doc: Record<string, unknown> }>("coop:cheio"),

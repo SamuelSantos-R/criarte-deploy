@@ -150,12 +150,65 @@ function Linha({
   );
 }
 
+/** Uma paleta está posta quando todas as cores que ela define batem certo. */
+function estaPosta(paleta: Paleta, tema: Record<string, string>): boolean {
+  return Object.entries(paleta.cores).every(
+    ([k, v]) => (tema[k] ?? "").trim().toLowerCase() === v.toLowerCase(),
+  );
+}
+
+// As quatro que se leem à distância: o destaque manda na página, o par de fundos
+// dá o tom, e o filete diz se a paleta é quente ou fria.
+const AMOSTRA = ["destaque", "fundo-2", "fundo-1", "filete"];
+
+function Paletas({
+  tema,
+  onAplicar,
+}: {
+  tema: Record<string, string>;
+  onAplicar: (cores: Record<string, string>) => void;
+}): ReactElement {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {PALETAS.map((p) => {
+        const posta = estaPosta(p, tema);
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onAplicar(p.cores)}
+            title={p.nota}
+            aria-pressed={posta}
+            className={cn(
+              "no-drag group flex w-[152px] flex-col border text-left transition-colors",
+              posta ? "border-text" : "border-rule hover:border-muted",
+            )}
+          >
+            <span className="flex h-9">
+              {AMOSTRA.map((c) => (
+                <span key={c} className="flex-1" style={{ background: p.cores[c] }} />
+              ))}
+            </span>
+            <span className="flex items-baseline justify-between border-t border-rule px-2 py-1.5">
+              <span className="text-[12px] text-text">{p.nome}</span>
+              {posta && <span className="font-mono text-serial uppercase text-muted">posta</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function PainelTema({
   tema,
   onChange,
+  onAplicarPaleta,
 }: {
   tema: Record<string, string>;
   onChange: (token: string, valor: string) => void;
+  /** Troca a paleta toda num patch só, em vez de 19 — o co-op recebe uma mensagem. */
+  onAplicarPaleta: (cores: Record<string, string>) => void;
 }): ReactElement {
   // Papel que existe no convite.json mas o Studio não conhece continua editável:
   // um convite antigo abre sem perder cor nenhuma.
@@ -180,11 +233,24 @@ export function PainelTema({
         paleta, ou escreve o hex à direita.
       </p>
 
+      <section className="mb-9">
+        <div className="mb-2 flex items-baseline gap-3">
+          <span className="font-mono text-serial text-muted/50">01</span>
+          <span className="font-mono text-label uppercase text-text">paletas prontas</span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted/80">
+          Põe a paleta inteira de uma vez. Depois dá para mexer linha a linha — e o que ficar
+          diferente já não conta como paleta posta.
+        </p>
+        <Paletas tema={tema} onAplicar={onAplicarPaleta} />
+      </section>
+
       {grupos.map((grupo, i) => (
         <section key={grupo.titulo} className="mb-9 last:mb-0">
           <div className="mb-2 flex items-baseline gap-3">
             <span className="font-mono text-serial text-muted/50">
-              {String(i + 1).padStart(2, "0")}
+              {String(i + 2).padStart(2, "0")}
             </span>
             <span className="font-mono text-label uppercase text-text">{grupo.titulo}</span>
             <span className="h-px flex-1 bg-rule" />
@@ -231,3 +297,74 @@ export const TEMA_PADRAO: Record<string, string> = {
   manual: "#B08A4A",
   "card-borda": "#D6BB8D",
 };
+
+export type Paleta = { id: string; nome: string; nota: string; cores: Record<string, string> };
+
+/**
+ * As duas paletas novas foram medidas contra os fundos que elas próprias trazem:
+ * todo o texto fica em 4.5:1 ou acima, e o `countdown-texto` acima de 5.5:1 sobre
+ * o `destaque` — que é o fundo do cartão da contagem, não um fundo de secção.
+ *
+ * A dourada fica como está (o pior par é 2.82:1, no chapéu) porque é a que já
+ * está publicada em todos os convites; mexer nela repintava o que já foi enviado.
+ */
+export const PALETAS: Paleta[] = [
+  {
+    id: "dourado",
+    nome: "Dourado",
+    nota: "A de sempre.",
+    cores: TEMA_PADRAO,
+  },
+  {
+    id: "oliva-claro",
+    nome: "Oliva claro",
+    nota: "Fundos em verde muito lavado, letra em oliva fechado.",
+    cores: {
+      destaque: "#5B6340",
+      e: "#F7F8F0",
+      "iban-fundo": "#F4F5EC",
+      "recado-fundo": "#FFFFFF",
+      "fundo-1": "#F4F5EC",
+      "fundo-2": "#EBEEE1",
+      chapeu: "#646E46",
+      filete: "#9AA575",
+      "countdown-texto": "#F7F8F0",
+      "countdown-borda": "#8A9463",
+      versiculo: "#4E5638",
+      bencao: "#5B6340",
+      pais: "#5B6340",
+      historia: "#5A6239",
+      evento: "#4E5638",
+      "nosso-dia": "#4E5638",
+      presentes: "#414830",
+      manual: "#5A6239",
+      "card-borda": "#C7CFAE",
+    },
+  },
+  {
+    id: "terracota",
+    nome: "Terracota",
+    nota: "Areia quente e barro cozido, sem nada de dourado.",
+    cores: {
+      destaque: "#93513C",
+      e: "#FCF7F2",
+      "iban-fundo": "#FBF6F1",
+      "recado-fundo": "#FFFFFF",
+      "fundo-1": "#FBF6F1",
+      "fundo-2": "#F4E7DD",
+      chapeu: "#8C5240",
+      filete: "#CE9C80",
+      "countdown-texto": "#FCF7F2",
+      "countdown-borda": "#C4886B",
+      versiculo: "#8A4E39",
+      bencao: "#93513C",
+      pais: "#93513C",
+      historia: "#8C5240",
+      evento: "#8A4E39",
+      "nosso-dia": "#8A4E39",
+      presentes: "#74402E",
+      manual: "#8C5240",
+      "card-borda": "#E2C4AF",
+    },
+  },
+];

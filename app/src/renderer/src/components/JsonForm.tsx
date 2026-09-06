@@ -352,6 +352,11 @@ export function JsonForm({
       <PainelTema
         tema={valor as Record<string, string>}
         onChange={(token, cor) => alterar([secao, token], cor)}
+        // Espalhado por cima do que está lá: cor que a paleta não define — de um
+        // modelo antigo — fica onde estava em vez de desaparecer do convite.
+        onAplicarPaleta={(cores) =>
+          alterar([secao], { ...(valor as Record<string, string>), ...cores })
+        }
       />
     );
   }

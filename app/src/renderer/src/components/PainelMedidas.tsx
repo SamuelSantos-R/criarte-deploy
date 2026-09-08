@@ -77,6 +77,15 @@ const MEDIDAS: Medida[] = [
     padrao: 230,
   },
   {
+    chave: "countdownDataTamanho",
+    rotulo: "data do countdown",
+    dica: "O dia · mês · ano grande dentro do cartão. Teto no computador; no telemóvel continua a acompanhar a tela.",
+    min: 20,
+    max: 80,
+    passo: 1,
+    padrao: 44,
+  },
+  {
     chave: "vasoLargura",
     rotulo: "vaso dos presentes",
     dica: "Largura. A altura acompanha sozinha.",
@@ -316,11 +325,11 @@ export function LinhaMedida({
       {/* A régua não é um widget colado embaixo do rótulo: é a própria linha que
           enche. Arrastar em qualquer ponto move o valor; os botões ficam por cima. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 bg-accent/15"
+        className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/15"
         style={{ width: `${pct}%` }}
         aria-hidden
       />
-      <div className="pointer-events-none absolute inset-y-0 w-px bg-accent" style={{ left: `${pct}%` }} aria-hidden />
+      <div className="pointer-events-none absolute inset-y-0 w-px bg-cyan" style={{ left: `${pct}%` }} aria-hidden />
 
       <input
         type="range"
@@ -332,14 +341,14 @@ export function LinhaMedida({
         aria-label={`${medida.rotulo} em pixels`}
         className={cn(
           "no-drag absolute inset-0 h-full w-full cursor-ew-resize appearance-none bg-transparent opacity-0",
-          "focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+          "focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
         )}
       />
 
       <div className="pointer-events-none relative flex items-center gap-4 py-3 pl-4 pr-2">
         <div className="min-w-0 flex-1">
-          <span className="font-mono text-[12px] text-text">{medida.rotulo}</span>
-          <p className="mt-0.5 max-w-[44ch] text-[11px] leading-[1.5] text-muted/80">{medida.dica}</p>
+          <span className="text-[12px] text-text">{medida.rotulo}</span>
+          <p className="mt-0.5 max-w-[44ch] text-[11px] leading-[1.5] text-muted">{medida.dica}</p>
         </div>
 
         <div className="pointer-events-auto flex shrink-0 items-center gap-1">
@@ -353,7 +362,7 @@ export function LinhaMedida({
               className={cn(
                 "no-drag flex h-7 w-7 items-center justify-center border border-rule text-muted transition-colors",
                 "hover:border-rule-strong hover:text-text",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
                 "disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-rule disabled:hover:text-muted",
               )}
             >
@@ -361,7 +370,7 @@ export function LinhaMedida({
             </button>
           ))}
 
-          <span className="flex w-[62px] items-baseline justify-end gap-0.5 pr-1 font-mono text-[12px] tabular-nums text-text">
+          <span className="flex w-[62px] items-baseline justify-end gap-0.5 pr-1 gauge font-narrow text-[12px] font-semibold text-text">
             <input
               value={rascunho ?? String(atual)}
               onChange={(e) => setRascunho(e.target.value)}
@@ -373,7 +382,7 @@ export function LinhaMedida({
               inputMode="decimal"
               aria-label={`${medida.rotulo} em ${unidade}`}
               className={cn(
-                "no-drag w-full min-w-0 bg-transparent text-right font-mono text-[12px] tabular-nums text-text",
+                "no-drag w-full min-w-0 bg-transparent text-right gauge font-narrow text-[12px] font-semibold text-text",
                 "focus:bg-surface-2 focus:outline-none",
               )}
             />
@@ -388,7 +397,7 @@ export function LinhaMedida({
             title={`Padrão: ${medida.padrao}${unidade}`}
             className={cn(
               "no-drag flex h-7 w-7 items-center justify-center text-muted transition-colors hover:text-text",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
               "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
             )}
           >
@@ -397,7 +406,7 @@ export function LinhaMedida({
         </div>
       </div>
 
-      <div className="pointer-events-none relative flex justify-between px-4 pb-2 font-mono text-serial text-muted/50">
+      <div className="pointer-events-none relative flex justify-between px-4 pb-2 font-narrow font-semibold text-gauge text-muted">
         <span>{medida.min}</span>
         <span>{medida.max}</span>
       </div>
@@ -423,14 +432,14 @@ function LinhaEspaco({
 
   return (
     <div className="flex items-center gap-3 border-b border-rule py-2 pl-4 pr-2 last:border-b-0 focus-within:bg-surface-2/40">
-      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">{bloco.rotulo}</span>
+      <span className="min-w-0 flex-1 truncate text-[12px] text-text">{bloco.rotulo}</span>
 
       {(["topo", "base"] as const).map((lado) => {
         const bruto = valores[lado];
         const atual = typeof bruto === "number" && Number.isFinite(bruto) ? bruto : bloco[lado];
         return (
           <label key={lado} className="flex shrink-0 items-baseline gap-1.5">
-            <span className="font-mono text-serial uppercase tracking-[0.12em] text-muted/60">
+            <span className="font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted">
               {lado}
             </span>
             <input
@@ -447,8 +456,8 @@ function LinhaEspaco({
               inputMode="decimal"
               aria-label={`${bloco.rotulo}, folga de ${lado} em pixels`}
               className={cn(
-                "no-drag w-[52px] border border-rule bg-transparent px-1.5 py-1 text-right font-mono text-[12px] tabular-nums text-text",
-                "hover:border-rule-strong focus:border-accent focus:bg-surface-2 focus:outline-none",
+                "no-drag w-[52px] border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold text-text",
+                "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-none",
               )}
             />
           </label>
@@ -466,7 +475,7 @@ function LinhaEspaco({
         title={`Origem: ${bloco.topo} / ${bloco.base}px`}
         className={cn(
           "no-drag flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-text",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
           "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
         )}
       >
@@ -529,8 +538,8 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">tamanhos</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">tamanhos</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(MEDIDAS.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
@@ -549,13 +558,13 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">nome dos noivos</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">nome dos noivos</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(ESPACAMENTOS.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
           Fonte de desenho costuma colar as letras umas nas outras e as linhas umas
           por cima das outras. Aqui abre-se o nome sem mexer no tamanho — de lado
           por linha, porque não apertam todas igual, e de cima a baixo de uma vez.
@@ -574,13 +583,13 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">rodapé</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">rodapé</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(RODAPE.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
           O nome do casal fecha o convite na mesma fonte do topo, mas em tamanho
           próprio: aqui não é um clamp, é um número fixo.
         </p>
@@ -598,13 +607,13 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">altura das secções</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">altura das secções</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(BLOCOS.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
           A folga em cima e a folga embaixo de cada bloco, em pixels. Secção que
           você não tocar fica com a medida com que o convite foi desenhado.
         </p>
@@ -622,13 +631,13 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">opacidades</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">opacidades</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(OPACIDADES.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
           Peças que não têm cor própria: saem da cor de destaque, só que esbatidas.
           Mudar a cor de destaque muda todas de uma vez.
         </p>
@@ -646,8 +655,8 @@ export function PainelMedidas({
 
       <section>
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">fonte dos noivos</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">fonte dos noivos</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(fontes.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
@@ -657,9 +666,9 @@ export function PainelMedidas({
               onClick={() => void carregar()}
               disabled={carregando}
               className={cn(
-                "no-drag flex shrink-0 items-center gap-1.5 self-center border border-rule px-2.5 py-1 font-mono text-serial uppercase tracking-[0.12em] text-muted transition-colors",
+                "no-drag flex shrink-0 items-center gap-1.5 self-center border border-rule px-2.5 py-1 font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted transition-colors",
                 "hover:border-rule-strong hover:text-text",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
                 "disabled:cursor-not-allowed disabled:opacity-40",
               )}
             >
@@ -670,7 +679,7 @@ export function PainelMedidas({
         </div>
         {/* Sem amostra visual de propósito: o Studio não carrega as fontes do site,
             e um preview desenhado com a fonte errada mente mais do que ajuda. */}
-        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
           Vale para os dois nomes e o <span className="font-mono">&amp;</span> do meio. A
           amostra de verdade é o preview ao lado.{" "}
           {convidado
@@ -679,13 +688,13 @@ export function PainelMedidas({
         </p>
 
         {erroFonte && (
-          <p className="mb-3 border-l-2 border-accent pl-3 font-mono text-[11px] leading-[1.6] text-text">
+          <p className="mb-3 border-l-2 border-pencil bg-pencil/5 py-2 pl-3 font-mono text-[11px] leading-[1.6] text-pencil">
             {erroFonte}
           </p>
         )}
 
         {lista.length === 0 ? (
-          <p className="border-y border-rule py-4 pl-4 text-[12px] leading-[1.6] text-muted/70">
+          <p className="border-y border-rule py-4 pl-4 text-[12px] leading-[1.6] text-muted">
             O banco está vazio. Carregue um <span className="font-mono">.ttf</span>,{" "}
             <span className="font-mono">.otf</span>, <span className="font-mono">.woff</span> ou{" "}
             <span className="font-mono">.woff2</span>.
@@ -697,8 +706,8 @@ export function PainelMedidas({
                 key={f.chave}
                 className={cn(
                   "no-drag flex cursor-pointer items-center gap-3 border-b border-rule py-2.5 pl-4 pr-3 last:border-b-0",
-                  "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent",
-                  f.chave === fonte ? "bg-accent/10" : "hover:bg-surface-2/40",
+                  "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-cyan",
+                  f.chave === fonte ? "bg-cyan/10" : "hover:bg-surface-2/40",
                 )}
               >
                 <input
@@ -706,7 +715,7 @@ export function PainelMedidas({
                   name="noivosFonte"
                   checked={f.chave === fonte}
                   onChange={() => onChange(["noivosFonte"], f.chave)}
-                  className="no-drag h-3.5 w-3.5 shrink-0 accent-accent"
+                  className="no-drag h-3.5 w-3.5 shrink-0 accent-cyan"
                 />
                 <span
                   className={cn(
@@ -716,7 +725,7 @@ export function PainelMedidas({
                 >
                   {f.nome}
                 </span>
-                <span className="ml-auto shrink-0 font-mono text-serial uppercase tabular-nums text-muted/60">
+                <span className="ml-auto shrink-0 font-narrow font-semibold text-gauge uppercase tabular-nums text-muted">
                   {f.ausente ? "não está no banco" : `${Math.round(f.bytes / 1024)} kb`}
                 </span>
               </label>

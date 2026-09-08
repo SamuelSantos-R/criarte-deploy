@@ -31,7 +31,7 @@ function csp(): string {
     "img-src 'self' data: https://*.r2.dev",
     "object-src 'none'",
     // O preview é um <iframe> pro `next dev` local. Só o loopback: o app nunca
-    // emoldura nada da internet. O preview do anfitrião na sessão a dois entra
+    // emoldura nada da internet. O preview do anfitrião na sessão coop entra
     // por aqui também, porque o espelho o serve em 127.0.0.1.
     "frame-src http://localhost:* http://127.0.0.1:*",
     "base-uri 'none'",
@@ -62,9 +62,10 @@ function createWindow(): void {
     minWidth: 1160,
     minHeight: 680,
     show: false,
-    backgroundColor: "#F3F0E6",
+    backgroundColor: "#5A5D5F",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 18, y: 22 },
+    // Centrado nos 44px da margem de chapa.
+    trafficLightPosition: { x: 18, y: 16 },
     webPreferences: {
       preload: join(RAIZ, "out", "preload", "index.cjs"),
       sandbox: true,

@@ -1,5 +1,7 @@
 import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, extname, join, resolve } from "node:path";
+import { app } from "electron";
 import { containedPath } from "./paths";
 import { siteDir } from "./sites";
 
@@ -96,6 +98,31 @@ export async function gravarAsset(
   const nome = nomeSeguro(nomeBruto);
   await writeFile(await containedPath(destinoDir, nome), conteudo);
   return { nome, web: `/assets/${nome}`, bytes: conteudo.byteLength };
+}
+
+/**
+ * As imagens que uma secção precisa para nascer inteira. Viajam dentro do app,
+ * como as peças da tokenização: semear o RSVP num convite que nunca teve as
+ * alianças tem de deixar a imagem lá, não só o caminho para ela.
+ */
+const SEMENTES_DE_ASSET: Record<string, string> = {
+  rsvp: "aliancas-casamento.png",
+};
+
+/** Copia o asset de partida da secção, se o convite ainda não o tiver. */
+export async function semearAsset(siteId: string, secao: string): Promise<AssetImportado | null> {
+  const nome = SEMENTES_DE_ASSET[secao];
+  if (!nome) return null;
+  const dir = await siteDir(siteId);
+  const destino = await containedPath(dir, "public", "assets", nome);
+  // Nunca por cima: quem já trocou as alianças por outras não as perde ao
+  // desligar e voltar a ligar a secção.
+  if (existsSync(destino)) return null;
+  const molde = app.isPackaged
+    ? join(process.resourcesPath, "rsvp", nome)
+    : resolve(app.getAppPath(), "resources", "rsvp", nome);
+  const [importado] = await importAssets(siteId, [molde]);
+  return importado ?? null;
 }
 
 export const FILTROS = [

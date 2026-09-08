@@ -5,6 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Papéis — o valor vem da região (cabine por omissão, mesa em .light).
         ground: "var(--ground)",
         surface: "var(--surface)",
         "surface-2": "var(--surface-2)",
@@ -12,27 +13,29 @@ export default {
         "rule-strong": "var(--rule-strong)",
         muted: "var(--muted)",
         text: "var(--text)",
-        accent: "var(--accent)",
-        "accent-deep": "var(--accent-deep)",
-        sage: "var(--sage)",
-        ok: "var(--ok)",
-        bad: "var(--bad)",
-        paper: "var(--paper)",
-        "paper-ink": "var(--paper-ink)",
-        "paper-muted": "var(--paper-muted)",
+        focus: "var(--focus)",
+
+        // Tinta de processo — fixa, cada uma com o seu cargo.
+        cyan: "var(--cyan)",
+        magenta: "var(--magenta)",
+        yellow: "var(--yellow)",
+        reg: "var(--reg)",
+        pencil: "var(--pencil)",
       },
       fontFamily: {
-        display: ['"Instrument Serif"', "Georgia", "serif"],
-        sans: ['"IBM Plex Sans"', "ui-sans-serif", "sans-serif"],
-        mono: ['"IBM Plex Mono"', "ui-monospace", "monospace"],
+        sans: ["Archivo", "ui-sans-serif", "sans-serif"],
+        narrow: ['"Archivo Narrow"', "Archivo", "ui-sans-serif", "sans-serif"],
+        // Só para saída literal de máquina: consola, caminhos, endereços.
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       // Saltos reais, não 1.125 em tudo.
       fontSize: {
-        serial: ["10px", { lineHeight: "1.1", letterSpacing: "0.14em" }],
-        label: ["11px", { lineHeight: "1.3", letterSpacing: "0.16em" }],
-        body: ["14px", { lineHeight: "1.55" }],
-        h2: ["24px", { lineHeight: "1.15" }],
-        display: ["42px", { lineHeight: "1.02", letterSpacing: "-0.015em" }],
+        gauge: ["10px", { lineHeight: "1.1", letterSpacing: "0.18em" }],
+        label: ["11px", { lineHeight: "1.2", letterSpacing: "0.14em" }],
+        body: ["13px", { lineHeight: "1.5" }],
+        read: ["15px", { lineHeight: "1.5" }],
+        head: ["20px", { lineHeight: "1.15", letterSpacing: "-0.01em" }],
+        readout: ["34px", { lineHeight: "1", letterSpacing: "0.18em" }],
       },
     },
   },

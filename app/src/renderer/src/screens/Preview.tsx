@@ -67,7 +67,7 @@ export function Preview({
           className="w-[200px]"
         />
         <SeletorAparelho valor={aparelho} onChange={setAparelho} className="w-[210px]" />
-        <span className="font-mono text-serial uppercase tracking-[0.16em] text-muted">
+        <span className="font-narrow font-semibold text-gauge uppercase tracking-[0.16em] text-muted">
           {largura}×{altura}
         </span>
 
@@ -120,13 +120,13 @@ export function Preview({
             ) : (
               <>
                 <p className="text-[13px] text-muted">Escolha o site e suba o preview.</p>
-                <p className="font-mono text-[11px] text-muted/70">
+                <p className="font-mono text-[11px] text-muted">
                   Roda o `next dev` da pasta do site — nada vai pro servidor.
                 </p>
               </>
             )}
             {erro && (
-              <pre className="mt-3 max-w-[560px] whitespace-pre-wrap border-l-2 border-bad pl-3 text-left font-mono text-[11px] text-bad">
+              <pre className="mt-3 max-w-[560px] whitespace-pre-wrap border-l-2 border-pencil pl-3 text-left font-mono text-[11px] text-pencil">
                 {erro}
               </pre>
             )}

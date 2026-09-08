@@ -35,7 +35,7 @@ export function ipDaRede(): string | null {
  * pra resolver um import — assim um convite recém-criado abre no preview sem
  * ninguém precisar de terminal.
  */
-function acharNext(desde: string): string | null {
+export function acharNext(desde: string): string | null {
   for (let dir = desde; ; ) {
     const bin = join(dir, "node_modules", "next", "dist", "bin", "next");
     if (existsSync(bin)) return bin;
@@ -45,7 +45,26 @@ function acharNext(desde: string): string | null {
   }
 }
 
-function portaLivre(): Promise<number> {
+function livre(porta: number): Promise<boolean> {
+  return new Promise((res) => {
+    const s = createServer();
+    s.on("error", () => res(false));
+    s.listen(porta, "0.0.0.0", () => s.close(() => res(true)));
+  });
+}
+
+/**
+ * Sempre a mesma porta, e não uma efémera ao acaso. Com porta nova a cada
+ * arranque, o QR lido ontem e o separador que ficou aberto no telemóvel apontam
+ * para uma porta que já não existe — dá "o servidor não responde", que parece
+ * bloqueio de rede e não é. Fixa, o mesmo endereço serve sempre, e ainda dá para
+ * escrever à mão. Se estiver ocupada anda uma casa, até desistir e pedir uma
+ * qualquer ao sistema.
+ */
+const PORTA_BASE = 4321;
+
+async function portaLivre(): Promise<number> {
+  for (let p = PORTA_BASE; p < PORTA_BASE + 8; p++) if (await livre(p)) return p;
   return new Promise((res, rej) => {
     const s = createServer();
     s.on("error", rej);
@@ -187,7 +206,7 @@ function frameDoPreview(wc: WebContents): ReturnType<typeof wc.mainFrame.framesI
 }
 
 /**
- * O convidado do À Dois não tem servidor nenhum: vê o preview do anfitrião pelo
+ * O convidado da coop não tem servidor nenhum: vê o preview do anfitrião pelo
  * espelho, em `127.0.0.1`. Para pintar tanto faz de quem é o `next dev` do outro
  * lado — o que interessa é o quadro que está mesmo na janela.
  */
@@ -277,6 +296,7 @@ const PINTADAS = [
   "noivoEspacamento",
   "eEspacamento",
   "noivosAltura",
+  "countdownDataTamanho",
   "rodapeTamanho",
   "rodapeAltura",
   "rodapeEspacamento",

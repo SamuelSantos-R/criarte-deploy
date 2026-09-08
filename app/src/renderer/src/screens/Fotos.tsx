@@ -71,7 +71,7 @@ export function Fotos({
           className="w-[220px]"
         />
         <label className="no-drag flex items-center gap-2">
-          <span className="font-mono text-label uppercase text-muted">Lado</span>
+          <span className="font-narrow font-semibold text-label uppercase text-muted">Lado</span>
           <Input
             type="number"
             min={200}
@@ -83,7 +83,7 @@ export function Fotos({
           />
         </label>
         <label className="no-drag flex items-center gap-2">
-          <span className="font-mono text-label uppercase text-muted">Qual.</span>
+          <span className="font-narrow font-semibold text-label uppercase text-muted">Qual.</span>
           <Input
             type="number"
             min={1}

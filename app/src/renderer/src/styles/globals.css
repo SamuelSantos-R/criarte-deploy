@@ -1,10 +1,8 @@
-@import "@fontsource/instrument-serif/400.css";
-@import "@fontsource/instrument-serif/400-italic.css";
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/archivo/400.css";
+@import "@fontsource/archivo/500.css";
+@import "@fontsource/archivo/600.css";
+@import "@fontsource/archivo-narrow/400.css";
+@import "@fontsource/archivo-narrow/600.css";
 
 @tailwind base;
 @tailwind components;
@@ -12,38 +10,49 @@
 
 @layer base {
   :root {
-    /* 70% — o chão. Bancada de papel bege, quase branco. Três degraus curtos:
-       em fundo claro a hierarquia vem da régua, não do contraste de fundos. */
-    --ground: #f3f0e6;
-    --surface: #ede9db;
-    --surface-2: #e2ddc9;
+    /* ------------------------------------------------------------------
+       TINTA DE PROCESSO — fixa em toda a tela. Cada tinta tem um cargo e
+       não o empresta a ninguém. Contra a bancada só o amarelo passa como
+       texto (5,5:1); as outras entram como bloco cheio, com o tipo por
+       cima em registo (ciano 5,1:1 · amarelo 14,4:1) ou branco (magenta
+       4,5:1). Sobre a mesa de luz o lápis lê a 4,9:1.
+       ------------------------------------------------------------------ */
+    --cyan: #0093d3; /* servidor a correr, ação primária */
+    --magenta: #e5007e; /* coop — a outra mão */
+    --yellow: #ffed00; /* por gravar */
+    --reg: #1a1a1a; /* registo: estrutura, carimbo de publicado */
+    --pencil: #d0202a; /* lápis vermelho: erro */
 
-    /* 20% — estrutura. Réguas, texto secundário, divisórias. */
-    --rule: #d2ccb4;
-    --rule-strong: #b0a98c;
-    --muted: #6b6853;
-    --text: #232719;
+    /* ------------------------------------------------------------------
+       PAPÉIS. As mesmas seis funções — chão, superfície, régua, texto —
+       mudam de valor conforme a região. A cabine é o predefinido; a mesa
+       de luz redefine-as em .light. Assim uma peça sabe onde está sem
+       saber que cor tem.
+       ------------------------------------------------------------------ */
+    --ground: #5a5d5f;
+    --surface: #4e5153;
+    --surface-2: #3e4145;
+    --rule: #6e7173;
+    --rule-strong: #87898b;
+    --muted: #d4d9de; /* 4,67:1 */
+    --text: #f1f3f5; /* 5,90:1 */
 
-    /* 10% — dois acentos com trabalhos diferentes, nunca no mesmo lugar: a
-       oliva é AÇÃO (botão, régua, serial) e a oliva profunda é LUGAR (foco,
-       marcador de ativo). Mesma família, luminosidades distantes — em fundo
-       claro é o valor que separa os dois, não o matiz.
-       Sobre o chão: oliva 4,99:1, oliva profunda 8,3:1, texto 13,5:1. */
-    --accent: #5b6e33;
-    --sage: #3e4a26;
-    /* Sálvia profunda — só vive sobre o papel creme da prova. */
-    --accent-deep: #4f6249;
+    /* Cabine: o anel de foco e o marcador de ativo são amarelos, porque o
+       ciano afoga-se no cinzento. */
+    --focus: var(--yellow);
+  }
 
-    /* Semântico — carrega estado, não é o acento. Escurecidos: o verde e o
-       coral claros do tema antigo sumiam num fundo bege. */
-    --ok: #4f7a3a;
-    --bad: #b23c22;
-
-    /* A prova. Agora é a peça mais clara da tela — o papel do convite em cima
-       da bancada bege, e não o contrário. */
-    --paper: #fdfaf4;
-    --paper-ink: #3d2b1a;
-    --paper-muted: #6b5d4c;
+  /* Mesa de luz D50 — a única região clara. Toda a leitura e toda a
+     edição acontecem aqui em cima; a cabine só segura instrumentos. */
+  .light {
+    --ground: #f4f5f6;
+    --surface: #eaecee;
+    --surface-2: #dfe2e5;
+    --rule: #d6d9dc;
+    --rule-strong: #b9bdc1;
+    --muted: #5a5e63; /* 5,98:1 */
+    --text: #1a1a1a; /* 15,9:1 */
+    --focus: var(--cyan);
   }
 
   * {
@@ -54,23 +63,30 @@
     margin: 0;
     background: var(--ground);
     color: var(--text);
-    font-family: "IBM Plex Sans", ui-sans-serif, sans-serif;
-    font-size: 14px;
+    font-family: Archivo, ui-sans-serif, sans-serif;
+    font-size: 13px;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
     user-select: none;
   }
 
-  /* Foco sempre visível — nunca outline:none sem substituto. */
+  /* Foco sempre visível — nunca outline:none sem substituto. Aresta viva. */
   :focus-visible {
-    outline: 2px solid var(--sage);
+    outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: 2px;
+    border-radius: 0;
   }
 
   input,
   textarea {
     user-select: text;
+    caret-color: var(--magenta);
+  }
+
+  /* Marca-texto sobre a prova. */
+  ::selection {
+    background: var(--yellow);
+    color: var(--reg);
   }
 
   ::-webkit-scrollbar {
@@ -81,31 +97,27 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--rule);
-    border: 3px solid var(--ground);
-    border-radius: 6px;
+    background: var(--rule-strong);
+    border-radius: 0;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--rule-strong);
+    background: var(--muted);
   }
 }
 
 @layer components {
-  /* Grão sobre o chão — dá textura de papel de prova sem virar ilustração. */
-  .grain::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.035;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
   .drag-region {
     -webkit-app-region: drag;
   }
   .no-drag {
     -webkit-app-region: no-drag;
+  }
+
+  /* Mostrador de instrumento: algarismo que se lê de relance e não dança
+     de largura quando o número muda. */
+  .gauge {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
   }
 }
 

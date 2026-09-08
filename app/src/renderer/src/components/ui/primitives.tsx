@@ -3,21 +3,24 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// Padding/raio/elevação variam de propósito entre variantes — o "tudo com a
-// mesma cara" é justamente o que faz interface parecer gerada.
+// Um botão veste a tinta do estado que resolve: ciano põe o servidor de pé,
+// amarelo grava o que está por gravar, magenta fala com a outra mão, lápis
+// desfaz. Bloco cheio, aresta viva, sem sombra — é tinta, não relevo.
 const button = cva(
-  "no-drag inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage",
+  "no-drag inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors duration-0 disabled:pointer-events-none disabled:opacity-40",
   {
     variants: {
       variant: {
-        primary: "bg-accent text-ground hover:brightness-90",
-        ghost: "text-muted hover:text-text hover:bg-surface-2",
-        outline: "border border-rule text-text hover:border-rule-strong hover:bg-surface",
-        danger: "border border-bad/40 text-bad hover:bg-bad/10",
+        primary: "bg-cyan text-reg hover:bg-cyan/85",
+        save: "bg-yellow text-reg hover:bg-yellow/85",
+        coop: "bg-magenta text-white hover:bg-magenta/85",
+        danger: "bg-pencil text-white hover:bg-pencil/85",
+        outline: "border border-rule-strong text-text hover:bg-surface-2",
+        ghost: "text-muted hover:bg-surface-2 hover:text-text",
       },
       size: {
-        sm: "h-[30px] px-3 text-[12px] rounded-[3px]",
-        md: "h-[38px] px-5 text-[13px] rounded-[4px]",
+        sm: "h-[28px] px-3 text-[12px]",
+        md: "h-[34px] px-5 text-[13px]",
       },
     },
     defaultVariants: { variant: "outline", size: "sm" },
@@ -38,34 +41,21 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
+// O campo é uma calha fresada: fundo recuado e a régua de baixo é a única
+// aresta. Ao focar, a régua engrossa e toma a tinta da região.
+const campo =
+  "no-drag w-full bg-surface text-[13px] text-text border-b-2 border-rule focus:border-focus focus:outline-none placeholder:text-muted transition-colors duration-0";
+
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (
-    <input
-      ref={ref}
-      className={cn(
-        "no-drag h-[34px] w-full bg-surface px-3 text-[13px] text-text",
-        "border-b border-rule focus:border-sage focus:outline-none",
-        "placeholder:text-muted/50 transition-colors",
-        className,
-      )}
-      {...props}
-    />
+    <input ref={ref} className={cn(campo, "h-[32px] px-2.5", className)} {...props} />
   ),
 );
 Input.displayName = "Input";
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
   ({ className, ...props }, ref) => (
-    <textarea
-      ref={ref}
-      className={cn(
-        "no-drag w-full resize-y bg-surface p-3 text-[13px] leading-[1.6] text-text",
-        "border-b border-rule focus:border-sage focus:outline-none",
-        "placeholder:text-muted/50 transition-colors",
-        className,
-      )}
-      {...props}
-    />
+    <textarea ref={ref} className={cn(campo, "resize-y p-2.5 leading-[1.6]", className)} {...props} />
   ),
 );
 Textarea.displayName = "Textarea";
@@ -81,18 +71,20 @@ export function Field({
 }): ReactElement {
   return (
     <label className="block">
-      <span className="mb-1.5 block font-mono text-label uppercase text-muted">{label}</span>
+      <span className="mb-1.5 block font-narrow text-label font-semibold uppercase text-muted">
+        {label}
+      </span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-muted/70">{hint}</span>}
+      {hint && <span className="mt-1 block text-[11px] text-muted">{hint}</span>}
     </label>
   );
 }
 
-/** Título de seção com régua — a régua carrega a hierarquia, não o tamanho da fonte. */
+/** Título de seção com régua — a régua carrega a hierarquia, não o corpo da fonte. */
 export function Rule({ children }: { children: ReactNode }): ReactElement {
   return (
     <div className="mb-5 mt-9 flex items-center gap-3 first:mt-0">
-      <span className="font-mono text-label uppercase text-muted">{children}</span>
+      <span className="font-narrow text-label font-semibold uppercase text-muted">{children}</span>
       <span className="h-px flex-1 bg-rule" />
     </div>
   );

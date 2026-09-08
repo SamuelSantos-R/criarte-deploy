@@ -72,12 +72,12 @@ export function RenomearSite({
           e.preventDefault();
           void confirmar();
         }}
-        className="w-[480px] border-l-2 border-accent bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[480px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
       >
         <div className="border-b border-rule px-7 py-4">
           <h2
             id="renomear-titulo"
-            className="font-mono text-label uppercase tracking-[0.18em] text-text"
+            className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text"
           >
             Renomear convite
           </h2>
@@ -97,16 +97,16 @@ export function RenomearSite({
           </Field>
 
           <p className="mt-3 font-mono text-[12px] text-muted">
-            {categoria}/{atual} <span className="text-text/60">→</span>{" "}
+            {categoria}/{atual} <span className="text-text">→</span>{" "}
             <span className="text-text">
               {categoria}/{NOME.test(limpo) ? limpo : "…"}
             </span>
           </p>
 
           {slug.trim() !== "" && !NOME.test(limpo) && (
-            <p className="mt-2 text-[12px] text-bad">Só minúsculas, números e hífen.</p>
+            <p className="mt-2 text-[12px] text-pencil">Só minúsculas, números e hífen.</p>
           )}
-          {erro && <p className="mt-2 text-[12px] text-bad">{erro}</p>}
+          {erro && <p className="mt-2 text-[12px] text-pencil">{erro}</p>}
 
           <p className="mt-5 text-[12px] leading-[1.7] text-muted">
             Os recados já deixados continuam neste convite — o mural não anda

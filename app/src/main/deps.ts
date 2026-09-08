@@ -49,7 +49,7 @@ export type EstadoDeps = {
  * O PATH de um app aberto pelo Finder não é o do terminal — vem do launchd e
  * quase nunca tem o Node. Por isso os caminhos são procurados à mão.
  */
-function candidatosNpm(): string[] {
+function candidatosUnix(): string[] {
   const fixos = ["/opt/homebrew/bin/npm", "/usr/local/bin/npm", "/usr/bin/npm"];
   const nvm = join(homedir(), ".nvm", "versions", "node");
   if (existsSync(nvm)) {
@@ -61,6 +61,45 @@ function candidatosNpm(): string[] {
     }
   }
   return fixos;
+}
+
+/**
+ * No Windows o `npm` do PATH é um `.cmd`, não um symlink para o `npm-cli.js` que
+ * precisamos — seguir o `.cmd` não leva a lado nenhum. O que serve é a pasta
+ * onde o `node.exe` mora: ao lado dele fica sempre
+ * `node_modules\npm\bin\npm-cli.js`, seja instalador oficial, nvm, fnm ou scoop.
+ *
+ * E aqui o PATH pode ser lido: ao contrário do launchd do macOS, o Explorer
+ * passa ao app o PATH do sistema, que é onde o instalador do Node se escreve.
+ */
+function candidatosWindows(): string[] {
+  const cli = (base: string): string => join(base, "node_modules", "npm", "bin", "npm-cli.js");
+  const bases: string[] = [];
+  for (const dir of (process.env.PATH ?? "").split(";")) {
+    const limpo = dir.trim().replace(/"/g, "");
+    if (limpo && existsSync(join(limpo, "node.exe"))) bases.push(limpo);
+  }
+  // Rede de segurança para o PATH que ainda não recarregou depois de instalar.
+  for (const v of [process.env.ProgramFiles, process.env["ProgramFiles(x86)"]]) {
+    if (v) bases.push(join(v, "nodejs"));
+  }
+  // Quem correu `npm i -g npm` fica com uma cópia mais nova aqui.
+  if (process.env.APPDATA) bases.push(join(process.env.APPDATA, "npm"));
+  // nvm-windows: o symlink aponta à versão em uso; senão, a mais recente.
+  if (process.env.NVM_SYMLINK) bases.push(process.env.NVM_SYMLINK);
+  const nvm = process.env.NVM_HOME;
+  if (nvm && existsSync(nvm)) {
+    try {
+      for (const v of readdirSync(nvm).sort().reverse()) bases.push(join(nvm, v));
+    } catch {
+      /* pasta ilegível conta como ausente */
+    }
+  }
+  return bases.map(cli);
+}
+
+function candidatosNpm(): string[] {
+  return process.platform === "win32" ? candidatosWindows() : candidatosUnix();
 }
 
 /**

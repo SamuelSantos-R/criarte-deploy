@@ -60,7 +60,11 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
       // Cada opção entra como par nomeado e só depois de passar pelo asJob.
       // A UI continua sem caminho para inventar flag (--guests-reset queima os
       // links já enviados).
-      const args = ["--yes"];
+      // A pasta escolhida na lista manda na categoria. Sem isto o CLI cai no
+      // palpite por conteúdo e um casamento com ares de noivado ia ao ar em
+      // noivado/<slug> — endereço diferente do que o Studio mostra.
+      const [categoria, slug] = job.siteId.split("/");
+      const args = ["--yes", "--category", categoria, "--slug", slug];
       if (job.dryRun) args.push("--dry-run");
       if (job.expires) args.push("--expires", job.expires);
       if (job.subdomain) args.push("--subdomain", job.subdomain);
@@ -75,9 +79,13 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
       const npm = acharNpm();
       if (!npm) throw new Error("não achei o npm nesta máquina");
       await prepararRaiz();
+      // Com o CI=1 do spawn o npm cala a barra de progresso e não imprime mais
+      // nada até acabar — numa máquina fria isso são minutos de consola vazia, e
+      // quem está a olhar conclui que travou. O `http` devolve uma linha por
+      // pacote baixado: lento continua lento, mas dá para ver que anda.
       return {
         script: npm,
-        args: ["install", "--no-audit", "--no-fund"],
+        args: ["install", "--no-audit", "--no-fund", "--loglevel=http"],
         cwd: requireSitesRoot(),
       };
     }
@@ -145,8 +153,21 @@ export async function startJob(sender: WebContents, job: Job): Promise<string> {
   child.stdout?.on("data", (c: Buffer) => emit("out", c));
   child.stderr?.on("data", (c: Buffer) => emit("err", c));
 
+  // O npm só fala enquanto baixa; gravar as dezenas de milhares de ficheiros é
+  // mudo, e num Windows com o Defender a cheirar cada um são minutos de consola
+  // parada. Quem está a olhar dá o install por morto e fecha o app a meio.
+  let relogio: NodeJS.Timeout | null = null;
+  if (job.kind === "deps") {
+    const inicio = Date.now();
+    emit("out", Buffer.from("A instalar as dependências. Na primeira vez leva vários minutos.\n"));
+    relogio = setInterval(() => {
+      emit("out", Buffer.from(`… ${Math.round((Date.now() - inicio) / 60000)} min, ainda a trabalhar.\n`));
+    }, 30_000);
+  }
+
   const finish = (code: number | null, erro?: string): void => {
     running.delete(runId);
+    if (relogio) clearInterval(relogio);
     if (sender.isDestroyed()) return;
     sender.send("cli:done", { runId, code: code ?? -1, erro: erro ?? null });
   };

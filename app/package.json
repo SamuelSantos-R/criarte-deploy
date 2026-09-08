@@ -1,6 +1,6 @@
 {
   "name": "criarte-studio",
-  "version": "5.40.0",
+  "version": "5.46.0",
   "description": "Fábrica de convites da Criarte Design AO",
   "main": "./out/main/index.js",
   "author": "Criarte Design AO",
@@ -18,9 +18,8 @@
     "subset-font": "^2.7.0"
   },
   "devDependencies": {
-    "@fontsource/ibm-plex-mono": "^5.1.1",
-    "@fontsource/ibm-plex-sans": "^5.1.1",
-    "@fontsource/instrument-serif": "^5.1.1",
+    "@fontsource/archivo": "^5.3.0",
+    "@fontsource/archivo-narrow": "^5.3.0",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-label": "^2.1.1",
     "@radix-ui/react-scroll-area": "^1.2.2",

@@ -1,14 +1,18 @@
 import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import { existsSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { loadSettings, saveSettings } from "./paths";
+import { estadoCredenciais, exportarCredenciais, importarCredenciais } from "./credenciais";
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, destinoPublicacao, startJob, type Job } from "./cli";
 import { estadoDeps } from "./deps";
 import { duplicarSite, renomearSite, salvarSessaoComoNovo } from "./duplicar";
-import { FILTROS, importAssets } from "./assets";
+import { FILTROS, importAssets, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
+import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
+import { plantarSecao } from "./plantar";
 import { estadoToken, tokenizar } from "./tokenizar";
 import { trocarPorWebp } from "./webp";
 import { vigiarConvite } from "./vigia";
@@ -174,6 +178,14 @@ export function registerIpc(): void {
     return importAssets(asString(id, "id"), origens.map((o) => asString(o, "caminho")));
   });
 
+  handle("assets:semente", (_e, id: unknown, secao: unknown) =>
+    semearAsset(asString(id, "id"), asString(secao, "secao")),
+  );
+
+  handle("secao:plantar", (_e, id: unknown, secao: unknown) =>
+    plantarSecao(asString(id, "id"), asString(secao, "secao")),
+  );
+
   handle("assets:webp", (_e, id: unknown) => trocarPorWebp(asString(id, "id")));
 
   handle("assets:pick", async (event, id: unknown, pasta: unknown) => {
@@ -210,6 +222,16 @@ export function registerIpc(): void {
   handle("preview:scroll", (event, ancora: unknown) =>
     rolarPreview(event.sender, asString(ancora, "âncora")),
   );
+
+  // O build fala durante ~35 a 80 segundos; as linhas vão saindo para a janela
+  // em vez de ficarem presas até ao fim, senão o botão parece pendurado.
+  handle("telemovel:construir", (event, id: unknown) =>
+    construirEspelho(asString(id, "id"), (linha) => {
+      if (!event.sender.isDestroyed()) event.sender.send("telemovel:passo", linha);
+    }),
+  );
+  handle("telemovel:parar", () => pararEspelho());
+  handle("telemovel:estado", () => estadoEspelho());
 
   handle("envelope:modelo", async (event) => {
     const escolha = await abrir(event, {
@@ -296,6 +318,33 @@ export function registerIpc(): void {
       filters: [{ name: "Lista de convidados", extensions: ["txt"] }],
     }),
   );
+
+  handle("cred:estado", () => estadoCredenciais());
+
+  // Mesma regra do pickGuests: caminho vem sempre de diálogo nativo. Aqui pesa
+  // mais — é o ficheiro com os segredos todos da equipa.
+  handle("cred:importar", async (event) => {
+    const origem = await abrir(event, {
+      title: "Credenciais do Criarte (config.json)",
+      properties: ["openFile"],
+      filters: [{ name: "Credenciais", extensions: ["json"] }],
+    });
+    return origem ? await importarCredenciais(origem) : null;
+  });
+
+  handle("cred:exportar", async (event) => {
+    const conteudo = await exportarCredenciais();
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const opcoes: Electron.SaveDialogOptions = {
+      title: "Guardar credenciais para a equipa",
+      defaultPath: "criarte-credenciais.json",
+      filters: [{ name: "Credenciais", extensions: ["json"] }],
+    };
+    const r = win ? await dialog.showSaveDialog(win, opcoes) : await dialog.showSaveDialog(opcoes);
+    if (r.canceled || !r.filePath) return null;
+    await writeFile(r.filePath, conteudo, { encoding: "utf8", mode: 0o600 });
+    return r.filePath;
+  });
 
   handle("job:start", (event, job: unknown) => startJob(event.sender, asJob(job)));
   handle("job:cancel", (_e, runId: unknown) => cancelJob(runId));

@@ -42,7 +42,7 @@ export function SeletorSite({
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           "no-drag h-[32px] w-full appearance-none bg-surface pl-3 pr-8 text-[13px] text-text",
-          "border border-rule focus:border-sage focus:outline-none disabled:opacity-40",
+          "border border-rule focus:border-focus focus:outline-none disabled:opacity-40",
         )}
       >
         <option value="" disabled>
@@ -70,7 +70,7 @@ export function SeletorSite({
   if (!label) return select;
   return (
     <label className="block">
-      <span className="mb-1.5 block font-mono text-label uppercase text-muted">{label}</span>
+      <span className="mb-1.5 block font-narrow font-semibold text-label uppercase text-muted">{label}</span>
       {select}
     </label>
   );

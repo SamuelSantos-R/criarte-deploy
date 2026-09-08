@@ -26,6 +26,14 @@ extraResources:
   # Peças da tokenização, copiadas para o convite quando o Heatz manda injetar.
   - from: resources/token
     to: token
+  # As alianças do RSVP. Viajam no app porque semear a secção num convite que
+  # ainda não tem a imagem deixaria a página a apontar pro vazio.
+  - from: resources/rsvp
+    to: rsvp
+  # O componente de cada secção que o Studio sabe criar. Sem ele a chave nascia
+  # no convite.json e a página não tinha nada para desenhar.
+  - from: resources/secoes
+    to: secoes
   - from: ../node_modules
     to: cli/node_modules
     filter:
@@ -52,7 +60,7 @@ mac:
   extendInfo:
     NSLocalNetworkUsageDescription: >-
       O Criarte Studio procura outros Studios na rede de casa para vocês
-      editarem o mesmo convite a dois.
+      editarem o mesmo convite em coop.
 
 dmg:
   title: Criarte Studio

@@ -3,12 +3,14 @@ import { useSiteValido } from "@/lib/useSiteValido";
 import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
+  plantarSecao,
   previewRecarregar,
   previewPintar,
   previewRepintar,
   previewScroll,
   readConvite,
   reveal,
+  semearAsset,
   vigiarConvite,
   writeConvite,
   type Site,
@@ -24,6 +26,7 @@ import {
   semearSecao,
 } from "@/lib/secoes";
 import { derrubarServidor, subirServidor, usarServidor } from "@/lib/servidor";
+import { useProva } from "@/lib/prova";
 import { useHistorico } from "@/lib/useHistorico";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
@@ -59,9 +62,13 @@ export function Convites({
   ativa: boolean;
 }): ReactElement {
   const comConvite = useMemo(() => sites.filter((s) => s.temConvite), [sites]);
+  const { marcar } = useProva();
   const [original, setOriginal] = useState<string>("");
   const [secao, setSecao] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  // Gravou mas com ressalva não é erro. Sem um canal só pra isso, o convidado do
+  // co-op via a linha vermelha do SITE_ID e concluía que não tinha baixado nada.
+  const [aviso, setAviso] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
@@ -147,6 +154,7 @@ export function Convites({
     recomecar(null);
     setSecao(null);
     setErro(null);
+    setAviso(null);
     setConflito(false);
     readConvite(id)
       .then(({ dados: d, marca: m }) => {
@@ -177,6 +185,20 @@ export function Convites({
   const faltando = dados ? ausentes(dados) : [];
   const sujo = dados !== null && JSON.stringify(dados) !== original;
 
+  // A barra de cor no pé da janela mostra estes estados de qualquer aba. A
+  // tranca alheia é a que tira a cruz de registo do registo; `donoDe` já
+  // descarta as minhas, que é o que o convidado precisa.
+  const trancaAlheia =
+    coop.estado.trancas.map((t) => coop.donoDe(t.secao)).find((x) => x !== null)?.nome ?? null;
+  useEffect(() => {
+    marcar({
+      porGravar: sujo,
+      coopLigado: coop.ligado,
+      coopPares: coop.ligado ? coop.estado.pares.length + 1 : 0,
+      coopTranca: trancaAlheia,
+    });
+  }, [sujo, coop.ligado, coop.estado.pares.length, trancaAlheia, marcar]);
+
   /** Fora da sessão é um no-op — o editor não muda de forma por causa do co-op. */
   const publicar = useCallback(
     (caminho: Caminho, valor: unknown): void => {
@@ -191,6 +213,18 @@ export function Convites({
     setDados(proximo);
     publicar([chave], proximo[chave]);
     setSecao(chave);
+    // Criar a chave não põe nada no ar: o convite ainda tem de ter o componente
+    // que a desenha e a linha que o pendura na página. As alianças vêm junto,
+    // porque a maior parte dos convites nunca as teve. Como convidado não dá: a
+    // pasta do site está no PC do anfitrião, e é ele quem grava.
+    if (id && !convidado) {
+      void semearAsset(id, chave).catch(() => undefined);
+      void plantarSecao(id, chave)
+        .then((p) => {
+          if (p.impedimento) setAviso(`A secção foi criada, mas não entrou na página: ${p.impedimento}.`);
+        })
+        .catch((e: Error) => setAviso(`A secção foi criada, mas não entrou na página: ${e.message}.`));
+    }
   };
 
   /**
@@ -263,7 +297,12 @@ export function Convites({
 
   const descartar = (): void => {
     if (!original) return;
-    recomecar(JSON.parse(original) as Record<string, unknown>);
+    const antes = JSON.parse(original) as Record<string, unknown>;
+    recomecar(antes);
+    // Descartar depois de semear leva a secção embora; sem isto o formulário
+    // dela ficava aberto e vazio, a editar uma chave que já não existe.
+    const secoes = Object.keys(antes).filter((k) => k !== CHAVE_SECOES);
+    setSecao((atual) => (atual && secoes.includes(atual) ? atual : (secoes[0] ?? null)));
     void desfazerNoDisco();
   };
 
@@ -290,7 +329,7 @@ export function Convites({
    * do convite, e o Studio escreve-as direto no quadro. O que se vê é o que o
    * build vai dar, porque quem faz a conta é o `varsDe` do próprio site.
    *
-   * Corre também em sessão, e é aí que mais rende: com o À Dois aberto ninguém
+   * Corre também em sessão, e é aí que mais rende: com a coop aberta ninguém
    * grava em disco, então sem isto o convidado arrastava um cursor e não via
    * absolutamente nada mudar até a sessão fechar.
    *
@@ -408,11 +447,16 @@ export function Convites({
    */
   const aoDuplicar = async (copia: { id: string; faltam: string[] }): Promise<void> => {
     setDuplicando(false);
-    // O uuid do mural já foi escrito; estas o Studio não tem de onde tirar. Sem
-    // elas o correio do amor abre vazio e não diz porquê.
-    if (copia.faltam.length > 0) {
-      setErro(`convite criado, mas falta no .env.local: ${copia.faltam.join(", ")}`);
-    }
+    setErro(null);
+    // Numa máquina sem o config do CLI não há chave pra registar o convite, e o
+    // uuid do mural fica em falta junto com as outras. Sem elas o correio do
+    // amor abre vazio e não diz porquê — a pasta em si está inteira, e é isso
+    // que a linha tem de dizer primeiro.
+    setAviso(
+      copia.faltam.length > 0
+        ? `${copia.id} gravado na tua máquina. Falta no .env.local: ${copia.faltam.join(", ")} — sem isso o mural de recados abre vazio.`
+        : `${copia.id} gravado na tua máquina.`,
+    );
     try {
       // O convidado não tinha convite aberto do próprio disco pra devolver ao
       // estado salvo, e o convite.json dele já foi escrito com o doc da sessão.
@@ -466,11 +510,8 @@ export function Convites({
           />
         </div>
 
-        {sujo && !emSessao && (
-          <span className="font-mono text-serial uppercase tracking-[0.18em] text-accent">alterado</span>
-        )}
         {emSessao && (
-          <span className="font-mono text-serial uppercase tracking-[0.18em] text-muted">
+          <span className="font-narrow text-gauge font-semibold uppercase text-muted">
             {convidado ? "grava no anfitrião" : "grava sozinho"}
           </span>
         )}
@@ -480,28 +521,28 @@ export function Convites({
               <RotateCcw size={13} /> Descartar
             </Button>
           )}
-          {/* Ligado, o botão para de ser botão e vira placa: o ponto verde e a
-              contagem dizem que tem mais gente na mesa sem ter que abrir o painel. */}
+          {/* Aberta, a sessão veste a sua tinta: o botão vira bloco magenta com
+              a contagem, e diz que há outra mão sem ter de abrir o painel. */}
           <button
             type="button"
             aria-pressed={mostrarCoop}
             onClick={() => setMostrarCoop((v) => !v)}
-            title={coop.ligado ? "Sessão a dois — abrir painel" : "Editar a dois"}
+            title={coop.ligado ? "Coop aberta — abrir painel" : "Abrir sessão coop"}
             className={cn(
-              "no-drag flex h-[28px] shrink-0 items-center gap-2 px-2 text-[12px] transition-colors",
-              "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-sage",
-              mostrarCoop ? "bg-surface-2 text-text" : "text-muted hover:text-text",
+              "no-drag flex h-[28px] shrink-0 items-center gap-2 px-2.5 text-[12px] font-medium transition-colors duration-0",
+              coop.ligado
+                ? "bg-magenta text-white"
+                : mostrarCoop
+                  ? "bg-surface-2 text-text"
+                  : "text-muted hover:bg-surface-2 hover:text-text",
             )}
           >
             <Users size={13} strokeWidth={1.8} aria-hidden />
-            <span>A dois</span>
+            <span>Coop</span>
             {coop.ligado && (
-              <>
-                <span aria-hidden className="h-[5px] w-[5px] shrink-0 rounded-full bg-ok" />
-                <span className="font-mono text-serial text-muted">
-                  {String(coop.estado.pares.length + 1).padStart(2, "0")}
-                </span>
-              </>
+              <span className="gauge font-narrow text-gauge font-semibold">
+                {String(coop.estado.pares.length + 1).padStart(2, "0")}
+              </span>
             )}
           </button>
           {/* No convidado é o único jeito de ficar com o convite: a pasta do
@@ -526,8 +567,15 @@ export function Convites({
               <FolderOpen size={13} /> Abrir pasta
             </Button>
           )}
+          {/* Amarelo é a tinta do "por gravar": o botão só a veste enquanto há
+              alguma coisa por gravar, e volta a contorno assim que o disco iguala. */}
           {!emSessao && (
-            <Button variant="primary" size="sm" disabled={!sujo || salvando} onClick={() => void salvar()}>
+            <Button
+              variant={sujo ? "save" : "outline"}
+              size="sm"
+              disabled={!sujo || salvando}
+              onClick={() => void salvar()}
+            >
               <Save size={13} /> {salvando ? "Salvando…" : "Salvar"}
             </Button>
           )}
@@ -554,7 +602,8 @@ export function Convites({
         )}
 
         <section className="min-w-0 flex-1 overflow-auto px-7 pb-16 pt-6">
-          {erro && <p className="border-l-2 border-bad pl-3 text-[13px] text-bad">{erro}</p>}
+          {erro && <p className="border-l-2 border-pencil pl-3 text-[13px] text-pencil">{erro}</p>}
+          {aviso && <p className="border-l-2 border-cyan pl-3 text-[13px] text-text">{aviso}</p>}
           {mostrarCoop ? (
             <PainelCoop
               estado={coop.estado}
@@ -580,7 +629,7 @@ export function Convites({
               {dados && secao && (
                 <>
                   <div className="mb-5 flex items-center gap-3 border-b border-rule pb-2">
-                    <h2 className="font-mono text-label uppercase tracking-[0.18em] text-text">
+                    <h2 className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
                       {rotulo(secao)}
                     </h2>
                     {podeDesligar(secao) && !bloqueio && (
@@ -598,7 +647,7 @@ export function Convites({
                         meio da edição precisa saber de quem é a mão, não só que
                         a caixa não responde. */}
                     {bloqueio && (
-                      <span className="flex items-center gap-1.5 font-mono text-label uppercase tracking-[0.14em] text-muted">
+                      <span className="flex items-center gap-1.5 font-narrow font-semibold text-label uppercase tracking-[0.14em] text-muted">
                         <Lock size={12} strokeWidth={1.8} aria-hidden />
                         {bloqueio.nome} está aqui
                       </span>

@@ -90,7 +90,7 @@ export function Palco({
               className="pointer-events-none absolute inset-0 outline outline-1 outline-rule-strong shadow-[14px_14px_0_-1px_rgba(0,0,0,0.5)]"
             />
             {legenda && (
-              <span className="pointer-events-none absolute left-0 top-full mt-3 font-mono text-serial uppercase tracking-[0.16em] text-muted">
+              <span className="pointer-events-none absolute left-0 top-full mt-3 font-narrow font-semibold text-gauge uppercase tracking-[0.16em] text-muted">
                 {aparelho.nome} · {largura}×{altura} · {Math.round(zoom * 100)}%
               </span>
             )}

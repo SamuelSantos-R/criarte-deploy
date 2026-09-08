@@ -43,12 +43,12 @@ export function PainelAoVivo({
   return (
     <aside className="flex shrink-0 flex-col bg-surface" style={{ width: largura }}>
       <div className="no-drag flex h-[38px] shrink-0 items-center gap-2 border-b border-rule px-4">
-        <span className="shrink-0 font-mono text-label uppercase text-muted">Ao vivo</span>
+        <span className="shrink-0 font-narrow font-semibold text-label uppercase text-muted">Ao vivo</span>
         {url && (
           <>
             <span
               aria-hidden
-              className="h-[5px] w-[5px] shrink-0 animate-pulse rounded-full bg-ok"
+              className="h-[5px] w-[5px] shrink-0 animate-pulse bg-cyan"
               style={{ animationDuration: "2s" }}
             />
             <SeletorAparelho
@@ -78,7 +78,7 @@ export function PainelAoVivo({
             </>
           )}
           {emprestado ? (
-            <span className="font-mono text-label uppercase tracking-[0.16em] text-muted">
+            <span className="font-narrow font-semibold text-label uppercase tracking-[0.16em] text-muted">
               do anfitrião
             </span>
           ) : url ? (
@@ -111,7 +111,7 @@ export function PainelAoVivo({
                 : "Ligue pra ver o convite de verdade repintando enquanto edita."}
           </p>
           {ligando && (
-            <p className="font-mono text-[11px] text-muted/70">a primeira vez demora uns segundos.</p>
+            <p className="font-mono text-[11px] text-muted">a primeira vez demora uns segundos.</p>
           )}
         </div>
       </Palco>
@@ -136,9 +136,9 @@ export function FaixaConflito({
       role="alert"
       className="flex shrink-0 items-center gap-3 border-b border-rule bg-surface-2/50 py-2.5 pl-5 pr-7"
     >
-      <span aria-hidden className="h-[30px] w-[2px] shrink-0 bg-bad" />
+      <span aria-hidden className="h-[30px] w-[2px] shrink-0 bg-pencil" />
       <div className="min-w-0">
-        <p className="font-mono text-label uppercase tracking-[0.18em] text-bad">conflito</p>
+        <p className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-pencil">conflito</p>
         <p className="mt-0.5 text-[12px] leading-[1.5] text-muted">
           O <span className="font-mono">convite.json</span> mudou fora do Studio e você tem alteração
           na tela. Um dos dois vai embora.
@@ -151,7 +151,7 @@ export function FaixaConflito({
         <button
           type="button"
           onClick={onGravarPorCima}
-          className="no-drag text-[11px] leading-none text-muted underline decoration-dotted underline-offset-4 transition-colors hover:text-bad focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage"
+          className="no-drag text-[11px] leading-none text-muted underline decoration-dotted underline-offset-4 transition-colors hover:text-pencil focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           descartar o arquivo
         </button>

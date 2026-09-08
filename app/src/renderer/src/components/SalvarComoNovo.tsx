@@ -75,10 +75,10 @@ export function SalvarComoNovo({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dup-titulo"
-        className="w-[440px] border-l-2 border-accent bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[440px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
       >
         <div className="border-b border-rule px-6 py-4">
-          <h2 id="dup-titulo" className="font-mono text-label uppercase tracking-[0.18em] text-text">
+          <h2 id="dup-titulo" className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
             Salvar como novo
           </h2>
           <p className="mt-1.5 text-[12px] leading-[1.5] text-muted">
@@ -115,7 +115,7 @@ export function SalvarComoNovo({
             />
           </Field>
 
-          <p className="border-l border-rule pl-3 text-[11px] leading-[1.6] text-muted/80">
+          <p className="border-l border-rule pl-3 text-[11px] leading-[1.6] text-muted">
             Não viajam junto: listas de convidados (<span className="font-mono">.txt</span> da raiz),{" "}
             <span className="font-mono">node_modules</span>, <span className="font-mono">.next</span> e{" "}
             <span className="font-mono">.originais</span>. O{" "}
@@ -123,7 +123,7 @@ export function SalvarComoNovo({
             de recados cairia em cima do casal antigo.
           </p>
 
-          {erro && <p className="border-l-2 border-bad pl-3 text-[12px] text-bad">{erro}</p>}
+          {erro && <p className="border-l-2 border-pencil pl-3 text-[12px] text-pencil">{erro}</p>}
         </div>
 
         <div className="flex items-center gap-3 border-t border-rule px-6 py-4">

@@ -131,10 +131,10 @@ function Pega({
       aria-label={`Mover ${label} ${i + 1} — arraste, ou use as setas`}
       title="Arraste para trocar a ordem (ou setas ↑ ↓)"
       className={cn(
-        "no-drag flex h-7 w-5 shrink-0 cursor-grab items-center justify-center text-muted/60",
+        "no-drag flex h-7 w-5 shrink-0 cursor-grab items-center justify-center text-muted",
         "transition-colors hover:text-text active:cursor-grabbing",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage",
-        pegado === i && "text-accent",
+        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus",
+        pegado === i && "text-cyan",
       )}
     >
       <GripVertical size={13} />
@@ -176,8 +176,8 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
   return (
     <section className="mt-6">
       <div className="mb-3 flex items-center gap-3">
-        <span className="font-mono text-label uppercase text-muted">{label}</span>
-        <span className="font-mono text-serial text-muted/60">{String(valor.length).padStart(2, "0")}</span>
+        <span className="font-narrow font-semibold text-label uppercase text-muted">{label}</span>
+        <span className="font-narrow font-semibold text-gauge text-muted">{String(valor.length).padStart(2, "0")}</span>
         <span className="h-px flex-1 bg-rule" />
         <Button
           variant="ghost"
@@ -207,13 +207,13 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
               // A marca do destino é uma linha, não um realce do bloco inteiro:
               // o que interessa saber é entre que dois itens ele vai cair.
               pegado !== null && alvo === i && pegado !== i &&
-                (i < pegado ? "border-t-2 border-t-accent" : "border-b-2 border-b-accent"),
+                (i < pegado ? "border-t-2 border-t-cyan" : "border-b-2 border-b-cyan"),
               pegado === i && "opacity-50",
             )}
           >
             {deObjetos ? (
               <>
-                <span className="absolute -left-[9px] top-4 bg-ground px-1 font-mono text-serial text-muted">
+                <span className="absolute -left-[9px] top-4 bg-ground px-1 font-narrow font-semibold text-gauge text-muted">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div className="absolute right-9 top-3">
@@ -223,7 +223,7 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
                   <Nos valor={item} caminho={[...caminho, i]} onChange={onChange} />
                 </div>
                 <button
-                  className="no-drag absolute right-3 top-3 p-1 text-muted transition-colors hover:text-bad"
+                  className="no-drag absolute right-3 top-3 p-1 text-muted transition-colors hover:text-pencil"
                   onClick={() => onChange(caminho, valor.filter((_, k) => k !== i))}
                   aria-label={`Remover item ${i + 1}`}
                   title="Remover"
@@ -234,10 +234,10 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
             ) : (
               <>
                 <Pega i={i} label={label} pegado={pegado} onPegar={setPegado} onLargar={largar} onMover={mover} />
-                <span className="w-6 shrink-0 font-mono text-serial text-muted">{String(i + 1).padStart(2, "0")}</span>
+                <span className="w-6 shrink-0 font-narrow font-semibold text-gauge text-muted">{String(i + 1).padStart(2, "0")}</span>
                 <Input value={String(item ?? "")} onChange={(e) => onChange([...caminho, i], e.target.value)} />
                 <button
-                  className="no-drag p-2 text-muted transition-colors hover:text-bad"
+                  className="no-drag p-2 text-muted transition-colors hover:text-pencil"
                   onClick={() => onChange(caminho, valor.filter((_, k) => k !== i))}
                   aria-label={`Remover item ${i + 1}`}
                   title="Remover"
@@ -294,9 +294,9 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
                 type="checkbox"
                 checked={v}
                 onChange={(e) => onChange(filho, e.target.checked)}
-                className="no-drag h-4 w-4 accent-accent"
+                className="no-drag h-4 w-4 accent-cyan"
               />
-              <span className="font-mono text-label uppercase text-muted">{label}</span>
+              <span className="font-narrow font-semibold text-label uppercase text-muted">{label}</span>
             </label>
           );
         }

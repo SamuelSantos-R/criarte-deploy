@@ -127,11 +127,11 @@ function Linha({
         <div className="flex items-baseline gap-2.5">
           <span className="text-[13px] text-text">{papel.rotulo}</span>
           {!valido && (
-            <span className="shrink-0 font-mono text-serial uppercase text-bad">hex inválido</span>
+            <span className="shrink-0 font-narrow font-semibold text-gauge uppercase text-pencil">hex inválido</span>
           )}
         </div>
         {papel.onde && (
-          <p className="mt-0.5 text-[12px] leading-[1.5] text-muted/80">{papel.onde}</p>
+          <p className="mt-0.5 text-[12px] leading-[1.5] text-muted">{papel.onde}</p>
         )}
       </div>
 
@@ -143,7 +143,7 @@ function Linha({
         className={cn(
           "no-drag w-[92px] shrink-0 self-start bg-transparent py-2.5 pr-3 text-right font-mono text-[12px] uppercase",
           "focus:bg-surface-2 focus:outline-none",
-          valido ? "text-muted" : "text-bad",
+          valido ? "text-muted" : "text-pencil",
         )}
       />
     </div>
@@ -191,7 +191,7 @@ function Paletas({
             </span>
             <span className="flex items-baseline justify-between border-t border-rule px-2 py-1.5">
               <span className="text-[12px] text-text">{p.nome}</span>
-              {posta && <span className="font-mono text-serial uppercase text-muted">posta</span>}
+              {posta && <span className="font-narrow font-semibold text-gauge uppercase text-muted">posta</span>}
             </span>
           </button>
         );
@@ -235,11 +235,11 @@ export function PainelTema({
 
       <section className="mb-9">
         <div className="mb-2 flex items-baseline gap-3">
-          <span className="font-mono text-serial text-muted/50">01</span>
-          <span className="font-mono text-label uppercase text-text">paletas prontas</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">01</span>
+          <span className="font-narrow font-semibold text-label uppercase text-text">paletas prontas</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted/80">
+        <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted">
           Põe a paleta inteira de uma vez. Depois dá para mexer linha a linha — e o que ficar
           diferente já não conta como paleta posta.
         </p>
@@ -249,13 +249,13 @@ export function PainelTema({
       {grupos.map((grupo, i) => (
         <section key={grupo.titulo} className="mb-9 last:mb-0">
           <div className="mb-2 flex items-baseline gap-3">
-            <span className="font-mono text-serial text-muted/50">
+            <span className="font-narrow font-semibold text-gauge text-muted">
               {String(i + 2).padStart(2, "0")}
             </span>
-            <span className="font-mono text-label uppercase text-text">{grupo.titulo}</span>
+            <span className="font-narrow font-semibold text-label uppercase text-text">{grupo.titulo}</span>
             <span className="h-px flex-1 bg-rule" />
           </div>
-          <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted/80">{grupo.nota}</p>
+          <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted">{grupo.nota}</p>
           <div className="border-t border-rule">
             {grupo.papeis.map((papel) => (
               <Linha

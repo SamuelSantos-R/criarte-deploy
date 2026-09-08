@@ -95,7 +95,7 @@ export function CampoArquivo({
 
   return (
     <div className="block">
-      <span className="mb-1.5 block font-mono text-label uppercase text-muted">{label}</span>
+      <span className="mb-1.5 block font-narrow font-semibold text-label uppercase text-muted">{label}</span>
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -105,7 +105,7 @@ export function CampoArquivo({
         onDrop={soltar}
         className={cn(
           "no-drag flex items-center gap-2 border border-dashed px-2.5 py-2 transition-colors",
-          sobre ? "border-sage bg-sage/10" : "border-rule bg-surface",
+          sobre ? "border-focus bg-focus/10" : "border-rule bg-surface",
           ocupado && "opacity-50",
         )}
       >
@@ -122,7 +122,7 @@ export function CampoArquivo({
               }}
               aria-label={`Limpar ${label}`}
               title="Limpar"
-              className="shrink-0 p-1 text-muted transition-colors hover:text-bad"
+              className="shrink-0 p-1 text-muted transition-colors hover:text-pencil"
             >
               <X size={13} />
             </button>
@@ -149,8 +149,8 @@ export function CampoArquivo({
           <FolderOpen size={13} /> Pasta
         </Button>
       </div>
-      {nota && <span className="mt-1 block font-mono text-[11px] text-ok">{nota}</span>}
-      {erro && <span className="mt-1 block font-mono text-[11px] text-bad">{erro}</span>}
+      {nota && <span className="mt-1 block font-mono text-[11px] text-cyan">{nota}</span>}
+      {erro && <span className="mt-1 block font-mono text-[11px] text-pencil">{erro}</span>}
     </div>
   );
 }

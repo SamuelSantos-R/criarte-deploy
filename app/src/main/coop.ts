@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomInt, randomUUID, timingSafeEqual } from "node:crypto";
+import { hostname } from "node:os";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { BrowserWindow } from "electron";
@@ -486,7 +487,7 @@ export async function abrirSessao(siteId: string): Promise<EstadoCoop> {
     gravacao: null,
     faltas: new Map(),
   };
-  anunciar(siteId, PORTA);
+  anunciar(siteId, PORTA, anfitriao.codigo);
   avisarEstado();
   return estadoCoop();
 }
@@ -513,6 +514,9 @@ export async function entrarSessao(
   await fecharSessao();
   if (!/^[\d.]+:\d+$/.test(endereco)) throw new Error("endereço tem que ser ip:porta");
   if (!/^\d{6}$/.test(codigo)) throw new Error("o código tem 6 dígitos");
+  // Entrar num vizinho é um clique só, e um clique não tem onde escrever o nome.
+  // O da máquina é o que o anfitrião já ia adivinhar de qualquer maneira.
+  nome = nome.trim().slice(0, 40) || hostname().replace(/\.local$/, "");
 
   const parar = new AbortController();
   const alvo = `http://${endereco}/entrar?codigo=${codigo}&nome=${encodeURIComponent(nome)}`;

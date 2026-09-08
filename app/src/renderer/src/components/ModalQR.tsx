@@ -50,17 +50,17 @@ export function ModalQR({
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-titulo"
-        className="w-[380px] border-l-2 border-accent bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[380px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
       >
         <div className="flex items-center gap-3 border-b border-rule px-6 py-4">
-          <h2 id="qr-titulo" className="font-mono text-label uppercase tracking-[0.18em] text-text">
+          <h2 id="qr-titulo" className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
             Ver no telefone
           </h2>
           <button
             type="button"
             onClick={onFechar}
             aria-label="Fechar"
-            className="ml-auto flex h-[28px] w-[28px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage"
+            className="ml-auto flex h-[28px] w-[28px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <X size={14} />
           </button>
@@ -74,7 +74,7 @@ export function ModalQR({
                 alt={`QR code para abrir ${lan} no telefone`}
                 className="block w-full border border-rule"
               />
-              <p className="mt-4 break-all font-mono text-[12px] text-text/85">{lan}</p>
+              <p className="mt-4 break-all font-mono text-[12px] text-text">{lan}</p>
               <p className="mt-2 text-[12px] leading-[1.5] text-muted">
                 Telefone e Mac no mesmo Wi-Fi. Aponte a câmera.
               </p>
@@ -89,8 +89,8 @@ export function ModalQR({
 
           {url && (
             <>
-              <span className="mt-7 block font-mono text-label uppercase text-muted">Neste Mac</span>
-              <p className="mt-2 break-all font-mono text-[11px] text-text/85">{url}</p>
+              <span className="mt-7 block font-narrow font-semibold text-label uppercase text-muted">Neste Mac</span>
+              <p className="mt-2 break-all font-mono text-[11px] text-text">{url}</p>
             </>
           )}
         </div>

@@ -15,8 +15,19 @@ type Credenciais = { url: string; serviceKey: string };
  * A chave secreta mora no mesmo config do CLI, fora do repo, e é lida só aqui no
  * main. Se ela chegasse ao renderer viraria `NEXT_PUBLIC_` na primeira distração.
  */
+const CONFIG_CLI = (): string => join(homedir(), ".criarte-deploy", "config.json");
+
+/**
+ * O convidado do co-op costuma estar numa máquina que nunca publicou nada, logo
+ * sem o config do CLI. Não ter a chave não pode impedi-lo de ficar com a pasta:
+ * publicar é outro passo, e quem publica é quem tem a chave.
+ */
+function podeRegistrar(): boolean {
+  return existsSync(CONFIG_CLI());
+}
+
 function credenciais(): Credenciais {
-  const arquivo = join(homedir(), ".criarte-deploy", "config.json");
+  const arquivo = CONFIG_CLI();
   if (!existsSync(arquivo)) throw new Error("~/.criarte-deploy/config.json não existe");
   const bruto = JSON.parse(readFileSync(arquivo, "utf8")) as {
     supabase?: { url?: unknown; serviceKey?: unknown };
@@ -68,18 +79,21 @@ const CHAVES_MURAL = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY
  * dá para inventar (a anon key não está no config do CLI), então voltam como
  * aviso em vez de ficarem em silêncio.
  */
-async function gravarSiteId(destino: string, siteId: string): Promise<string[]> {
+async function gravarSiteId(destino: string, siteId: string | null): Promise<string[]> {
   const arquivo = join(destino, ".env.local");
   const antes = existsSync(arquivo) ? await readFile(arquivo, "utf8") : "";
-  const linha = `NEXT_PUBLIC_SITE_ID=${siteId}`;
-  const depois = /^NEXT_PUBLIC_SITE_ID=.*$/m.test(antes)
-    ? antes.replace(/^NEXT_PUBLIC_SITE_ID=.*$/m, linha)
-    : `${antes ? antes.replace(/\n*$/, "\n") : ""}${linha}\n`;
+  // Sem uuid novo o herdado tem de sair na mesma: deixá-lo era o convite novo a
+  // escrever no mural do casal de quem mandou a pasta.
+  const limpo = antes.replace(/^NEXT_PUBLIC_SITE_ID=.*\n?/m, "");
+  const depois = siteId
+    ? `${limpo ? limpo.replace(/\n*$/, "\n") : ""}NEXT_PUBLIC_SITE_ID=${siteId}\n`
+    : limpo;
   await writeFile(arquivo, depois, "utf8");
-  return CHAVES_MURAL.filter((c) => !new RegExp(`^${c}=.+$`, "m").test(depois));
+  const exigidas = siteId ? CHAVES_MURAL : [...CHAVES_MURAL, "NEXT_PUBLIC_SITE_ID"];
+  return exigidas.filter((c) => !new RegExp(`^${c}=.+$`, "m").test(depois));
 }
 
-export type Copia = { id: string; siteId: string; faltam: string[] };
+export type Copia = { id: string; siteId: string | null; faltam: string[] };
 
 async function destinoLivre(categoria: string, slug: string): Promise<string> {
   if (!NOME.test(categoria)) throw new Error("categoria inválida — minúsculas e hífen");
@@ -121,7 +135,7 @@ export async function salvarSessaoComoNovo(
   }
   const destino = await destinoLivre(categoria, slug);
   const pacote = await baixarFonte();
-  const siteId = await registrar(slug, tituloDe(doc, slug));
+  const siteId = podeRegistrar() ? await registrar(slug, tituloDe(doc, slug)) : null;
 
   await mkdir(destino, { recursive: true });
   await desempacotar(pacote, destino);

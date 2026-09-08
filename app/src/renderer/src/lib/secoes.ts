@@ -97,6 +97,7 @@ const ANCORAS: Record<string, string> = {
   presentes: "presentes",
   manual: "manual",
   dresscode: "dresscode",
+  rsvp: "rsvp",
   recados: "mensagens",
 };
 
@@ -125,6 +126,7 @@ export const BLOCOS: {
   { id: "nosso-dia", rotulo: "nosso dia", topo: 60, base: 60, ornamento: true },
   { id: "presentes", rotulo: "presentes", topo: 100, base: 100, ornamento: true },
   { id: "manual", rotulo: "manual", topo: 100, base: 100, ornamento: true },
+  { id: "rsvp", rotulo: "RSVP", topo: 90, base: 100, ornamento: true },
   { id: "dresscode", rotulo: "dress code", topo: 100, base: 100, ornamento: true },
   { id: "mensagens", rotulo: "mural", topo: 70, base: 90, ornamento: true },
 ];
@@ -142,6 +144,7 @@ const LADO_DESENHO: Record<string, "left" | "right"> = {
   "nosso-dia": "right",
   presentes: "left",
   manual: "right",
+  rsvp: "left",
   dresscode: "left",
   mensagens: "right",
   footer: "left",
@@ -169,6 +172,7 @@ const DESLIGAVEIS = new Set([
   "presentes",
   "manual",
   "dresscode",
+  "rsvp",
   "recados",
 ]);
 
@@ -181,11 +185,30 @@ export const CHAVE_SECOES = "secoes";
  * que o Studio sabe criar sozinho, com o conteúdo de partida.
  *
  * Só entra o que é configuração pura. Bloco de conteúdo (história, galeria) fica
- * de fora de propósito: semear um vazio poria uma seção oca no ar.
+ * de fora de propósito: semear um vazio poria uma seção oca no ar. O RSVP entra
+ * porque não é conteúdo: é a ligação a um Google Form já feito — o `url` é o
+ * `formResponse` dele e cada campo é o `entry.N` do respectivo input.
+ *
+ * Os `entry.N` vêm preenchidos porque o form de cada casal nasce de uma cópia do
+ * mesmo modelo, e duplicar no Google mantém os números — são iguais no Rossana &
+ * Adilson e no joana-paulo4. Fica por preencher só o que é mesmo de cada casal: o
+ * `url` do form novo e o prazo. Se algum dia o form for refeito do zero em vez de
+ * duplicado, os números mudam e têm de ser trocados aqui no editor.
  */
 const SEMENTES: Record<string, () => Record<string, unknown>> = {
   medidas: () => ({ ...MEDIDAS_PADRAO }),
   ornamentos: () => ({ ...ORNAMENTOS_PADRAO }),
+  rsvp: () => ({
+    prazo: "",
+    aliancas: "/assets/aliancas-casamento.png",
+    form: {
+      url: "",
+      nome: "entry.717821013",
+      comparecer: "entry.2035339163",
+      acompanhantes: "entry.165080896",
+      acompanhanteNome: "entry.1583532518",
+    },
+  }),
   tema: () => ({ ...TEMA_PADRAO }),
 };
 

@@ -1,0 +1,189 @@
+{
+  "title": "A cara nova do Criarte Studio",
+  "question": "O dado caiu na Folha Geigy. Fica com ela, escolhe uma alternativa, ou roda outra vez.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "A Ficha",
+      "kicker": "THE ROLL",
+      "lineage": "Programa de impressos técnicos da Geigy, Basileia 1955-1975",
+      "thesis": "O Studio é a ficha técnica do convite: cada campo tem lugar fixo na grelha e a cor enche regiões inteiras para dizer o que aquela região é, nunca para enfeitar.",
+      "palette": ["#1B32C8", "#F5C400", "#D93B1E", "#0F6B3F", "#14161A", "#F6F5F1"],
+      "materials": ["tinta plana offset", "tabela de dosagem", "grelha de coluna impressa", "campo a sangrar até à aresta"],
+      "viewport": "Janela sem painéis flutuantes: uma folha de aresta a aresta. Banda de topo drenada na cor da superfície aberta, e no fim dela a tira de estado com quatro células fixas - CONVITE, SERVIDOR, COOP, POR GRAVAR - que se leem pela posição antes de se lerem pelo texto. Por baixo, coluna-régua estreita à esquerda, tabela numerada de convites ao centro com filete de cabelo e marcador amarelo-crómio na linha aberta, campo de trabalho a ocupar o resto.",
+      "risk": "Uma folha suíça drenada pode sair clínica para uma casa de papelaria de casamento, e se a grelha afrouxa cai em 'dashboard com barra azul'.",
+      "raised": [
+        {
+          "from": "Cabo de Ouro (capa de seda)",
+          "raise": "Uma só cor de comando: o amarelo-crómio só aparece em controlos que mudam o convite. Nada decorativo o veste."
+        },
+        {
+          "from": "Chuva com Gravidade",
+          "raise": "Todo o estado viaja num eixo com sentido: por gravar - gravado - publicado corre sempre da esquerda para a direita, e reverter corre para trás."
+        },
+        {
+          "from": "Tubo Nixie",
+          "raise": "Nenhum valor troca em silêncio: cada token muda num passo único com o valor anterior ainda legível por baixo durante o passo."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "banda + tira de estado", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "coluna-régua", "x": 0, "y": 1, "w": 2, "h": 9 },
+          { "label": "tabela de convites", "x": 2, "y": 1, "w": 4, "h": 9 },
+          { "label": "campo de trabalho", "x": 6, "y": 1, "w": 6, "h": 9 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "model-pick",
+      "label": "Mesa de Prova",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Bancada de controlo de cor de pré-impressão: barras de cor, cruzes de registo, alvos de densitómetro",
+      "thesis": "O app é a bancada onde a prova se aprova: o preview é a folha por baixo do vidro e os controlos são os instrumentos que a medem.",
+      "palette": ["#00A0C6", "#E5007E", "#FFE800", "#1A1A1A", "#EDEDE8"],
+      "materials": ["barra de cor", "cruz de registo", "vidro de aumento", "chapa de alumínio"],
+      "viewport": "Preview ao centro sob uma moldura de cruzes de registo, barra de cor viva em baixo a servir de escala de estado, instrumentos encostados às arestas.",
+      "risk": "É a associação mais óbvia que existe - ferramenta de cor logo vira mesa de cor - e puxa direita para o cluster kraft/creme que já foi rejeitado.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "instrumentos", "x": 0, "y": 0, "w": 3, "h": 9 },
+          { "label": "prova sob vidro", "x": 3, "y": 0, "w": 9, "h": 9 },
+          { "label": "barra de cor / estado", "x": 0, "y": 9, "w": 12, "h": 1, "accent": true }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/model-pick.webp"
+    },
+    {
+      "id": "challenger-blind",
+      "label": "Rolo de Destinos",
+      "verdict": "competitive",
+      "lineage": "Letreiro de rolo de camioneta, lona tingida em cursos enviesados",
+      "thesis": "O estado é o rolo: o que está errado é o curso parado a meio do passo, com dois meios letreiros a encontrarem-se numa costura.",
+      "palette": ["#0B4D2E", "#F2C200", "#EFE7D2"],
+      "materials": ["lona tingida", "ilhós punçoados", "luz por trás"],
+      "viewport": "Verde-garrafa drenado de aresta a aresta, letreiros em crómio, uma janela fixa por onde os cursos passam a passo inteiro.",
+      "case": "Vocabulário de estado imbatível - avaria é meio passo, morto mostra a trama - e paleta totalmente comprometida. Perde na identificação: os operadores são de papelaria, não de estação de camionagem, e o rolo de cursos briga com seis superfícies e um iframe vivo lá dentro.",
+      "risk": "A topologia de rolo não dá para um app com preview a correr ao lado.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "janela fixa", "x": 1, "y": 2, "w": 10, "h": 6, "accent": true },
+          { "label": "fita de ilhós", "x": 0, "y": 0, "w": 1, "h": 10 },
+          { "label": "cursos por baixo", "x": 1, "y": 8, "w": 10, "h": 2 }
+        ]
+      },
+      "hero": "https://impeccable.style/worlds/cards/operate-c-depot-blind-courses-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/operate-c-depot-blind-courses.webp",
+      "comp": ".impeccable/mocks/decision/challenger-blind.webp"
+    },
+    {
+      "id": "challenger-manual",
+      "label": "Manual de Acetato",
+      "verdict": "competitive",
+      "lineage": "Manual de software em caixa, folha de acetato punçoada sobre separador de cor cheia",
+      "thesis": "Cada superfície é uma divisão do manual: o separador de cor é o fundo, e tudo o que se edita vive numa folha de acetato pousada um milímetro acima dele.",
+      "palette": ["#F2C200", "#1D6FB8", "#3E8C3A", "#E2E0D6", "#C4331C"],
+      "materials": ["acetato leitoso", "cartão de cor cheia", "furos de arquivo", "dobradiça de 90ms"],
+      "viewport": "Separador crómio a encher a janela, régua de abas escalonada na aresta direita com uma aba por superfície, folha de acetato por cima com os campos.",
+      "case": "Identificação altíssima - são gente de impressão e o app tem mesmo seis divisões, que a régua de abas resolve de uma vez. Perde na clareza: a gramática privilegia uma folha de cada vez, e o pedido foi ler tudo ao mesmo tempo.",
+      "risk": "Camada sobre camada esconde metade dos estados que têm de estar à vista.",
+      "hero": "https://impeccable.style/worlds/cards/rw-manual-acetate-tab-board-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/rw-manual-acetate-tab-board.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "separador (cor cheia)", "x": 0, "y": 0, "w": 11, "h": 10 },
+          { "label": "folha de acetato", "x": 1, "y": 1, "w": 9, "h": 8, "accent": true },
+          { "label": "régua de abas", "x": 11, "y": 0, "w": 1, "h": 10 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/challenger-manual.webp"
+    },
+    {
+      "id": "challenger-jp",
+      "label": "Densidade Japonesa",
+      "verdict": "competitive",
+      "lineage": "Web japonesa de alta densidade: módulos em caixa, tipo miúdo, vermelho de sinal",
+      "thesis": "Nada de espaço desperdiçado: dezenas de módulos com aba própria a ladrilhar o ecrã, tudo legível sem abrir nada.",
+      "palette": ["#FFFFFF", "#111111", "#D0021B", "#8A8A8A"],
+      "materials": ["filete de cabelo", "aba de módulo", "grelha mosaico"],
+      "viewport": "Mosaico de módulos ruído a filete, cada um com aba vermelha pequena, barra de navegação persistente em duas filas.",
+      "case": "Clareza forte para sessão longa: cada painel do Studio vira módulo com aba, e a densidade é honesta. Perde na identificação e no risco de rut: branco + cinzento + vermelho a ladrilhar é primo direito do dashboard genérico que se quer fugir.",
+      "risk": "Sem disciplina de grelha vira o painel SaaS de sempre, só que mais apertado.",
+      "hero": "https://impeccable.style/worlds/cards/japanese-high-density-web-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/japanese-high-density-web.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "navegação (2 filas)", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "rail de categorias", "x": 0, "y": 1, "w": 2, "h": 9 },
+          { "label": "mosaico de módulos", "x": 2, "y": 1, "w": 10, "h": 9 }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/challenger-jp.webp"
+    },
+    {
+      "id": "challenger-cape",
+      "label": "Capa de Cordão",
+      "verdict": "declined",
+      "lineage": "Capa de seda com canais de cordão escondidos",
+      "thesis": "Um puxão transforma um plano liso em volume.",
+      "palette": ["#0A0A0A", "#C8A02E", "#3A3F45"],
+      "materials": ["seda mate", "cordão dourado"],
+      "viewport": "Plano preto que se franze a partir de um cordão.",
+      "risk": "Transformação de pano não diz nada sobre editar tokens com campos trancados.",
+      "case": "Perde nos dois eixos: nem identificação nem clareza.",
+      "kept": "Uma só cor de comando, reservada ao que muda mesmo o convite.",
+      "hero": "https://impeccable.style/worlds/cards/textiles-weave-drape-fashion-drawcord-transforming-cape-hero.webp"
+    },
+    {
+      "id": "challenger-rain",
+      "label": "Jardim de Chuva com Gravidade",
+      "verdict": "declined",
+      "lineage": "Mundos impossíveis, chuva que cai segundo a cor da nuvem",
+      "thesis": "Cada nuvem manda na sua gravidade.",
+      "palette": ["#3B4A44", "#2E5FD0", "#C0392B"],
+      "materials": ["campo vetorial", "chuva dirigida"],
+      "viewport": "Jardim com linhas de base a dobrar segundo a gravidade local.",
+      "risk": "Linhas de base tortas matam a leitura de uma ferramenta de sessão longa.",
+      "case": "Perde nos dois eixos.",
+      "kept": "Estado viaja num eixo com sentido, não muda no sítio.",
+      "hero": "https://impeccable.style/worlds/cards/dream-surreal-impossible-worlds-gravity-rain-garden-hero.webp"
+    },
+    {
+      "id": "challenger-nixie",
+      "label": "Contador Nixie",
+      "verdict": "declined",
+      "lineage": "Contador de laboratório com tubos nixie",
+      "thesis": "A quantidade é a interface.",
+      "palette": ["#FF8A1E", "#0D0D0D", "#6E7478"],
+      "materials": ["vidro", "chassis de aço", "plasma"],
+      "viewport": "Bancos de tubos com casas decimais fixas.",
+      "risk": "O Studio quase não tem números; tem cor, texto e medidas.",
+      "case": "Perde nos dois eixos.",
+      "kept": "Nenhum valor troca em silêncio: a mudança é um evento visível.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-nixie-laboratory-counter-hero.webp"
+    }
+  ],
+  "canon": true,
+  "canonCard": {
+    "label": "O padrão da categoria",
+    "thesis": "A pele que toda a ferramenta de secretária desta categoria veste, feita com craft impecável.",
+    "palette": ["#1E1F22", "#2B2D31", "#4C8DF6", "#E6E6E6"],
+    "materials": ["chrome escuro", "painéis flutuantes", "rail de ícones"],
+    "viewport": "Rail de ícones à esquerda, inspector à direita, tela ao centro, azul de acento.",
+    "risk": "Indistinguível do Figma, do VS Code e de todos os outros - por desenho."
+  },
+  "reroll": { "registers": ["safer", "bolder"] },
+  "steer": true,
+  "buildPath": { "value": "code" }
+}

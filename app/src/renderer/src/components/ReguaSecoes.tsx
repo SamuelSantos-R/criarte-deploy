@@ -35,8 +35,8 @@ export function Regua({
               ativo ? "bg-surface-2 text-text" : "text-muted hover:text-text",
             )}
           >
-            <span className={cn("absolute left-0 top-0 h-full w-[2px]", ativo ? "bg-sage" : "bg-transparent")} />
-            <span className="w-[15px] shrink-0 font-mono text-serial text-muted/70">
+            <span className={cn("absolute left-0 top-0 h-full w-[2px]", ativo ? "bg-focus" : "bg-transparent")} />
+            <span className="w-[15px] shrink-0 font-narrow font-semibold text-gauge text-muted">
               {String(i + 1).padStart(2, "0")}
             </span>
             <Icone size={14} strokeWidth={1.6} aria-hidden />
@@ -60,11 +60,11 @@ export function Regua({
                 title={`Criar ${rotulo(chave)} neste convite`}
                 className={cn(
                   "no-drag flex w-full items-center gap-2 px-3 py-[7px] text-left text-[12px] transition-colors",
-                  "text-muted/60 hover:bg-surface-2/40 hover:text-text",
-                  "focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-accent",
+                  "text-muted hover:bg-surface-2/40 hover:text-text",
+                  "focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-cyan",
                 )}
               >
-                <span className="w-[15px] shrink-0 text-center font-mono text-serial text-muted/50">+</span>
+                <span className="w-[15px] shrink-0 text-center font-narrow font-semibold text-gauge text-muted">+</span>
                 <Icone size={14} strokeWidth={1.6} aria-hidden />
                 <span className="truncate">{rotulo(chave)}</span>
               </button>
@@ -98,20 +98,20 @@ export function ChaveSecao({
       title={ligada ? `Tirar ${nome} da página` : `Devolver ${nome} à página`}
       className={cn(
         "no-drag flex h-[28px] shrink-0 items-center gap-2 px-1 transition-colors",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage",
-        ligada ? "text-text hover:text-accent" : "text-muted hover:text-text",
+        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus",
+        ligada ? "text-text hover:text-cyan" : "text-muted hover:text-text",
       )}
     >
       <span
         aria-hidden
         className={cn(
           "flex h-[15px] w-[28px] items-center border px-[2px]",
-          ligada ? "justify-end border-accent/70" : "justify-start border-rule-strong",
+          ligada ? "justify-end border-cyan/70" : "justify-start border-rule-strong",
         )}
       >
-        <span className={cn("h-[9px] w-[9px]", ligada ? "bg-accent" : "bg-muted")} />
+        <span className={cn("h-[9px] w-[9px]", ligada ? "bg-cyan" : "bg-muted")} />
       </span>
-      <span className="font-mono text-label uppercase tracking-[0.14em]">
+      <span className="font-narrow font-semibold text-label uppercase tracking-[0.14em]">
         {ligada ? "na página" : "fora"}
       </span>
     </button>
@@ -142,8 +142,8 @@ export function BotaoTrilha({
       className={cn(
         "flex h-[28px] w-[32px] items-center justify-center transition-colors",
         "text-muted hover:bg-surface-2 hover:text-text",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-sage",
-        "disabled:pointer-events-none disabled:text-muted/30",
+        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
+        "disabled:pointer-events-none disabled:text-muted",
       )}
     >
       <Icone size={13} strokeWidth={1.8} aria-hidden />

@@ -1,5 +1,5 @@
 import { type ReactElement } from "react";
-import { FileText, X } from "lucide-react";
+import { ChevronDown, FileText, X } from "lucide-react";
 import { pickGuests } from "@/lib/api";
 import { Button, Input } from "@/components/ui/primitives";
 
@@ -44,7 +44,7 @@ export function validadeEmPalavras(o: Opcoes): string {
 }
 
 const Rotulo = ({ children }: { children: string }): ReactElement => (
-  <span className="font-mono text-label uppercase tracking-[0.16em] text-muted">{children}</span>
+  <span className="font-narrow font-semibold text-label uppercase tracking-[0.16em] text-muted">{children}</span>
 );
 
 /**
@@ -68,18 +68,25 @@ export function OpcoesDeploy({
     <div className="flex flex-wrap items-end gap-x-7 gap-y-3 border-b border-rule px-8 py-4">
       <label className="flex flex-col gap-1.5">
         <Rotulo>Validade</Rotulo>
-        <select
-          value={valor.validade}
-          disabled={travado}
-          onChange={(e) => set({ validade: e.target.value })}
-          className="no-drag h-[30px] w-[130px] border border-rule bg-surface px-2 text-[12px] text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage disabled:opacity-40"
-        >
-          {VALIDADES.map((v) => (
-            <option key={v.valor} value={v.valor}>
-              {v.rotulo}
-            </option>
-          ))}
-        </select>
+        <div className="relative w-[130px]">
+          <select
+            value={valor.validade}
+            disabled={travado}
+            onChange={(e) => set({ validade: e.target.value })}
+            className="no-drag h-[30px] w-full appearance-none border border-rule bg-surface pl-2.5 pr-8 text-[12px] text-text focus:border-focus focus:outline-none disabled:opacity-40"
+          >
+            {VALIDADES.map((v) => (
+              <option key={v.valor} value={v.valor}>
+                {v.rotulo}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={13}
+            aria-hidden
+            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
+          />
+        </div>
       </label>
 
       {valor.validade === "data" && (
@@ -127,7 +134,7 @@ export function OpcoesDeploy({
               onClick={() => set({ convidados: null })}
               aria-label="Tirar a lista de convidados"
               title="Sem lista o convite sobe em prévia, sem token por convidado"
-              className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-sage disabled:opacity-40"
+              className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
             >
               <X size={13} />
             </button>

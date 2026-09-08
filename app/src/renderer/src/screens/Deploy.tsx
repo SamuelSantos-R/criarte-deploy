@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Rocket, Square, Stethoscope } from "lucide-react";
 import type { Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
+import { useProva } from "@/lib/prova";
 import { useSiteValido } from "@/lib/useSiteValido";
 import { Button } from "@/components/ui/primitives";
 import { ConfirmarPublicacao } from "@/components/ConfirmarPublicacao";
@@ -29,6 +30,7 @@ export function Deploy({
   const [opcoes, setOpcoes] = useState<Opcoes>(OPCOES_PADRAO);
   const [confirmando, setConfirmando] = useState(false);
   const job = useJob();
+  const { marcar } = useProva();
 
   useSiteValido(sites, id, setId);
 
@@ -52,6 +54,15 @@ export function Deploy({
       "──────────────────────────────────────────────",
     ]);
   }, [job.estado, job]);
+
+  // O carimbo no fim da barra de cor só vale para publicação a sério: o ensaio
+  // não põe nada no ar, então não carimba nem apaga carimbo de antes.
+  useEffect(() => {
+    if (foiEnsaio.current) return;
+    if (job.rodando) marcar({ publicacao: "a-correr" });
+    else if (job.estado === "ok") marcar({ publicacao: "publicado" });
+    else if (job.estado === "falhou") marcar({ publicacao: "parada" });
+  }, [job.rodando, job.estado, marcar]);
 
   const disparar = (dryRun: boolean): void => {
     if (!id || expires === null) return;
@@ -82,9 +93,9 @@ export function Deploy({
             checked={ensaio}
             disabled={job.rodando}
             onChange={(e) => setEnsaio(e.target.checked)}
-            className="h-4 w-4 accent-accent"
+            className="h-4 w-4 accent-cyan"
           />
-          <span className="font-mono text-label uppercase text-muted">Ensaio</span>
+          <span className="font-narrow font-semibold text-label uppercase text-muted">Ensaio</span>
         </label>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Button

@@ -106,12 +106,12 @@ export function Divisor({
         e.preventDefault();
       }}
       title="Arraste pra mudar o tamanho · duplo clique volta ao padrão"
-      className="no-drag group relative w-[9px] shrink-0 cursor-col-resize focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-sage"
+      className="no-drag group relative w-[9px] shrink-0 cursor-col-resize focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-focus"
     >
       <span
         aria-hidden
         className={`absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors ${
-          arrastando ? "bg-accent" : "bg-rule group-hover:bg-rule-strong"
+          arrastando ? "bg-cyan" : "bg-rule group-hover:bg-rule-strong"
         }`}
       />
       {/* Três traços: a linha sozinha é só uma borda como as outras, e ninguém
@@ -124,7 +124,7 @@ export function Divisor({
           <span
             key={i}
             className={`block h-[3px] w-[3px] transition-colors ${
-              arrastando ? "bg-accent" : "bg-rule-strong group-hover:bg-accent"
+              arrastando ? "bg-cyan" : "bg-rule-strong group-hover:bg-cyan"
             }`}
           />
         ))}

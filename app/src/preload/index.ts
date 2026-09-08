@@ -3,18 +3,26 @@ import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from "ele
 type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 type AssetImportado = { nome: string; web: string; bytes: number };
 type Servidor = { siteId: string; url: string; lan: string | null };
-type Copia = { id: string; siteId: string; faltam: string[] };
+type Copia = { id: string; siteId: string | null; faltam: string[] };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
 type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };
 type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
+type Plantio = { ficheiros: string[]; ligada: boolean; impedimento: string | null };
 type Convite = { dados: unknown; marca: number };
 type Gravacao = { conflito: boolean; marca: number };
 type ConviteMudou = { id: string; marca: number };
 type Patch = { caminho: (string | number)[]; valor: unknown };
 type Tranca = { secao: string; nome: string };
-type Vizinho = { endereco: string; nome: string; siteId: string };
+type Vizinho = { endereco: string; nome: string; siteId: string; codigo: string | null };
 type Perto = { lista: Vizinho[]; vivo: boolean };
+type Espelho = { siteId: string; lan: string | null; url: string; feito: number };
+type EstadoCredenciais = {
+  temFicheiro: boolean;
+  podePublicar: boolean;
+  podeRegistar: boolean;
+  nome: string | null;
+};
 type EstadoDeps = {
   raiz: string | null;
   temManifesto: boolean;
@@ -70,6 +78,9 @@ const api = {
   importAssets: (id: string, origens: string[]) =>
     invoke<AssetImportado[]>("assets:import", id, origens),
   pickAssets: (id: string, pasta: boolean) => invoke<AssetImportado[]>("assets:pick", id, pasta),
+  semearAsset: (id: string, secao: string) =>
+    invoke<AssetImportado | null>("assets:semente", id, secao),
+  plantarSecao: (id: string, secao: string) => invoke<Plantio>("secao:plantar", id, secao),
   trocarPorWebp: (id: string) => invoke<unknown>("assets:webp", id),
 
   listarFontes: () => invoke<Fonte[]>("fontes:listar"),
@@ -86,6 +97,11 @@ const api = {
   previewRecarregar: () => invoke<boolean>("preview:recarregar"),
   previewPintar: (doc: unknown) => invoke<number>("preview:pintar", doc),
 
+  telemovelConstruir: (id: string) => invoke<Espelho>("telemovel:construir", id),
+  telemovelParar: () => invoke<void>("telemovel:parar"),
+  telemovelEstado: () => invoke<Espelho | null>("telemovel:estado"),
+  onTelemovelPasso: ouvir<string>("telemovel:passo"),
+
   envelopeModelo: () => invoke<unknown>("envelope:modelo"),
   envelopeLista: () => invoke<unknown>("envelope:lista"),
   envelopePasta: () => invoke<string | null>("envelope:pasta"),
@@ -93,6 +109,10 @@ const api = {
   envelopeAbrirSaida: () => invoke<void>("envelope:abrirSaida"),
 
   estadoDeps: () => invoke<EstadoDeps>("deps:estado"),
+
+  credEstado: () => invoke<EstadoCredenciais>("cred:estado"),
+  credImportar: () => invoke<EstadoCredenciais | null>("cred:importar"),
+  credExportar: () => invoke<string | null>("cred:exportar"),
 
   destinoPublicacao: (id: string) => invoke<{ url: string | null }>("deploy:destino", id),
   pickGuests: () => invoke<string | null>("deploy:pickGuests"),

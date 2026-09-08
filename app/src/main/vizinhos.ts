@@ -6,8 +6,11 @@ import { hostname, networkInterfaces } from "node:os";
  * UDP e todos os Studios da rede ouvem — assim ninguém precisa de perguntar o IP
  * ao lado antes de entrar.
  *
- * Ouvir não é ser convidado: o farol só diz onde bater, e o código de 6 dígitos
- * continua a ser a porta. Descoberta não é autorização.
+ * O código de 6 dígitos vai no grito. Deixa de ser segredo: quem alcança a
+ * difusão da sub-rede entra na sessão com um clique. É a troca pedida — ler o
+ * número em voz alta atravessando a sala custava mais do que protegia numa rede
+ * que já é a de casa. Quem quiser a porta fechada não abre a sessão; o servidor
+ * continua a exigir o código, e quem escreve o endereço à mão tem de o saber.
  */
 
 const PORTA_FAROL = 7413;
@@ -17,7 +20,8 @@ const VALIDADE_MS = 7_000;
 const VARRER_MS = 1_000;
 const MAX = 32;
 
-export type Vizinho = { endereco: string; nome: string; siteId: string };
+/** `codigo` é `null` quando o vizinho corre uma versão que ainda não o grita. */
+export type Vizinho = { endereco: string; nome: string; siteId: string; codigo: string | null };
 
 /**
  * `255.255.255.255` não sai de algumas placas e alguns APs deitam-no fora. O
@@ -51,7 +55,7 @@ let soquete: Socket | null = null;
 let farol: NodeJS.Timeout | null = null;
 let varredura: NodeJS.Timeout | null = null;
 let sonda: NodeJS.Timeout | null = null;
-let anunciando: { siteId: string; porta: number } | null = null;
+let anunciando: { siteId: string; porta: number; codigo: string } | null = null;
 /** Quando o nosso próprio pacote nos voltou pela última vez. Ver `farolVivo`. */
 let eco = 0;
 let abertoEm = 0;
@@ -77,7 +81,7 @@ function ler(carga: Buffer, origem: string): void {
     return;
   }
   if (!obj || typeof obj !== "object") return;
-  const { t, nome, siteId, porta } = obj as Record<string, unknown>;
+  const { t, nome, siteId, porta, codigo } = obj as Record<string, unknown>;
   if (t !== "criarte-studio") return;
   if (typeof siteId !== "string" || !/^[a-z0-9-]{1,64}\/[a-z0-9-]{1,64}$/.test(siteId)) return;
   if (typeof porta !== "number" || !Number.isInteger(porta) || porta < 1024 || porta > 65535) return;
@@ -87,8 +91,11 @@ function ler(carga: Buffer, origem: string): void {
   const endereco = `${origem}:${porta}`;
   const anterior = vistos.get(endereco);
   const limpo = typeof nome === "string" ? nome.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 40) : origem;
-  vistos.set(endereco, { endereco, nome: limpo || origem, siteId, visto: Date.now() });
-  if (!anterior || anterior.nome !== limpo || anterior.siteId !== siteId) avisar();
+  const chave = typeof codigo === "string" && /^\d{6}$/.test(codigo) ? codigo : null;
+  vistos.set(endereco, { endereco, nome: limpo || origem, siteId, codigo: chave, visto: Date.now() });
+  if (!anterior || anterior.nome !== limpo || anterior.siteId !== siteId || anterior.codigo !== chave) {
+    avisar();
+  }
 }
 
 function varrer(): void {
@@ -180,9 +187,9 @@ function gritar(): void {
 }
 
 /** Enquanto houver sessão aberta, este Studio aparece na lista dos outros. */
-export function anunciar(siteId: string, porta: number): void {
+export function anunciar(siteId: string, porta: number, codigo: string): void {
   abrir();
-  anunciando = { siteId, porta };
+  anunciando = { siteId, porta, codigo };
   gritar();
   farol ??= setInterval(gritar, ANUNCIO_MS);
   farol.unref?.();
@@ -199,5 +206,5 @@ export function vizinhos(): Vizinho[] {
   varrer();
   return [...vistos.values()]
     .sort((a, b) => a.nome.localeCompare(b.nome))
-    .map(({ endereco, nome, siteId }) => ({ endereco, nome, siteId }));
+    .map(({ endereco, nome, siteId, codigo }) => ({ endereco, nome, siteId, codigo }));
 }

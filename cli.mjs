@@ -25,6 +25,7 @@ import { analisarTema } from "./src/lib/harness.mjs";
 import { findPageFile, listSections, applyDisableToFile } from "./src/lib/sections.mjs";
 import { createManifest, finalizeManifest, saveManifest } from "./src/lib/manifest.mjs";
 import { printSummary } from "./src/lib/summary.mjs";
+import { zipPasta } from "./src/lib/zip.mjs";
 
 // ============================================================================
 // CONFIG
@@ -644,8 +645,12 @@ function runTypecheck(cwd, { timeoutMs = 90_000 } = {}) {
   if (!existsSync(tsconfig)) {
     return { skipped: true, reason: "sem tsconfig.json (projeto sem TypeScript)" };
   }
-  const tscBin = join(cwd, "node_modules", ".bin", "tsc");
-  if (!existsSync(tscBin)) {
+  // O `.bin/tsc` é um script com shebang `#!/usr/bin/env node`. Quando o CLI roda
+  // dentro do app (Electron como Node), a GUI não tem `node` no PATH e o shebang
+  // morre com "env: node: No such file or directory". Chamar o tsc.js com o
+  // próprio executável não depende de PATH nenhum.
+  const tscJs = join(cwd, "node_modules", "typescript", "bin", "tsc");
+  if (!existsSync(tscJs)) {
     return {
       skipped: true,
       reason: "node_modules não instalado",
@@ -653,8 +658,9 @@ function runTypecheck(cwd, { timeoutMs = 90_000 } = {}) {
     };
   }
   try {
-    execSync(`"${tscBin}" --noEmit --pretty false`, {
+    execFileSync(process.execPath, [tscJs, "--noEmit", "--pretty", "false"], {
       cwd, stdio: "pipe", timeout: timeoutMs,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
     });
     return { ok: true };
   } catch (e) {
@@ -3155,10 +3161,10 @@ async function cmdDirectDeploy(argv) {
     const sp2 = new Spinner("Compactando arquivos...").start();
     tmpZip = join(tmpdir(), `criarte-deploy-${slug}.zip`);
     try {
-      execSync(`cd "${stagingDir}" && zip -r "${tmpZip}" .`, { stdio: "pipe", timeout: 120000 });
+      await zipPasta(stagingDir, tmpZip);
     } catch (e) {
       sp2.fail("Falha ao criar zip");
-      err(e.stderr?.toString() || e.message);
+      err(e.message);
       rmSync(stagingDir, { recursive: true, force: true });
       process.exit(1);
     }

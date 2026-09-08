@@ -76,7 +76,7 @@ function LinhaAncora({
 
   return (
     <div className="flex items-center gap-3 border-b border-rule py-2 pl-4 pr-2 last:border-b-0 focus-within:bg-surface-2/40">
-      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text">
+      <span className="min-w-0 flex-1 truncate text-[12px] text-text">
         {ancora.rotulo}
       </span>
       <div className="flex shrink-0 border border-rule" role="group" aria-label={`Lado da arte de ${ancora.rotulo}`}>
@@ -89,10 +89,10 @@ function LinhaAncora({
             title={l === "left" ? "Arte no canto esquerdo" : "Arte no canto direito"}
             className={cn(
               "no-drag flex h-7 w-7 items-center justify-center transition-colors",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
               ladoAtual === l
-                ? "bg-accent/15 text-text"
-                : "text-muted/50 hover:text-text",
+                ? "bg-cyan/15 text-text"
+                : "text-muted hover:text-text",
             )}
           >
             {l === "left" ? <AlignLeft size={12} /> : <AlignRight size={12} />}
@@ -100,7 +100,7 @@ function LinhaAncora({
         ))}
       </div>
       {!proprio && (
-        <span className="shrink-0 font-mono text-serial uppercase tracking-[0.12em] text-muted/50">
+        <span className="shrink-0 font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted">
           herda
         </span>
       )}
@@ -122,9 +122,9 @@ function LinhaAncora({
         inputMode="decimal"
         aria-label={`Subir ou descer a arte de ${ancora.rotulo}, em pixels`}
         className={cn(
-          "no-drag w-[58px] shrink-0 border border-rule bg-transparent px-1.5 py-1 text-right font-mono text-[12px] tabular-nums",
-          "hover:border-rule-strong focus:border-accent focus:bg-surface-2 focus:outline-none",
-          proprio ? "text-text" : "text-muted/60",
+          "no-drag w-[58px] shrink-0 border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold",
+          "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-none",
+          proprio ? "text-text" : "text-muted",
         )}
       />
       <button
@@ -135,7 +135,7 @@ function LinhaAncora({
         title="Voltar a herdar o deslocamento geral"
         className={cn(
           "no-drag flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-text",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
           "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
         )}
       >
@@ -168,10 +168,10 @@ function LinhaCor({
         <div className="flex items-baseline gap-2.5">
           <span className="text-[13px] text-text">cor da arte</span>
           {!valido && (
-            <span className="shrink-0 font-mono text-serial uppercase text-bad">hex inválido</span>
+            <span className="shrink-0 font-narrow font-semibold text-gauge uppercase text-pencil">hex inválido</span>
           )}
         </div>
-        <p className="mt-0.5 max-w-[42ch] text-[12px] leading-[1.5] text-muted/80">
+        <p className="mt-0.5 max-w-[42ch] text-[12px] leading-[1.5] text-muted">
           {pintado
             ? "A arte sai chapada nesta cor. Serve a desenho de traço único."
             : "A arte sai com as cores do ficheiro."}
@@ -183,9 +183,9 @@ function LinhaCor({
           type="button"
           onClick={() => onChange("")}
           className={cn(
-            "no-drag shrink-0 self-start px-3 py-2.5 font-mono text-serial uppercase tracking-[0.14em]",
+            "no-drag shrink-0 self-start px-3 py-2.5 font-narrow font-semibold text-gauge uppercase tracking-[0.14em]",
             "text-muted hover:text-text",
-            "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-sage",
+            "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
           )}
         >
           limpar
@@ -200,8 +200,8 @@ function LinhaCor({
         aria-label="Hex da cor da arte"
         className={cn(
           "no-drag w-[92px] shrink-0 self-start bg-transparent py-2.5 pr-3 text-right font-mono text-[12px] uppercase",
-          "placeholder:normal-case placeholder:text-muted/50 focus:bg-surface-2 focus:outline-none",
-          valido ? "text-muted" : "text-bad",
+          "placeholder:normal-case placeholder:text-muted focus:bg-surface-2 focus:outline-none",
+          valido ? "text-muted" : "text-pencil",
         )}
       />
     </div>
@@ -232,8 +232,8 @@ export function PainelOrnamentos({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">arte</span>
-          <span className="font-mono text-serial text-muted/60">02</span>
+          <span className="font-narrow font-semibold text-label uppercase text-text">arte</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">02</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
         <div className="flex flex-col gap-5">
@@ -246,7 +246,7 @@ export function PainelOrnamentos({
                 aceita={SVG_OU_PNG}
                 aceitaNota="só SVG ou PNG"
               />
-              <p className="mt-1.5 max-w-[46ch] text-[11px] leading-[1.5] text-muted/80">
+              <p className="mt-1.5 max-w-[46ch] text-[11px] leading-[1.5] text-muted">
                 {slot.dica}
               </p>
             </div>
@@ -263,8 +263,8 @@ export function PainelOrnamentos({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">ajuste</span>
-          <span className="font-mono text-serial text-muted/60">02</span>
+          <span className="font-narrow font-semibold text-label uppercase text-text">ajuste</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">02</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
         <div className="border-t border-rule">
@@ -281,13 +281,13 @@ export function PainelOrnamentos({
 
       <section>
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-mono text-label uppercase text-text">por secção</span>
-          <span className="font-mono text-serial text-muted/60">
+          <span className="font-narrow font-semibold text-label uppercase text-text">por secção</span>
+          <span className="font-narrow font-semibold text-gauge text-muted">
             {String(ANCORAS_ORNAMENTO.length).padStart(2, "0")}
           </span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted/80">
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
           Sobe (negativo) ou desce (positivo) só a arte daquela secção. Enquanto
           diz <span className="font-mono">herda</span>, ela segue o ajuste geral acima.
           O par de setas troca o canto em que a arte se encosta.
@@ -296,18 +296,18 @@ export function PainelOrnamentos({
         <label
           className={cn(
             "no-drag mb-4 flex cursor-pointer items-center gap-3 border-y border-rule py-2.5 pl-4 pr-3",
-            "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-accent",
+            "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-cyan",
           )}
         >
           <input
             type="checkbox"
             checked={noRodape}
             onChange={(e) => onChange(["rodape"], e.target.checked)}
-            className="no-drag h-3.5 w-3.5 shrink-0 accent-accent"
+            className="no-drag h-3.5 w-3.5 shrink-0 accent-cyan"
           />
           <span className="min-w-0 flex-1">
-            <span className="font-mono text-[12px] text-text">arte no rodapé</span>
-            <span className="mt-0.5 block max-w-[42ch] text-[11px] leading-[1.5] text-muted/80">
+            <span className="text-[12px] text-text">arte no rodapé</span>
+            <span className="mt-0.5 block max-w-[42ch] text-[11px] leading-[1.5] text-muted">
               É a única que entra por baixo do bloco todo. Desligada, o rodapé fica
               limpo — o slot continua aqui para o próximo convite.
             </span>

@@ -46,7 +46,7 @@ export const writeConvite = (id: string, data: unknown, marca?: number) =>
 export const vigiarConvite = (id: string | null) => call(api.vigiarConvite(id));
 export const onConviteMudou = api.onConviteMudou;
 
-export type Copia = { id: string; siteId: string; faltam: string[] };
+export type Copia = { id: string; siteId: string | null; faltam: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
 export type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
@@ -62,6 +62,13 @@ export const importAssets = (id: string, origens: string[]) =>
   call(api.importAssets(id, origens)) as Promise<AssetImportado[]>;
 export const pickAssets = (id: string, pasta: boolean) =>
   call(api.pickAssets(id, pasta)) as Promise<AssetImportado[]>;
+export const semearAsset = (id: string, secao: string) =>
+  call(api.semearAsset(id, secao)) as Promise<AssetImportado | null>;
+
+/** O componente da secção, posto dentro do convite e ligado na página. */
+export type Plantio = { ficheiros: string[]; ligada: boolean; impedimento: string | null };
+export const plantarSecao = (id: string, secao: string) =>
+  call(api.plantarSecao(id, secao)) as Promise<Plantio>;
 export const caminhoDe = api.caminhoDe;
 
 export type TrocaWebp = { nome: string; webp: string; bytes: number; bytesWebp: number; refs: number };
@@ -89,6 +96,18 @@ export const previewRecarregar = () => call(api.previewRecarregar()) as Promise<
 /** Cor e medida no quadro, no mesmo instante. Devolve quantas vars entraram. */
 export const previewPintar = (doc: unknown) => call(api.previewPintar(doc)) as Promise<number>;
 
+/**
+ * A cópia construída que o telemóvel lê pelo QR. O `next dev` entrega ~12 MB de
+ * JavaScript e recompila a cada gravação — o separador aberto no telemóvel perde
+ * o fio dos chunks e o Safari mata-o. Esta cópia não recompila e pesa ~850 KB.
+ */
+export type Espelho = { siteId: string; lan: string | null; url: string; feito: number };
+export const telemovelConstruir = (id: string) =>
+  call(api.telemovelConstruir(id)) as Promise<Espelho>;
+export const telemovelParar = () => call(api.telemovelParar());
+export const telemovelEstado = () => call(api.telemovelEstado()) as Promise<Espelho | null>;
+export const onTelemovelPasso = api.onTelemovelPasso;
+
 export type Convidado = { url: string; nome: string };
 export type Modelo = { nome: string; largura: number; altura: number; dataUrl: string };
 export type Lista = {
@@ -110,8 +129,8 @@ export const envelopeAbrirSaida = () => call(api.envelopeAbrirSaida());
 
 export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };
-/** Anfitrião que anda a gritar na rede local. Só diz onde bater — não abre a porta. */
-export type Vizinho = { endereco: string; nome: string; siteId: string };
+/** Anfitrião a gritar na rede local. O código vem no grito: clicar entra. */
+export type Vizinho = { endereco: string; nome: string; siteId: string; codigo: string | null };
 /** `vivo: false` = a difusão não sai desta máquina; a lista vazia não é culpa de ninguém. */
 export type Perto = { lista: Vizinho[]; vivo: boolean };
 export type EstadoCoop = {
@@ -148,6 +167,17 @@ export const onCoopTrancas = api.onCoopTrancas;
 export const onCoopCaiu = api.onCoopCaiu;
 
 export const estadoDeps = () => call(api.estadoDeps()) as Promise<EstadoDeps>;
+
+/** O que esta máquina consegue fazer com o `~/.criarte-deploy/config.json` que tem. */
+export type EstadoCredenciais = {
+  temFicheiro: boolean;
+  podePublicar: boolean;
+  podeRegistar: boolean;
+  nome: string | null;
+};
+export const credEstado = () => call(api.credEstado()) as Promise<EstadoCredenciais>;
+export const credImportar = () => call(api.credImportar()) as Promise<EstadoCredenciais | null>;
+export const credExportar = () => call(api.credExportar()) as Promise<string | null>;
 
 export const destinoPublicacao = (id: string) =>
   call(api.destinoPublicacao(id)) as Promise<{ url: string | null }>;

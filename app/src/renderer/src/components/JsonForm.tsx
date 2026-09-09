@@ -323,6 +323,21 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
   );
 }
 
+/**
+ * O RSVP some da página sozinho quando não tem formulário ligado — é a mesma
+ * condição que o componente usa para não desenhar nada. Era o único caso em que
+ * o Studio criava a secção, dizia que correu bem, e o convite continuava igual.
+ */
+function semFormulario(secao: string, valor: unknown): boolean {
+  if (secao !== "rsvp") return false;
+  const form = (valor as Record<string, unknown>).form;
+  if (!form || typeof form !== "object") return true;
+  const { url, nome, comparecer } = form as Record<string, unknown>;
+  if (typeof nome !== "string" || !nome.trim()) return true;
+  if (typeof comparecer !== "string" || !comparecer.trim()) return true;
+  return typeof url !== "string" || !url.includes("docs.google.com/forms/");
+}
+
 /** Uma seção por vez: `secao` é uma chave de primeiro nível do convite.json. */
 export function JsonForm({
   dados,
@@ -382,9 +397,18 @@ export function JsonForm({
   }
   if (valor !== null && typeof valor === "object") {
     return (
-      <div className="grid grid-cols-2 gap-x-5 gap-y-3">
-        <Nos valor={valor} caminho={[secao]} onChange={alterar} />
-      </div>
+      <>
+        {semFormulario(secao, valor) && (
+          <p className="mb-4 border-l-2 border-cyan pl-3 text-[13px] text-text">
+            Enquanto o URL do formulário estiver vazio a secção não aparece no convite: sem
+            formulário, o botão engolia a resposta. Cola aqui o link do Google Form deste casal
+            (o `docs.google.com/forms/…`) e ela entra no ar.
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-x-5 gap-y-3">
+          <Nos valor={valor} caminho={[secao]} onChange={alterar} />
+        </div>
+      </>
     );
   }
   // Seção escalar (ex.: `data`) — um campo só, sem grid.

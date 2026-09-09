@@ -102,6 +102,16 @@ export const PAPEIS: Grupo[] = [
         rotulo: "Manual",
         onde: "As orientações dos cartões e o agradecimento no fim.",
       },
+      {
+        chave: "rsvp",
+        rotulo: "RSVP",
+        onde: "A frase por cima do botão e os rótulos do cartão. O botão e o «sim» seguem o Destaque.",
+      },
+      {
+        chave: "rsvp-fundo",
+        rotulo: "RSVP — cartão de confirmação",
+        onde: "Só o fundo do cartão que abre ao confirmar. Vazio deixa o branco de sempre.",
+      },
     ],
   },
 ];
@@ -295,6 +305,8 @@ export const TEMA_PADRAO: Record<string, string> = {
   "nosso-dia": "#A87C28",
   presentes: "#745A1A",
   manual: "#B08A4A",
+  rsvp: "#A87C28",
+  "rsvp-fundo": "#FFFFFF",
   "card-borda": "#D6BB8D",
 };
 
@@ -338,6 +350,8 @@ export const PALETAS: Paleta[] = [
       "nosso-dia": "#4E5638",
       presentes: "#414830",
       manual: "#5A6239",
+      rsvp: "#4E5638",
+      "rsvp-fundo": "#FFFFFF",
       "card-borda": "#C7CFAE",
     },
   },
@@ -364,6 +378,8 @@ export const PALETAS: Paleta[] = [
       "nosso-dia": "#8A4E39",
       presentes: "#74402E",
       manual: "#8C5240",
+      rsvp: "#8A4E39",
+      "rsvp-fundo": "#FFFFFF",
       "card-borda": "#E2C4AF",
     },
   },

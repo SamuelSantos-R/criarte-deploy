@@ -39,6 +39,9 @@ const APELIDOS: Record<string, string> = {
   recados: "Mural",
   dresscode: "Dress code",
   eyebrow: "Chapéu",
+  frase: "Frase do cartão",
+  limite: "Fecha em (AAAA-MM-DD)",
+  encerrado: "Frase depois de fechar",
   pretoEBranco: "Foto em preto e branco",
   centrarNomes: "Centrar nomes com a divisória",
 };
@@ -126,7 +129,7 @@ export const BLOCOS: {
   { id: "nosso-dia", rotulo: "nosso dia", topo: 60, base: 60, ornamento: true },
   { id: "presentes", rotulo: "presentes", topo: 100, base: 100, ornamento: true },
   { id: "manual", rotulo: "manual", topo: 100, base: 100, ornamento: true },
-  { id: "rsvp", rotulo: "RSVP", topo: 90, base: 100, ornamento: true },
+  { id: "rsvp", rotulo: "RSVP", topo: 80, base: 80, ornamento: true },
   { id: "dresscode", rotulo: "dress code", topo: 100, base: 100, ornamento: true },
   { id: "mensagens", rotulo: "mural", topo: 70, base: 90, ornamento: true },
 ];
@@ -144,7 +147,7 @@ const LADO_DESENHO: Record<string, "left" | "right"> = {
   "nosso-dia": "right",
   presentes: "left",
   manual: "right",
-  rsvp: "left",
+  rsvp: "right",
   dresscode: "left",
   mensagens: "right",
   footer: "left",
@@ -199,7 +202,9 @@ const SEMENTES: Record<string, () => Record<string, unknown>> = {
   medidas: () => ({ ...MEDIDAS_PADRAO }),
   ornamentos: () => ({ ...ORNAMENTOS_PADRAO }),
   rsvp: () => ({
-    prazo: "",
+    frase: "",
+    limite: "",
+    encerrado: "",
     aliancas: "/assets/aliancas-casamento.png",
     form: {
       url: "",

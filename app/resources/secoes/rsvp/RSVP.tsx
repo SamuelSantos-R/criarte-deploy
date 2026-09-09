@@ -1,31 +1,29 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Section from "./Section";
 import SectionDivider from "./SectionDivider";
-import GoldLine from "./GoldLine";
-import { Heart, X, Check, ChevronDown } from "lucide-react";
+import { Heart, X, Check, ChevronDown, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import confetti from "canvas-confetti";
 import convite from "@/lib/convite";
 
 const rsvp = (convite as { rsvp?: Record<string, unknown> }).rsvp ?? {};
+const form = (rsvp.form ?? {}) as Record<string, string>;
 
 const texto = (chave: string, padrao: string): string =>
   typeof rsvp[chave] === "string" && (rsvp[chave] as string).trim() !== ""
     ? (rsvp[chave] as string).trim()
     : padrao;
 
-const form = (rsvp.form ?? {}) as Record<string, string>;
-
 /**
- * O POST do Google Forms só entra no `/formResponse`; o link que se tem à mão é
- * quase sempre o `/viewform`. O `forms.gle` fica de fora de propósito: é um
- * encurtador, só resolve com redirecionamento, e o `no-cors` daqui não deixa ver
- * que o envio falhou — a pessoa via "confirmado" e a planilha ficava vazia.
+ * O POST só entra no `/formResponse`; o link que se tem à mão é quase sempre o
+ * `/viewform` ou um `forms.gle`. O `no-cors` daqui não deixa ver que o envio
+ * falhou — a pessoa via "confirmado" e a planilha ficava vazia.
  */
-const destino = ((): string => {
+const GOOGLE_FORM_URL = ((): string => {
   const url = typeof form.url === "string" ? form.url.trim() : "";
   if (!url.includes("docs.google.com/forms/")) return "";
   const base = url
@@ -35,214 +33,302 @@ const destino = ((): string => {
   return `${base}/formResponse`;
 })();
 
-/** Os rótulos são os das opções do form: o Google recusa valor fora da lista. */
-const ACOMPANHANTES = [
-  { valor: "0", rotulo: "Somente eu" },
-  { valor: "1", rotulo: "+1 acompanhante" },
+const ALIANCAS = texto("aliancas", "/assets/aliancas-casamento.png");
+
+/**
+ * O `prazo` continua a ser lido para os convites que já o têm gravado: era só a
+ * data, e o "Por favor, confirme até" estava cravado no componente. A `frase`
+ * veio porque cada casal escreve a sua à maneira dele.
+ */
+const PRAZO = texto("prazo", "");
+const FRASE = texto("frase", PRAZO ? `Por favor, confirme até ${PRAZO}` : "Por favor, confirme a sua presença");
+
+/** Último dia em que se pode responder, como `AAAA-MM-DD`. Vazio: nunca fecha. */
+const LIMITE = texto("limite", "");
+const TEXTO_ENCERRADO = texto("encerrado", "Confirmações encerradas");
+
+/**
+ * O papel `rsvp` do tema, por variável em vez de classe: o botão pode usar
+ * `bg-destaque` porque o Studio só planta esta secção onde o `destaque` existe,
+ * mas um papel novo não está no `tailwind.config.ts` de convite nenhum. Assim a
+ * cor segue o tema em qualquer convite, e cai no dourado de sempre onde ninguém
+ * a escolheu.
+ */
+const OURO_RSVP = "rgb(var(--c-rsvp, var(--c-realce-profundo)))";
+const COR_TEXTO = { color: OURO_RSVP };
+/** O rótulo é desenhado com contorno, senão a maiúscula fina desaparece no branco. */
+const COR_ROTULO = { color: OURO_RSVP, WebkitTextStroke: `0.2px ${OURO_RSVP}` };
+/** Vazio deixa o branco de sempre, como o cartão do Correio do Amor. */
+const COR_CARD = { background: "rgb(var(--c-rsvp-fundo, 255 255 255))" };
+
+/**
+ * Fecha no fim do dia limite, pelo relógio de quem abre o convite: a data está
+ * escrita no cartão sem fuso nenhum, e quem responde às 23h do último dia ainda
+ * está a horas. Data mal escrita não fecha nada — pior que abrir de mais é o
+ * convite trancar sozinho por causa de uma gralha.
+ */
+const jaFechou = (): boolean => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(LIMITE);
+  if (!m) return false;
+  const fim = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 23, 59, 59, 999);
+  return Date.now() > fim.getTime();
+};
+
+/** Os números do convite são desenhados na infant, e o prazo vem do json. */
+const emInfant = (t: string): ReactNode[] =>
+  t.split(/(\d+)/).map((p, i) =>
+    /^\d+$/.test(p) ? (
+      <span key={i} className="font-infant">
+        {p}
+      </span>
+    ) : (
+      <span key={i}>{p}</span>
+    ),
+  );
+
+function fireWeddingConfetti(canvas: HTMLCanvasElement) {
+  const fire = confetti.create(canvas, { resize: true, useWorker: false });
+  const colors = ["#7A7F4B", "#A8843F", "#B08A4A", "#F5EDD8", "#FDFAF4"];
+  const common: confetti.Options = {
+    spread: 45,
+    startVelocity: 18,
+    gravity: 0.45,
+    ticks: 380,
+    scalar: 0.9,
+    decay: 0.94,
+    colors,
+    shapes: ["square", "circle"],
+    disableForReducedMotion: true,
+  };
+  setTimeout(() => {
+    fire({ ...common, particleCount: 40, angle: 60,  origin: { x: 0.05, y: 0.65 } });
+    fire({ ...common, particleCount: 40, angle: 120, origin: { x: 0.95, y: 0.65 } });
+  }, 300);
+  setTimeout(() => {
+    fire({ ...common, particleCount: 30, angle: 65,  startVelocity: 15, origin: { x: 0.08, y: 0.7 } });
+    fire({ ...common, particleCount: 30, angle: 115, startVelocity: 15, origin: { x: 0.92, y: 0.7 } });
+  }, 800);
+  setTimeout(() => {
+    fire({ ...common, particleCount: 22, angle: 70,  startVelocity: 14, origin: { x: 0.05, y: 0.72 } });
+    fire({ ...common, particleCount: 22, angle: 110, startVelocity: 14, origin: { x: 0.95, y: 0.72 } });
+  }, 1400);
+}
+
+const ACOMPANHANTES_OPTIONS = [
+  { value: "0", label: <>Somente eu</> },
+  { value: "1", label: <><span className="font-infant">+1</span> acompanhante</> },
 ];
 
-const ALIANCAS = texto("aliancas", "");
-const PRAZO = texto("prazo", "");
-
 export default function RSVP() {
-  const [aberto, setAberto] = useState(false);
-  const [confirmado, setConfirmado] = useState(false);
-  const [montado, setMontado] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-  const [dados, setDados] = useState({ nome: "", comparecer: "", acompanhantes: "0" });
-  const [acompanhantes, setAcompanhantes] = useState<string[]>([]);
-  const [listaAberta, setListaAberta] = useState(false);
-  const listaRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef(0);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [resposta, setResposta] = useState<"sim" | "nao" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  // Só depois de montar: o HTML é estático, e decidir isto na build deixava o
+  // convite trancado com a data em que foi publicado.
+  const [encerrado, setEncerrado] = useState(false);
+  const [formData, setFormData] = useState({
+    nome: "",
+    comparecer: "",
+    acompanhantes: "0",
+  });
+  const [acompanhantesList, setAcompanhantesList] = useState<string[]>([]);
+  const [acompOpen, setAcompOpen] = useState(false);
+  const acompRef = useRef<HTMLDivElement>(null);
+  const scrollYRef = useRef(0);
+  const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    setMontado(true);
-    if (localStorage.getItem("rsvp-confirmado") === "1") setConfirmado(true);
+    if (!acompOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (acompRef.current && !acompRef.current.contains(e.target as Node)) {
+        setAcompOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [acompOpen]);
+
+  useEffect(() => {
+    setMounted(true);
+    setEncerrado(jaFechou());
+    const confirmed = localStorage.getItem("rsvp-confirmado") === "1";
+    if (confirmed) setIsConfirmed(true);
+    const respostaSalva = localStorage.getItem("rsvp-resposta");
+    if (respostaSalva === "sim" || respostaSalva === "nao") setResposta(respostaSalva);
   }, []);
 
-  useEffect(() => {
-    if (!listaAberta) return;
-    const fora = (e: MouseEvent): void => {
-      if (listaRef.current && !listaRef.current.contains(e.target as Node)) setListaAberta(false);
-    };
-    document.addEventListener("mousedown", fora);
-    return () => document.removeEventListener("mousedown", fora);
-  }, [listaAberta]);
-
-  // A página fica presa enquanto o cartão está aberto, e volta ao mesmo ponto ao
-  // fechar: sem isto o fundo rolava por baixo do dedo no telemóvel.
-  const abrir = (): void => {
-    scrollRef.current = window.scrollY;
+  const handleOpen = () => {
+    scrollYRef.current = window.scrollY;
     document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollRef.current}px`;
+    document.body.style.top = `-${scrollYRef.current}px`;
     document.body.style.width = "100%";
-    setAberto(true);
+    setIsOpen(true);
   };
 
-  const fechar = (): void => {
+  const handleClose = () => {
     document.body.style.position = "";
     document.body.style.top = "";
     document.body.style.width = "";
-    window.scrollTo({ top: scrollRef.current, behavior: "instant" });
-    setAberto(false);
+    window.scrollTo({ top: scrollYRef.current, behavior: "instant" });
+    setIsOpen(false);
   };
 
-  const escolherComparecer = (valor: string): void => {
-    setDados((p) => ({ ...p, comparecer: valor, acompanhantes: valor === "nao" ? "0" : p.acompanhantes }));
-    if (valor === "nao") setAcompanhantes([]);
+  const handleComparecerChange = (value: string) => {
+    setFormData({ ...formData, comparecer: value });
+    if (value === "nao") {
+      setFormData((prev) => ({ ...prev, acompanhantes: "0" }));
+      setAcompanhantesList([]);
+    }
   };
 
-  const escolherAcompanhantes = (valor: string): void => {
-    setDados((p) => ({ ...p, acompanhantes: valor }));
-    setAcompanhantes(new Array(parseInt(valor, 10)).fill(""));
+  const handleAcompanhantesChange = (value: string) => {
+    const n = parseInt(value, 10);
+    setFormData({ ...formData, acompanhantes: value });
+    setAcompanhantesList(new Array(n).fill(""));
   };
 
-  const enviar = (e: React.FormEvent): void => {
+  const handleAcompanhanteNameChange = (index: number, name: string) => {
+    const newList = [...acompanhantesList];
+    newList[index] = name;
+    setAcompanhantesList(newList);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (enviando) return;
-    setEnviando(true);
+    if (submitting) return;
+    setSubmitting(true);
+
+    const ENTRY_NOME       = form.nome;
+    const ENTRY_COMPARECER = form.comparecer;
+    const ENTRY_ACOMP      = form.acompanhantes;
+    const ENTRY_ACOMP_NOME = form.acompanhanteNome;
+
+    const compOpcao = formData.comparecer === 'sim' ? 'Sim, estarei lá!' : 'Infelizmente não';
+    const acompOpcao = formData.acompanhantes === '0' ? 'Somente eu' : '+1 acompanhante';
+    const acompNome = acompanhantesList.join(", ");
 
     const params = new URLSearchParams();
-    params.append(form.nome, dados.nome.trim());
-    params.append(
-      form.comparecer,
-      dados.comparecer === "sim" ? "Sim, estarei lá!" : "Infelizmente não",
-    );
-    params.append(
-      form.acompanhantes,
-      ACOMPANHANTES.find((o) => o.valor === dados.acompanhantes)?.rotulo ?? "Somente eu",
-    );
-    params.append(form.acompanhanteNome, acompanhantes.map((n) => n.trim()).join(", "));
+    params.append(ENTRY_NOME, formData.nome);
+    params.append(ENTRY_COMPARECER, compOpcao);
+    if (ENTRY_ACOMP) params.append(ENTRY_ACOMP, acompOpcao);
+    if (ENTRY_ACOMP_NOME) params.append(ENTRY_ACOMP_NOME, acompNome);
 
-    fetch(destino, {
+    fetch(GOOGLE_FORM_URL, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString(),
     }).then(() => {
       localStorage.setItem("rsvp-confirmado", "1");
-      setConfirmado(true);
-      setEnviando(false);
-      setTimeout(() => fechar(), 2500);
+      localStorage.setItem("rsvp-resposta", formData.comparecer);
+      setIsConfirmed(true);
+      setResposta(formData.comparecer as "sim" | "nao");
+      setSubmitting(false);
+      if (formData.comparecer === "sim" && confettiCanvasRef.current) {
+        fireWeddingConfetti(confettiCanvasRef.current);
+      }
+      setTimeout(() => handleClose(), 7000);
     });
   };
 
-  // Sem form ligado não há o que confirmar. Melhor não existir do que pôr no ar
-  // um botão que engole a resposta.
-  if (!destino || !form.nome || !form.comparecer) return null;
-
-  const rotulo = "font-medium text-[11.5px] tracking-[2px] uppercase text-chapeu";
-  const campo =
-    "w-full p-[14px_18px] bg-white border border-card-borda rounded-lg text-base text-destaque outline-none focus:border-gold transition-colors";
-
-  const cartao = (
+  const modalContent = (
     <AnimatePresence>
-      {aberto && (
+      {isOpen && (
         <div
           className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/55 backdrop-blur-sm"
-          onClick={fechar}
+          onClick={handleClose}
         >
+          <canvas
+            ref={confettiCanvasRef}
+            className="fixed inset-0 pointer-events-none"
+            style={{ zIndex: 99999, width: "100vw", height: "100vh" }}
+          />
           <motion.div
-            className="w-full max-w-[480px] max-h-[92vh] overflow-y-auto bg-white rounded-t-[20px] md:rounded-[20px] p-[22px_24px_30px] shadow-2xl"
+            className="w-full max-w-[460px] md:max-w-[420px] rounded-t-[20px] md:rounded-[22px] p-[22px_24px_32px] shadow-2xl overflow-hidden relative"
+            style={COR_CARD}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 26, stiffness: 210 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between gap-4 border-b border-card-borda pb-3.5 mb-5">
-              <p className="font-medium text-left text-[16px] leading-[1.35] text-destaque">
-                {PRAZO ? `Por favor, confirme até ${PRAZO}` : "Confirmação de presença"}
-              </p>
-              <button
-                type="button"
-                aria-label="Fechar"
-                onClick={fechar}
-                className="shrink-0 text-historia/60 hover:text-destaque transition-colors"
-              >
-                <X size={22} />
-              </button>
+            <div className="flex items-center justify-between border-b border-[rgb(var(--c-card-borda,214_187_141))] pb-3.5 mb-[22px]">
+              <p className="font-medium text-[17px] text-destaque">{emInfant(FRASE)}</p>
+              <button type="button" onClick={handleClose} className="p-0 text-text/60 hover:text-text"><X size={24} /></button>
             </div>
 
-            {!confirmado ? (
-              <form className="flex flex-col gap-3.5" onSubmit={enviar}>
-                <label className="flex flex-col gap-1.5 text-left">
-                  <span className={rotulo}>Nome completo</span>
+            {!isConfirmed ? (
+              <form className="flex flex-col gap-3.5" onSubmit={handleSubmit}>
+                <label className="flex flex-col gap-1 text-left">
+                  <span className="font-infant text-[11.5px] tracking-[2px] uppercase" style={COR_ROTULO}>Nome completo</span>
                   <input
                     type="text"
                     required
-                    maxLength={80}
                     placeholder="Seu nome"
-                    className={campo}
-                    value={dados.nome}
-                    onChange={(e) => setDados({ ...dados, nome: e.target.value })}
+                    className="w-full p-[11px_14px] bg-white border border-[rgb(var(--c-card-borda,214_187_141))] rounded-[10px] text-base text-text outline-none focus:border-gold focus:ring-3 focus:ring-gold/15 transition-all"
+                    value={formData.nome}
+                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   />
                 </label>
 
-                <div className="flex flex-col gap-1.5 text-left">
-                  <span className={rotulo}>Você irá comparecer?</span>
-                  <div className="flex gap-2.5 flex-wrap">
-                    {["sim", "nao"].map((valor) => (
+                <div className="flex flex-col gap-1 text-left">
+                  <span className="font-infant text-[11.5px] tracking-[2px] uppercase" style={COR_ROTULO}>Você irá comparecer?</span>
+                  <div className="flex gap-2.5 flex-wrap mt-1">
+                    {["sim", "nao"].map((val) => (
                       <label
-                        key={valor}
-                        className={`flex items-center gap-2.5 flex-1 min-w-[140px] p-[14px_16px] bg-white border rounded-lg cursor-pointer font-medium text-base text-destaque transition-colors ${
-                          dados.comparecer === valor ? "border-gold" : "border-card-borda"
-                        }`}
+                        key={val}
+                        className={`flex items-center gap-2 flex-1 min-w-[130px] p-[11px_14px] bg-white border rounded-[10px] cursor-pointer font-medium text-base text-text transition-all ${formData.comparecer === val ? 'border-[rgb(var(--c-card-borda,214_187_141))] ring-3 ring-gold/15' : 'border-[rgb(var(--c-card-borda,214_187_141))]'}`}
                       >
                         <input
                           type="radio"
                           name="comparecer"
-                          value={valor}
+                          value={val}
                           required
-                          className="appearance-none w-[18px] h-[18px] shrink-0 border-2 border-card-borda rounded-full relative checked:border-destaque checked:after:content-[''] checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:w-2 checked:after:h-2 checked:after:bg-destaque checked:after:rounded-full"
-                          onChange={() => escolherComparecer(valor)}
+                          className="appearance-none w-[18px] h-[18px] border-2 border-destaque/50 rounded-full relative checked:border-destaque checked:after:content-[''] checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:w-2 checked:after:h-2 checked:after:bg-destaque checked:after:rounded-full"
+                          onChange={() => handleComparecerChange(val)}
                         />
-                        {valor === "sim" ? "Sim, estarei lá!" : "Não poderei ir"}
+                        {val === "sim" ? "Sim, estarei lá!" : "Não poderei ir"}
                       </label>
                     ))}
                   </div>
                 </div>
 
                 <AnimatePresence>
-                  {dados.comparecer === "sim" && (
+                  {formData.comparecer === "sim" && (
                     <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                      className="flex flex-col gap-3.5 overflow-hidden"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex flex-col gap-3"
                     >
-                      <div className="flex flex-col gap-1.5 text-left">
-                        <span className={rotulo}>Acompanhantes</span>
-                        <div ref={listaRef} className="relative">
+                      <div className="flex flex-col gap-1 text-left">
+                        <span className="font-infant text-[11.5px] tracking-[2px] uppercase" style={COR_ROTULO}>Acompanhantes</span>
+                        <div ref={acompRef} className="relative">
                           <button
                             type="button"
-                            onClick={() => setListaAberta((v) => !v)}
-                            className={`w-full flex items-center justify-between p-[14px_18px] bg-white border rounded-lg font-medium text-base text-destaque transition-colors ${
-                              listaAberta ? "border-gold" : "border-card-borda"
-                            }`}
+                            onClick={() => setAcompOpen((v) => !v)}
+                            className={`w-full flex items-center justify-between p-[11px_14px] bg-white border rounded-[10px] text-base text-text outline-none transition-all ${acompOpen ? "border-gold ring-3 ring-gold/15" : "border-[rgb(var(--c-card-borda,214_187_141))]"}`}
                           >
-                            {ACOMPANHANTES.find((o) => o.valor === dados.acompanhantes)?.rotulo}
-                            <ChevronDown
-                              size={18}
-                              className={`text-chapeu transition-transform ${listaAberta ? "rotate-180" : ""}`}
-                            />
+                            <span>
+                              {ACOMPANHANTES_OPTIONS.find((o) => o.value === formData.acompanhantes)?.label}
+                            </span>
+                            <ChevronDown size={18} className={`text-gold-dark transition-transform ${acompOpen ? "rotate-180" : ""}`} />
                           </button>
-                          {listaAberta && (
-                            <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-card-borda rounded-lg shadow-md z-10 overflow-hidden">
-                              {ACOMPANHANTES.map((o) => (
-                                <li key={o.valor}>
+                          {acompOpen && (
+                            <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-[rgb(var(--c-card-borda,214_187_141))] rounded-[10px] shadow-md z-10 overflow-hidden">
+                              {ACOMPANHANTES_OPTIONS.map((opt) => (
+                                <li key={opt.value}>
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      escolherAcompanhantes(o.valor);
-                                      setListaAberta(false);
+                                      handleAcompanhantesChange(opt.value);
+                                      setAcompOpen(false);
                                     }}
-                                    className={`w-full text-left p-[13px_18px] font-medium text-base text-destaque hover:bg-cream-dark transition-colors ${
-                                      dados.acompanhantes === o.valor ? "bg-cream-dark" : ""
-                                    }`}
+                                    className={`w-full text-left p-[11px_14px] text-base text-text hover:bg-cream-dark transition-colors ${formData.acompanhantes === opt.value ? "bg-cream-dark" : ""}`}
                                   >
-                                    {o.rotulo}
+                                    {opt.label}
                                   </button>
                                 </li>
                               ))}
@@ -251,21 +337,18 @@ export default function RSVP() {
                         </div>
                       </div>
 
-                      {acompanhantes.map((_, i) => (
-                        <label key={i} className="flex flex-col gap-1.5 text-left">
-                          <span className={rotulo}>Nome completo do acompanhante</span>
+                      {acompanhantesList.map((_, i) => (
+                        <label key={i} className="flex flex-col gap-1 text-left">
+                          <span className="font-infant text-[11.5px] tracking-[2px] uppercase" style={COR_ROTULO}>
+                            {acompanhantesList.length === 1 ? "Nome completo do acompanhante" : `Nome completo do acompanhante ${i + 1}`}
+                          </span>
                           <input
                             type="text"
                             required
-                            maxLength={80}
-                            placeholder="Nome do acompanhante"
-                            className={campo}
-                            value={acompanhantes[i]}
-                            onChange={(e) => {
-                              const proximo = [...acompanhantes];
-                              proximo[i] = e.target.value;
-                              setAcompanhantes(proximo);
-                            }}
+                            placeholder="Nome completo do acompanhante"
+                            className="w-full p-[11px_14px] bg-white border border-[rgb(var(--c-card-borda,214_187_141))] rounded-[10px] text-base text-text outline-none focus:border-gold transition-all"
+                            value={acompanhantesList[i]}
+                            onChange={(e) => handleAcompanhanteNameChange(i, e.target.value)}
                           />
                         </label>
                       ))}
@@ -273,32 +356,33 @@ export default function RSVP() {
                   )}
                 </AnimatePresence>
 
-                <button
-                  type="submit"
-                  disabled={enviando}
-                  className="mt-1.5 flex items-center justify-center gap-2.5 py-[15px] px-10 bg-destaque text-white border-none font-medium text-xs tracking-[2.5px] uppercase rounded-lg cursor-pointer hover:opacity-85 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed"
-                  style={{ textShadow: "0 0 0.4px currentColor", WebkitTextStroke: "0.2px rgb(var(--c-creme))" }}
-                >
-                  <Heart size={16} className="fill-none stroke-[1.8]" />
-                  {enviando ? "Enviando..." : "Confirmar Presença"}
+                <button type="submit" disabled={submitting} className="mt-1.5 self-center inline-block py-[13px] px-11 bg-destaque text-[#ffffff] border-none rounded-full font-medium  text-base cursor-pointer shadow-lg hover:translate-y-[-1px] hover:shadow-xl transition-all disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-lg">
+                  {submitting ? "Enviando..." : "Confirmar Presença"}
                 </button>
               </form>
-            ) : (
-              <div className="text-center py-4">
+            ) : resposta === "nao" ? (
+              <div className="text-center pt-2">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ type: "spring", damping: 14, stiffness: 240 }}
-                  className="w-12 h-12 mx-auto mb-4 border-2 border-destaque rounded-full flex items-center justify-center"
+                  className="w-12 h-12 mx-auto mb-3.5 border-2 border-[#B33A3A] rounded-full flex items-center justify-center"
                 >
-                  <Check className="text-destaque" size={28} />
+                  <X className="text-[#B33A3A]" size={32} />
                 </motion.div>
-                <p className="font-medium italic text-[22px] text-destaque mb-2">
-                  Presença confirmada!
-                </p>
-                <p className="font-medium text-sm text-historia leading-[1.5]">
-                  Já recebemos a sua resposta. Obrigado!
-                </p>
+                <p className="font-medium italic text-[22px] text-[#B33A3A] mb-2.5">Sua ausência foi registrada.</p>
+                <p className="font-medium text-sm text-[#B33A3A]/70 mb-6 leading-[1.5]">Você já enviou suas informações para este evento.</p>
+              </div>
+            ) : (
+              <div className="text-center pt-2">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="w-12 h-12 mx-auto mb-3.5 border-2 border-destaque rounded-full flex items-center justify-center"
+                >
+                  <Check className="text-destaque" size={32} />
+                </motion.div>
+                <p className="font-medium italic text-[22px] text-destaque mb-2.5">Sua presença foi confirmada!</p>
+                <p className="font-medium text-sm text-destaque/70 mb-6 leading-[1.5]">Você já enviou suas informações para este evento.</p>
               </div>
             )}
           </motion.div>
@@ -307,57 +391,41 @@ export default function RSVP() {
     </AnimatePresence>
   );
 
+  // Sem form ligado não há o que confirmar. Melhor não existir do que pôr no ar
+  // um botão que engole a resposta.
+  if (!GOOGLE_FORM_URL || !form.nome || !form.comparecer) return null;
+
+  // Quem já respondeu antes do prazo continua a ver o que respondeu.
+  const trancado = encerrado && !isConfirmed;
+
   return (
-    <Section
-      id="rsvp"
-      className="px-6 text-center relative z-10"
-      topo={90}
-      base={100}
-      topDivider={<SectionDivider side="left" offsetRatio={0.93} ancora="rsvp" />}
-    >
-      <p className="font-medium text-[15px] tracking-[1.5px] uppercase text-chapeu mb-2">
-        {texto("eyebrow", "Confirmação")}
-      </p>
-      <h2 className="section-title !text-destaque">{texto("titulo", "Confirme a Sua Presença")}</h2>
-      <GoldLine />
-
-      {ALIANCAS && (
-        <div className="flex justify-center mt-6">
-          <Image
-            src={ALIANCAS}
-            alt=""
-            width={100}
-            height={70}
-            className="object-contain opacity-80"
-          />
-        </div>
-      )}
-
-      <p className="text-[clamp(16px,2.5vw,19px)] text-historia leading-[1.8] mt-5 font-medium whitespace-pre-line">
-        {texto("chamada", "Sua presença tornará\neste dia ainda mais especial.")}
-      </p>
-
-      {PRAZO && (
-        <p className="font-medium text-[13px] tracking-[1.5px] uppercase text-chapeu mt-3">
-          Confirme até {PRAZO}
-        </p>
-      )}
-
-      <motion.button
-        type="button"
-        onClick={abrir}
-        className="mx-auto mt-8 flex items-center justify-center gap-2.5 py-[15px] px-10 bg-destaque text-white border-none font-medium text-xs tracking-[2.5px] uppercase rounded-lg cursor-pointer hover:opacity-85 transition-opacity"
-        style={{ textShadow: "0 0 0.4px currentColor", WebkitTextStroke: "0.2px rgb(var(--c-creme))" }}
-        initial={{ opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-8%" }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+    <Section id="rsvp" className="px-6 bg-cream text-center relative z-10" topo={80} base={80} topDivider={<SectionDivider side="right" offsetRatio={0.85} ancora="rsvp" />}>
+      <div className="flex justify-center mb-[28px]">
+        <Image
+          src={ALIANCAS}
+          alt="Alianças de casamento"
+          width={100}
+          height={70}
+          className="object-contain opacity-80"
+        />
+      </div>
+      <p className="font-medium text-[15px] tracking-[1px] uppercase mb-3" style={COR_TEXTO}>Sua presença tornará<br />este dia ainda mais especial</p>
+      <button
+        onClick={handleOpen}
+        disabled={trancado}
+        className={`inline-flex items-center justify-center gap-1.5 w-full max-w-[350px] py-[13px] px-7 ${resposta === "nao" ? 'bg-[#B33A3A]' : 'bg-destaque'} text-cream border-none font-medium italic text-[19px] tracking-[0.3px] rounded-[15px] transition-all hover:translate-y-[-1px] hover:opacity-90 ${isConfirmed ? 'brightness-95' : ''} ${trancado ? 'opacity-60 grayscale hover:translate-y-0 cursor-not-allowed' : ''}`}
       >
-        <Heart size={16} className={confirmado ? "fill-current" : "fill-none stroke-[1.8]"} />
-        {confirmado ? "Presença Confirmada" : "Confirmar Presença"}
-      </motion.button>
+        {trancado ? (
+          <Lock className="w-5 h-5 stroke-[1.8]" />
+        ) : resposta === "nao" ? (
+          <X className="w-5 h-5 stroke-[2]" />
+        ) : (
+          <Heart className={`w-5 h-5 fill-none stroke-[1.8] ${isConfirmed ? 'fill-cream' : ''}`} />
+        )}
+        <span>{trancado ? TEXTO_ENCERRADO : resposta === "nao" ? "Ausência Informada" : isConfirmed ? "Presença Confirmada" : "Confirmar Presença"}</span>
+      </button>
 
-      {montado && createPortal(cartao, document.body)}
+      {mounted && createPortal(modalContent, document.body)}
     </Section>
   );
 }

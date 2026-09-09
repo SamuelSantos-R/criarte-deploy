@@ -20,6 +20,9 @@ const MANIFESTO = {
     "Dependências partilhadas por todos os convites. Escrito pelo Criarte Studio; não edite à mão.",
   dependencies: {
     "@supabase/supabase-js": "^2.109.0",
+    // A chuva de pétalas do RSVP. Entra na lista partilhada porque o molde que o
+    // Studio planta importa-a: sem ela o convite deixa de compilar.
+    "canvas-confetti": "^1.9.4",
     "framer-motion": "^11.1.7",
     "lucide-react": "^0.378.0",
     next: "14.2.3",
@@ -27,6 +30,7 @@ const MANIFESTO = {
     "react-dom": "^18.3.1",
   },
   devDependencies: {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "20.19.41",
     "@types/react": "18.3.29",
     "@types/react-dom": "^18.3.0",

@@ -1,6 +1,6 @@
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { app } from "electron";
 import { siteDirExistente } from "./sites";
 
@@ -19,6 +19,8 @@ type Planta = {
   depoisDe: string[];
   /** Token de cor que o molde usa. Sem ele o desenho sai sem cor nenhuma. */
   exigeToken: string;
+  /** Pacotes que o molde importa. Plantar sem eles deixa o convite sem compilar. */
+  exigeDeps: string[];
 };
 
 const PLANTAS: Record<string, Planta> = {
@@ -27,8 +29,20 @@ const PLANTAS: Record<string, Planta> = {
     componente: "RSVP",
     depoisDe: ['ligada("manual")', 'ligada("presentes")', 'ligada("cronograma")'],
     exigeToken: "destaque",
+    exigeDeps: ["canvas-confetti"],
   },
 };
+
+/** O Node sobe as pastas até achar o `node_modules`; a procura tem de subir também. */
+function temPacote(raiz: string, nome: string): boolean {
+  let dir = raiz;
+  for (;;) {
+    if (existsSync(join(dir, "node_modules", nome))) return true;
+    const acima = dirname(dir);
+    if (acima === dir) return false;
+    dir = acima;
+  }
+}
 
 export type Plantio = {
   /** Ficheiros criados agora. Vazio quando já lá estavam. */
@@ -71,6 +85,14 @@ export async function plantarSecao(siteId: string, secao: string): Promise<Plant
     return {
       ...NADA,
       impedimento: `este convite não tem a cor "${planta.exigeToken}" no tailwind.config.ts — o ${planta.componente} tem de ser desenhado à mão aqui`,
+    };
+  }
+
+  const falta = planta.exigeDeps.filter((d) => !temPacote(raiz, d));
+  if (falta.length > 0) {
+    return {
+      ...NADA,
+      impedimento: `falta ${falta.join(" e ")} nas dependências — abre a Config e prepara as dependências antes de criar esta secção`,
     };
   }
 

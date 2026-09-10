@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Section from "./Section";
@@ -60,6 +60,37 @@ const COR_TEXTO = { color: OURO_RSVP };
 const COR_ROTULO = { color: OURO_RSVP, WebkitTextStroke: `0.2px ${OURO_RSVP}` };
 /** Vazio deixa o branco de sempre, como o cartão do Correio do Amor. */
 const COR_CARD = { background: "rgb(var(--c-rsvp-fundo, 255 255 255))" };
+
+/**
+ * A bolinha do "Sim, estarei lá" e o realce da opção escolhida entre "Somente eu"
+ * e "+1 acompanhante". Ficam em papéis próprios porque a marca da escolha nem
+ * sempre quer ser a mesma cor do título — e antes eram o `destaque` e um creme,
+ * ambos cravados no componente.
+ *
+ * Vão para variáveis locais em vez de irem direitas à classe: o Tailwind aceita
+ * valor arbitrário, mas `var()` encavalitado com vírgulas lá dentro é frágil. Aqui
+ * a cascata resolve-se uma vez, e a classe lê uma variável só — que é o que o
+ * `::after` do rádio precisa, por ser pseudo-elemento e não aceitar estilo inline.
+ */
+const CANAL_OPCAO = "var(--c-rsvp-opcao, var(--c-destaque))";
+const CANAL_SELECAO = "var(--c-rsvp-selecao, var(--c-fundo-2, 248 240 224))";
+const PAPEIS = {
+  "--rsvp-opcao": CANAL_OPCAO,
+  "--rsvp-selecao": CANAL_SELECAO,
+} as CSSProperties;
+
+/** A borda de todos os campos do cartão, a mesma escolhida ou não. */
+const BORDA = "border-[rgb(var(--c-card-borda,214_187_141))]";
+
+/**
+ * O tamanho da frase do prazo, em pixels. Escrita curta pede letra maior; frase
+ * comprida em telemóvel estreito precisa de encolher para não partir em três
+ * linhas. Fora do intervalo cai no tamanho com que a secção foi desenhada.
+ */
+const FRASE_PX = ((): number => {
+  const n = rsvp.frasePx;
+  return typeof n === "number" && Number.isFinite(n) && n >= 11 && n <= 32 ? n : 17;
+})();
 
 /**
  * Fecha no fim do dia limite, pelo relógio de quem abre o convite: a data está
@@ -247,7 +278,7 @@ export default function RSVP() {
           />
           <motion.div
             className="w-full max-w-[460px] md:max-w-[420px] rounded-t-[20px] md:rounded-[22px] p-[22px_24px_32px] shadow-2xl overflow-hidden relative"
-            style={COR_CARD}
+            style={{ ...COR_CARD, ...PAPEIS }}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
@@ -255,7 +286,7 @@ export default function RSVP() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-[rgb(var(--c-card-borda,214_187_141))] pb-3.5 mb-[22px]">
-              <p className="font-medium text-[17px] text-destaque">{emInfant(FRASE)}</p>
+              <p className="font-medium text-destaque" style={{ fontSize: `${FRASE_PX}px` }}>{emInfant(FRASE)}</p>
               <button type="button" onClick={handleClose} className="p-0 text-text/60 hover:text-text"><X size={24} /></button>
             </div>
 
@@ -279,14 +310,14 @@ export default function RSVP() {
                     {["sim", "nao"].map((val) => (
                       <label
                         key={val}
-                        className={`flex items-center gap-2 flex-1 min-w-[130px] p-[11px_14px] bg-white border rounded-[10px] cursor-pointer font-medium text-base text-text transition-all ${formData.comparecer === val ? 'border-[rgb(var(--c-card-borda,214_187_141))] ring-3 ring-gold/15' : 'border-[rgb(var(--c-card-borda,214_187_141))]'}`}
+                        className={`flex items-center gap-2 flex-1 min-w-[130px] p-[11px_14px] bg-white border rounded-[10px] cursor-pointer font-medium text-base text-text transition-all ${BORDA} ${formData.comparecer === val ? "ring-3 ring-[rgb(var(--rsvp-opcao)/0.15)]" : ""}`}
                       >
                         <input
                           type="radio"
                           name="comparecer"
                           value={val}
                           required
-                          className="appearance-none w-[18px] h-[18px] border-2 border-destaque/50 rounded-full relative checked:border-destaque checked:after:content-[''] checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:w-2 checked:after:h-2 checked:after:bg-destaque checked:after:rounded-full"
+                          className="appearance-none w-[18px] h-[18px] border-2 border-[rgb(var(--rsvp-opcao)/0.5)] rounded-full relative checked:border-[rgb(var(--rsvp-opcao))] checked:after:content-[''] checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:w-2 checked:after:h-2 checked:after:bg-[rgb(var(--rsvp-opcao))] checked:after:rounded-full"
                           onChange={() => handleComparecerChange(val)}
                         />
                         {val === "sim" ? "Sim, estarei lá!" : "Não poderei ir"}
@@ -309,7 +340,7 @@ export default function RSVP() {
                           <button
                             type="button"
                             onClick={() => setAcompOpen((v) => !v)}
-                            className={`w-full flex items-center justify-between p-[11px_14px] bg-white border rounded-[10px] text-base text-text outline-none transition-all ${acompOpen ? "border-gold ring-3 ring-gold/15" : "border-[rgb(var(--c-card-borda,214_187_141))]"}`}
+                            className={`w-full flex items-center justify-between p-[11px_14px] bg-white border rounded-[10px] text-base text-text outline-none transition-all ${BORDA} ${acompOpen ? "ring-3 ring-[rgb(var(--rsvp-opcao)/0.15)]" : ""}`}
                           >
                             <span>
                               {ACOMPANHANTES_OPTIONS.find((o) => o.value === formData.acompanhantes)?.label}
@@ -326,7 +357,7 @@ export default function RSVP() {
                                       handleAcompanhantesChange(opt.value);
                                       setAcompOpen(false);
                                     }}
-                                    className={`w-full text-left p-[11px_14px] text-base text-text hover:bg-cream-dark transition-colors ${formData.acompanhantes === opt.value ? "bg-cream-dark" : ""}`}
+                                    className={`w-full text-left p-[11px_14px] text-base text-text transition-colors hover:bg-[rgb(var(--rsvp-selecao))] ${formData.acompanhantes === opt.value ? "bg-[rgb(var(--rsvp-selecao))]" : ""}`}
                                   >
                                     {opt.label}
                                   </button>

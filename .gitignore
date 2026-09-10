@@ -6,3 +6,5 @@ node_modules/
 app/out/
 app/dist/
 app/*.tsbuildinfo
+# Bundle do main que o electron-vite às vezes deixa cair fora de out/.
+app/index.js

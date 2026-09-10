@@ -19,6 +19,8 @@ import {
   alternarSecao,
   ancoraDe,
   ausentes,
+  completarSecao,
+  faltamCampos,
   CHAVE_SECOES,
   estaLigada,
   podeDesligar,
@@ -183,6 +185,7 @@ export function Convites({
   const chaves = dados ? Object.keys(dados).filter((k) => k !== CHAVE_SECOES) : [];
   const desligadas = new Set(chaves.filter((k) => dados !== null && !estaLigada(dados, k)));
   const faltando = dados ? ausentes(dados) : [];
+  const incompletas = dados ? faltamCampos(dados) : [];
   const sujo = dados !== null && JSON.stringify(dados) !== original;
 
   // A barra de cor no pé da janela mostra estes estados de qualquer aba. A
@@ -206,6 +209,13 @@ export function Convites({
     },
     [coop.ligado, coop.publicar],
   );
+
+  const completar = (chave: string): void => {
+    if (!dados) return;
+    const proximo = completarSecao(dados, chave);
+    setDados(proximo);
+    publicar([chave], proximo[chave]);
+  };
 
   const semear = (chave: string): void => {
     if (!dados) return;
@@ -657,12 +667,24 @@ export function Convites({
                     aria-disabled={bloqueio ? true : undefined}
                     className={cn(bloqueio && "pointer-events-none select-none opacity-40")}
                   >
+                    {incompletas.includes(secao) && (
+                      <div className="mb-4 flex items-start gap-3">
+                        <p className="border-l-2 border-cyan pl-3 text-[13px] text-text">
+                          Esta secção ganhou campos novos desde que este convite foi feito. Trazê-los
+                          não mexe no que já está escrito — só acrescenta o que falta.
+                        </p>
+                        <Button variant="primary" size="sm" onClick={() => completar(secao)}>
+                          Trazer os novos
+                        </Button>
+                      </div>
+                    )}
                     <JsonForm
                       dados={dados}
                       secao={secao}
                       onChange={setDados}
                       onPatch={publicar}
                       convidado={convidado}
+                      siteId={convidado ? null : id}
                     />
                   </div>
                 </>

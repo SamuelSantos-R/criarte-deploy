@@ -1,6 +1,6 @@
 {
   "name": "criarte-studio",
-  "version": "5.51.0",
+  "version": "5.55.0",
   "description": "Fábrica de convites da Criarte Design AO",
   "main": "./out/main/index.js",
   "author": "Criarte Design AO",
@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && electron-vite build",
-    "dmg": "npm run build && electron-builder --mac --x64"
+    "dmg": "npm run build && electron-builder --mac --x64",
+    "exe": "npm run build && electron-builder --win --x64"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

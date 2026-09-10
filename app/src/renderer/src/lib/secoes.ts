@@ -40,6 +40,7 @@ const APELIDOS: Record<string, string> = {
   dresscode: "Dress code",
   eyebrow: "Chapéu",
   frase: "Frase do cartão",
+  frasePx: "Tamanho da frase (px)",
   limite: "Fecha em (AAAA-MM-DD)",
   encerrado: "Frase depois de fechar",
   pretoEBranco: "Foto em preto e branco",
@@ -203,6 +204,7 @@ const SEMENTES: Record<string, () => Record<string, unknown>> = {
   ornamentos: () => ({ ...ORNAMENTOS_PADRAO }),
   rsvp: () => ({
     frase: "",
+    frasePx: 17,
     limite: "",
     encerrado: "",
     aliancas: "/assets/aliancas-casamento.png",
@@ -219,6 +221,56 @@ const SEMENTES: Record<string, () => Record<string, unknown>> = {
 
 export function ausentes(dados: Record<string, unknown>): string[] {
   return Object.keys(SEMENTES).filter((k) => !(k in dados));
+}
+
+/**
+ * Campo que a semente ganhou depois de a secção já existir no convite. O editor
+ * só desenha chave que está no ficheiro, então quem semeou o RSVP numa versão
+ * antiga ficava sem a frase do cartão e sem o prazo de fecho — e não havia como
+ * lá chegar, porque `ausentes` olha só para o nome da secção, que já existe.
+ */
+export function faltamCampos(dados: Record<string, unknown>): string[] {
+  return Object.keys(SEMENTES).filter((chave) => {
+    const atual = dados[chave];
+    if (!ehObjeto(atual)) return false;
+    return novasChaves(SEMENTES[chave](), atual).length > 0;
+  });
+}
+
+const ehObjeto = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** Só o que falta, e fundo adentro: o `form` do RSVP também é um bloco. */
+function novasChaves(semente: Record<string, unknown>, atual: Record<string, unknown>): string[] {
+  const faltam: string[] = [];
+  for (const [k, v] of Object.entries(semente)) {
+    if (!(k in atual)) faltam.push(k);
+    else if (ehObjeto(v) && ehObjeto(atual[k])) faltam.push(...novasChaves(v, atual[k]));
+  }
+  return faltam;
+}
+
+/** Acrescenta o que falta sem tocar no que já está escrito. */
+function fundir(
+  semente: Record<string, unknown>,
+  atual: Record<string, unknown>,
+): Record<string, unknown> {
+  const saida: Record<string, unknown> = { ...atual };
+  for (const [k, v] of Object.entries(semente)) {
+    if (!(k in saida)) saida[k] = v;
+    else if (ehObjeto(v) && ehObjeto(saida[k])) saida[k] = fundir(v, saida[k] as Record<string, unknown>);
+  }
+  return saida;
+}
+
+export function completarSecao(
+  dados: Record<string, unknown>,
+  chave: string,
+): Record<string, unknown> {
+  const semente = SEMENTES[chave];
+  const atual = dados[chave];
+  if (!semente || !ehObjeto(atual)) return dados;
+  return { ...dados, [chave]: fundir(semente(), atual) };
 }
 
 export function semearSecao(

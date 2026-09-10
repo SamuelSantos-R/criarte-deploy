@@ -307,6 +307,11 @@ export const TEMA_PADRAO: Record<string, string> = {
   manual: "#B08A4A",
   rsvp: "#A87C28",
   "rsvp-fundo": "#FFFFFF",
+  // A marca da escolha no cartão de confirmação: a bolinha do "Sim, estarei lá" e
+  // o realce da opção de acompanhante. Nascem iguais ao que estava cravado no
+  // componente, para o convite que já existe abrir exactamente como abria.
+  "rsvp-opcao": "#7A7F4B",
+  "rsvp-selecao": "#F8F0E0",
   "card-borda": "#D6BB8D",
 };
 

@@ -81,6 +81,9 @@ const api = {
   semearAsset: (id: string, secao: string) =>
     invoke<AssetImportado | null>("assets:semente", id, secao),
   plantarSecao: (id: string, secao: string) => invoke<Plantio>("secao:plantar", id, secao),
+  estadoPlantio: (id: string, secao: string) => invoke<Plantio>("secao:estado", id, secao),
+  atualizarSecao: (id: string, secao: string) => invoke<Plantio>("secao:atualizar", id, secao),
+  resolverFormulario: (url: string) => invoke<string>("form:resolver", url),
   trocarPorWebp: (id: string) => invoke<unknown>("assets:webp", id),
 
   listarFontes: () => invoke<Fonte[]>("fontes:listar"),

@@ -62,6 +62,25 @@ mac:
       O Criarte Studio procura outros Studios na rede de casa para vocês
       editarem o mesmo convite em coop.
 
+win:
+  # O .ico sai do PNG de 1024 na hora do build — não há ficheiro de ícone
+  # separado a manter desalinhado com o do macOS.
+  icon: resources/icon.png
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  # Instala por utilizador: sem isto o instalador pede administrador, e a
+  # máquina do cunhado não tem essa senha à mão.
+  perMachine: false
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Criarte Studio
+
 dmg:
   title: Criarte Studio
   contents:

@@ -66,9 +66,23 @@ export const semearAsset = (id: string, secao: string) =>
   call(api.semearAsset(id, secao)) as Promise<AssetImportado | null>;
 
 /** O componente da secção, posto dentro do convite e ligado na página. */
-export type Plantio = { ficheiros: string[]; ligada: boolean; impedimento: string | null };
+export type Plantio = {
+  ficheiros: string[];
+  ligada: boolean;
+  impedimento: string | null;
+  desatualizada: boolean;
+};
 export const plantarSecao = (id: string, secao: string) =>
   call(api.plantarSecao(id, secao)) as Promise<Plantio>;
+/** O mesmo diagnóstico do plantio, sem tocar em nada. */
+export const estadoPlantio = (id: string, secao: string) =>
+  call(api.estadoPlantio(id, secao)) as Promise<Plantio>;
+/** Troca o componente plantado pelo molde deste Studio. */
+export const atualizarSecao = (id: string, secao: string) =>
+  call(api.atualizarSecao(id, secao)) as Promise<Plantio>;
+/** Devolve o `/formResponse` do Google Form, venha o link curto ou o longo. */
+export const resolverFormulario = (url: string) =>
+  call(api.resolverFormulario(url)) as Promise<string>;
 export const caminhoDe = api.caminhoDe;
 
 export type TrocaWebp = { nome: string; webp: string; bytes: number; bytesWebp: number; refs: number };

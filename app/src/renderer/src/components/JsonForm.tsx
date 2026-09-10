@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
 import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
+import { AvisoRSVP } from "@/components/AvisoRSVP";
 import { PainelTema } from "@/components/PainelTema";
 import { PainelMedidas } from "@/components/PainelMedidas";
 import { PainelOrnamentos } from "@/components/PainelOrnamentos";
@@ -323,21 +324,6 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
   );
 }
 
-/**
- * O RSVP some da página sozinho quando não tem formulário ligado — é a mesma
- * condição que o componente usa para não desenhar nada. Era o único caso em que
- * o Studio criava a secção, dizia que correu bem, e o convite continuava igual.
- */
-function semFormulario(secao: string, valor: unknown): boolean {
-  if (secao !== "rsvp") return false;
-  const form = (valor as Record<string, unknown>).form;
-  if (!form || typeof form !== "object") return true;
-  const { url, nome, comparecer } = form as Record<string, unknown>;
-  if (typeof nome !== "string" || !nome.trim()) return true;
-  if (typeof comparecer !== "string" || !comparecer.trim()) return true;
-  return typeof url !== "string" || !url.includes("docs.google.com/forms/");
-}
-
 /** Uma seção por vez: `secao` é uma chave de primeiro nível do convite.json. */
 export function JsonForm({
   dados,
@@ -345,6 +331,7 @@ export function JsonForm({
   onChange,
   onPatch,
   convidado = false,
+  siteId = null,
 }: {
   dados: Record<string, unknown>;
   secao: string;
@@ -353,6 +340,8 @@ export function JsonForm({
   onPatch?: (caminho: Caminho, valor: unknown) => void;
   /** Convidado só mexe nos formulários: instalar fonte é do anfitrião. */
   convidado?: boolean;
+  /** Só o anfitrião o tem: é preciso para saber se a secção está na página. */
+  siteId?: string | null;
 }): ReactElement {
   const alterar = (caminho: Caminho, valor: unknown): void => {
     onChange(setIn(dados, caminho, valor) as Record<string, unknown>);
@@ -398,12 +387,8 @@ export function JsonForm({
   if (valor !== null && typeof valor === "object") {
     return (
       <>
-        {semFormulario(secao, valor) && (
-          <p className="mb-4 border-l-2 border-cyan pl-3 text-[13px] text-text">
-            Enquanto o URL do formulário estiver vazio a secção não aparece no convite: sem
-            formulário, o botão engolia a resposta. Cola aqui o link do Google Form deste casal
-            (o `docs.google.com/forms/…`) e ela entra no ar.
-          </p>
+        {secao === "rsvp" && (
+          <AvisoRSVP siteId={siteId} rsvp={valor as Record<string, unknown>} onChange={alterar} />
         )}
         <div className="grid grid-cols-2 gap-x-5 gap-y-3">
           <Nos valor={valor} caminho={[secao]} onChange={alterar} />

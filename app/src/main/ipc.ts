@@ -12,7 +12,8 @@ import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
-import { plantarSecao } from "./plantar";
+import { atualizarSecao, estadoPlantio, plantarSecao } from "./plantar";
+import { resolverFormulario } from "./formulario";
 import { estadoToken, tokenizar } from "./tokenizar";
 import { trocarPorWebp } from "./webp";
 import { vigiarConvite } from "./vigia";
@@ -185,6 +186,16 @@ export function registerIpc(): void {
   handle("secao:plantar", (_e, id: unknown, secao: unknown) =>
     plantarSecao(asString(id, "id"), asString(secao, "secao")),
   );
+
+  handle("secao:estado", (_e, id: unknown, secao: unknown) =>
+    estadoPlantio(asString(id, "id"), asString(secao, "secao")),
+  );
+
+  handle("secao:atualizar", (_e, id: unknown, secao: unknown) =>
+    atualizarSecao(asString(id, "id"), asString(secao, "secao")),
+  );
+
+  handle("form:resolver", (_e, url: unknown) => resolverFormulario(asString(url, "url")));
 
   handle("assets:webp", (_e, id: unknown) => trocarPorWebp(asString(id, "id")));
 

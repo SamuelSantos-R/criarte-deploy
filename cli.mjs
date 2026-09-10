@@ -2094,6 +2094,7 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
   // Coleta arquivos elegíveis (> SMALL_LIMIT_KB e NÃO importados via código)
   const candidates = []; // { localPath, publicRelPath, sz }
   let protectedCount = 0;
+  let intocaveisCount = 0;
   function walkPublic(dir) {
     for (const entry of readdirSync(dir)) {
       const full = join(dir, entry);
@@ -2103,12 +2104,20 @@ async function uploadAssetsToR2(siteCopyPath, category, slug, r2Config) {
       // Pula se o arquivo é importado em código (basename match)
       if (importedAssets.has(entry)) { protectedCount++; continue; }
       const publicRel = relative(publicDir, full).replace(/\\/g, "/");
+      // Mesma guarda do varredor de órfãos: em public/fonts/ o caminho nasce em
+      // runtime (`url("/fonts/" + ficheiro)`), nunca literal no source. O rewrite
+      // não o acharia e o ficheiro seria apagado daqui na mesma, deixando o
+      // @font-face a apontar pro vazio.
+      if (emPastaIntocavel(publicRel)) { intocaveisCount++; continue; }
       candidates.push({ localPath: full, publicRelPath: publicRel, sz: st.size });
     }
   }
   walkPublic(publicDir);
   if (protectedCount > 0) {
     info(`${protectedCount} arquivo(s) pesado(s) mantido(s) local pq são importados via código`);
+  }
+  if (intocaveisCount > 0) {
+    info(`${intocaveisCount} arquivo(s) mantido(s) local por estarem em pasta resolvida em runtime (${ALWAYS_USED_DIRS.join(", ")})`);
   }
 
   if (candidates.length === 0) {
@@ -2169,6 +2178,9 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
   if (remoteMap.size === 0) return 0;
 
   let touched = 0;
+  // Quais referências foram mesmo trocadas pela URL do R2. Só essas podem ter o
+  // ficheiro local apagado — ver a guarda mais abaixo.
+  const reescritos = new Set();
   // Mapa de prefixos a substituir: /assets/, /fonts/, /videos/, etc
   // Pega os primeiros segmentos únicos dos publicRelPath
   const prefixes = new Set();
@@ -2194,7 +2206,6 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
       // crua (com espaços/acentos) quanto URL-encoded. Ordenamos por path mais
       // longo primeiro pra evitar match parcial entre nomes que se sobrepõem.
       // Lookup direto evita o problema do regex que truncava em espaço.
-      const replacedThisFile = new Set();
       const entries = [...remoteMap.entries()].sort((a, b) => b[0].length - a[0].length);
       for (const [publicRel, url] of entries) {
         const variants = new Set([
@@ -2207,7 +2218,7 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
           // Garante que não vamos substituir um path já reescrito ou path mais longo
           content = content.split(v).join(url);
           changed = true;
-          replacedThisFile.add(publicRel);
+          reescritos.add(publicRel);
         }
       }
       if (changed) {
@@ -2220,10 +2231,18 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
 
   // Remove os arquivos do public/ que foram pro R2 — eles não precisam mais
   // estar no git. Mas mantém os pequenos (<100KB) que ficaram no git.
+  // Só sai daqui o que o rewrite acima trocou de facto. Se a referência nasce em
+  // runtime, nenhuma substituição a apanha — apagar o ficheiro deixaria o site a
+  // pedir um caminho que já não existe, e o 404 só aparece ao abrir o convite.
   const publicDir = join(siteCopyPath, "public");
+  const orfaosDoRewrite = [];
   for (const publicRel of remoteMap.keys()) {
+    if (!reescritos.has(publicRel)) { orfaosDoRewrite.push(publicRel); continue; }
     const localPath = join(publicDir, publicRel);
     if (existsSync(localPath)) rmSync(localPath);
+  }
+  if (orfaosDoRewrite.length > 0) {
+    warn(`${orfaosDoRewrite.length} asset(s) subiram pro R2 mas nenhuma referência foi reescrita — mantidos locais por segurança: ${c.dim}${orfaosDoRewrite.slice(0, 5).join(", ")}${orfaosDoRewrite.length > 5 ? "…" : ""}${c.reset}`);
   }
   // Remove pastas vazias que sobraram (assets/, fonts/, etc)
   function pruneEmpty(dir) {

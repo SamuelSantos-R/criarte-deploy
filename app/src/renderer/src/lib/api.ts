@@ -55,6 +55,17 @@ export const tokenInjetar = (id: string) => call(api.tokenInjetar(id)) as Promis
 
 export const renomearSite = (id: string, slug: string) =>
   call(api.renomearSite(id, slug)) as Promise<{ id: string }>;
+
+export type EstadoSlug = { slug: string; registado: boolean; temPasta: boolean; recados: number };
+/** O que já existe com este nome — antes de apagar seja o que for. */
+export const estadoSlug = (categoria: string, slug: string) =>
+  call(api.estadoSlug(categoria, slug)) as Promise<EstadoSlug>;
+/** Solta um nome preso no Supabase sem mexer em pasta nenhuma. */
+export const liberarSlug = (slug: string) =>
+  call(api.liberarSlug(slug)) as Promise<{ recados: number }>;
+/** Apaga o convite inteiro: registo no Supabase e pasta em disco. */
+export const apagarSite = (id: string) =>
+  call(api.apagarSite(id)) as Promise<{ recados: number }>;
 export const salvarSessaoComoNovo = (categoria: string, slug: string, doc: unknown) =>
   call(api.salvarSessaoComoNovo(categoria, slug, doc)) as Promise<Copia>;
 

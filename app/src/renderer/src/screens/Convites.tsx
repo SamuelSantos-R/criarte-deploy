@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useSiteValido } from "@/lib/useSiteValido";
-import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Undo2, Users } from "lucide-react";
+import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Trash2, Undo2, Users } from "lucide-react";
 import {
   onConviteMudou,
   plantarSecao,
@@ -37,6 +37,7 @@ import { PainelCoop } from "@/components/PainelCoop";
 import { useCoop } from "@/lib/useCoop";
 import { ProvedorSite } from "@/components/CampoArquivo";
 import { Divisor, useLarguraPainel } from "@/components/Divisor";
+import { ApagarSite } from "@/components/ApagarSite";
 import { RenomearSite } from "@/components/RenomearSite";
 import { Tokenizar } from "@/components/Tokenizar";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
@@ -74,6 +75,7 @@ export function Convites({
   const [salvando, setSalvando] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
+  const [apagando, setApagando] = useState(false);
   const [tokenizando, setTokenizando] = useState(false);
   const rodando = usarServidor();
   // O dev server é um só no app inteiro: se a tela de Preview levou pra outro
@@ -577,6 +579,11 @@ export function Convites({
               <FolderOpen size={13} /> Abrir pasta
             </Button>
           )}
+          {id && !convidado && (
+            <Button variant="ghost" onClick={() => setApagando(true)}>
+              <Trash2 size={13} /> Apagar
+            </Button>
+          )}
           {/* Amarelo é a tinta do "por gravar": o botão só a veste enquanto há
               alguma coisa por gravar, e volta a contorno assim que o disco iguala. */}
           {!emSessao && (
@@ -728,6 +735,20 @@ export function Convites({
             // aponta pro id novo, senão o selector fica a mostrar um site morto
             // ou salta pro primeiro da lista por o id novo ainda não estar lá.
             void recarregar().then(() => setId(novo));
+          }}
+        />
+      )}
+
+      {apagando && id && (
+        <ApagarSite
+          id={id}
+          onFechar={() => setApagando(false)}
+          onPronto={() => {
+            setApagando(false);
+            // O site deixou de existir: relê a lista e larga o id. O
+            // `useSiteValido` escolhe outro — apontar para o apagado deixava o
+            // painel a ler uma pasta que já não está lá.
+            void recarregar().then(() => setId(null));
           }}
         />
       )}

@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -178,6 +178,119 @@ async function gravarSlugLocal(destino: string, slug: string): Promise<void> {
   } catch {
     // site.json ilegível não impede o rename — o CLI regrava-o no próximo deploy.
   }
+}
+
+/** Cabeçalhos do PostgREST com a chave de serviço. */
+function auth(serviceKey: string): Record<string, string> {
+  return { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
+}
+
+/** O uuid que o banco deu a este slug, ou null se o nome não está registado. */
+async function uuidDoSlug(slug: string): Promise<string | null> {
+  const { url, serviceKey } = credenciais();
+  const r = await fetch(
+    `${url}/rest/v1/cr_sites?slug=eq.${encodeURIComponent(slug)}&select=id`,
+    { headers: auth(serviceKey) },
+  );
+  if (!r.ok) throw new Error(`Supabase recusou a consulta (${r.status})`);
+  const id = ((await r.json()) as { id?: unknown }[])[0]?.id;
+  return typeof id === "string" ? id : null;
+}
+
+/** Quantos recados o mural deste uuid guarda. Conta exacta, via content-range. */
+async function contarRecados(uuid: string): Promise<number> {
+  const { url, serviceKey } = credenciais();
+  const r = await fetch(
+    `${url}/rest/v1/cr_mensagens?site_id=eq.${encodeURIComponent(uuid)}&select=id`,
+    { headers: { ...auth(serviceKey), Prefer: "count=exact", Range: "0-0" } },
+  );
+  if (!r.ok) throw new Error(`Supabase recusou a contagem (${r.status})`);
+  const total = Number((r.headers.get("content-range") ?? "").split("/")[1]);
+  return Number.isFinite(total) ? total : 0;
+}
+
+export type EstadoSlug = {
+  slug: string;
+  registado: boolean;
+  temPasta: boolean;
+  recados: number;
+};
+
+/**
+ * O que existe com este nome, antes de apagar seja o que for. A UI precisa de
+ * saber três coisas separadas: se o nome está preso no banco, se há pasta em
+ * disco, e quantos recados se perdem — porque um convite de teste e um convite
+ * com recados de convidados merecem avisos diferentes.
+ */
+export async function estadoDoSlug(categoria: string, slug: string): Promise<EstadoSlug> {
+  if (!NOME.test(slug)) throw new Error("nome inválido — minúsculas e hífen");
+  const temPasta = NOME.test(categoria)
+    ? existsSync(await containedPath(requireSitesRoot(), categoria, slug))
+    : false;
+  if (!podeRegistrar()) return { slug, registado: false, temPasta, recados: 0 };
+
+  const uuid = await uuidDoSlug(slug);
+  if (!uuid) return { slug, registado: false, temPasta, recados: 0 };
+  return { slug, registado: true, temPasta, recados: await contarRecados(uuid) };
+}
+
+/**
+ * Solta o nome no banco: apaga os recados e depois a linha de `cr_sites`.
+ *
+ * Existe porque `duplicarSite` regista **antes** de copiar os ficheiros, de
+ * propósito — mas isso deixa o nome preso quando a pasta desaparece depois, e
+ * até 2026-09-12 não havia forma de o libertar sem ir ao SQL à mão. Era esse o
+ * beco: pasta apagada, nome ocupado, e o Studio a responder 409 para sempre.
+ *
+ * Os recados saem primeiro: se a linha do site saísse antes e a segunda chamada
+ * falhasse, ficavam recados apontados a um uuid que já não existe — invisíveis
+ * na app e impossíveis de encontrar pelo nome.
+ */
+export async function libertarSlug(slug: string): Promise<{ recados: number }> {
+  if (!NOME.test(slug)) throw new Error("nome inválido — minúsculas e hífen");
+  const { url, serviceKey } = credenciais();
+
+  const uuid = await uuidDoSlug(slug);
+  if (!uuid) return { recados: 0 };
+  const recados = await contarRecados(uuid);
+
+  const apagados = await fetch(
+    `${url}/rest/v1/cr_mensagens?site_id=eq.${encodeURIComponent(uuid)}`,
+    { method: "DELETE", headers: { ...auth(serviceKey), Prefer: "return=minimal" } },
+  );
+  if (!apagados.ok) {
+    throw new Error(`Supabase recusou apagar os recados (${apagados.status}) — nada foi alterado`);
+  }
+
+  const site = await fetch(`${url}/rest/v1/cr_sites?slug=eq.${encodeURIComponent(slug)}`, {
+    method: "DELETE",
+    headers: { ...auth(serviceKey), Prefer: "return=minimal" },
+  });
+  if (!site.ok) {
+    throw new Error(
+      `os recados de "${slug}" foram apagados, mas o Supabase recusou apagar o registo (${site.status}). ` +
+        `O nome continua ocupado — tenta outra vez.`,
+    );
+  }
+  return { recados };
+}
+
+/**
+ * Apaga o convite: a pasta em disco e o registo no banco.
+ *
+ * A pasta sai **depois** do registo. Falhando a meio, o que sobra é uma pasta
+ * sem nome reservado — que se apaga à mão e não impede nada. Na ordem inversa
+ * sobraria o nome preso, que é exactamente o problema que isto vem resolver.
+ */
+export async function apagarSite(id: string): Promise<{ recados: number }> {
+  const categoria = id.split("/")[0] ?? "";
+  const slug = id.split("/")[1] ?? "";
+  if (!NOME.test(categoria) || !NOME.test(slug)) throw new Error("id inválido");
+
+  const pasta = await containedPath(requireSitesRoot(), categoria, slug);
+  const { recados } = podeRegistrar() ? await libertarSlug(slug) : { recados: 0 };
+  await rm(pasta, { recursive: true, force: true });
+  return { recados };
 }
 
 async function renomearNoSupabase(antigo: string, novo: string): Promise<void> {

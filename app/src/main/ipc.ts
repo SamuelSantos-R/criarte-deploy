@@ -6,7 +6,14 @@ import { estadoCredenciais, exportarCredenciais, importarCredenciais } from "./c
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, destinoPublicacao, startJob, type Job } from "./cli";
 import { estadoDeps } from "./deps";
-import { duplicarSite, renomearSite, salvarSessaoComoNovo } from "./duplicar";
+import {
+  apagarSite,
+  duplicarSite,
+  estadoDoSlug,
+  libertarSlug,
+  renomearSite,
+  salvarSessaoComoNovo,
+} from "./duplicar";
 import { FILTROS, importAssets, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
@@ -169,6 +176,12 @@ export function registerIpc(): void {
   handle("sites:rename", (_e, id: unknown, slug: unknown) =>
     renomearSite(asString(id, "id"), asString(slug, "nome")),
   );
+
+  handle("sites:estadoSlug", (_e, categoria: unknown, slug: unknown) =>
+    estadoDoSlug(asString(categoria, "categoria"), asString(slug, "nome")),
+  );
+  handle("sites:liberar", (_e, slug: unknown) => libertarSlug(asString(slug, "nome")));
+  handle("sites:apagar", (_e, id: unknown) => apagarSite(asString(id, "id")));
 
   handle("sites:salvarSessao", (_e, categoria: unknown, slug: unknown, doc: unknown) =>
     salvarSessaoComoNovo(asString(categoria, "categoria"), asString(slug, "nome"), doc),

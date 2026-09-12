@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import { renomearSite } from "@/lib/api";
+import { estadoSlug, liberarSlug, renomearSite, type EstadoSlug } from "@/lib/api";
 import { Button, Field, Input } from "@/components/ui/primitives";
 
 const NOME = /^[a-z0-9][a-z0-9-]*$/;
@@ -44,7 +44,51 @@ export function RenomearSite({
   }, [onFechar]);
 
   const limpo = slug.trim().toLowerCase();
-  const valido = NOME.test(limpo) && limpo !== atual;
+  const nomeOk = NOME.test(limpo) && limpo !== atual;
+
+  /**
+   * O nome de destino é consultado enquanto se escreve, não depois de falhar.
+   * `renomearSite` move a pasta **antes** de falar com o Supabase, então deixar
+   * o 409 acontecer deixava a pasta com o nome novo e o registo com o velho —
+   * um estado que ninguém consegue ler pela app. Perguntar antes evita isso.
+   */
+  const [ocupado, setOcupado] = useState<EstadoSlug | null>(null);
+  const [libertando, setLibertando] = useState(false);
+
+  useEffect(() => {
+    if (!nomeOk) {
+      setOcupado(null);
+      return;
+    }
+    let cancelado = false;
+    const t = setTimeout(() => {
+      void estadoSlug(categoria, limpo)
+        .then((e) => !cancelado && setOcupado(e.registado || e.temPasta ? e : null))
+        .catch(() => !cancelado && setOcupado(null));
+    }, 300);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [categoria, limpo, nomeOk]);
+
+  // Nome preso no banco por um convite que já não existe em disco: é isso que
+  // se pode soltar. Havendo pasta, há convite a sério e o nome não é nosso.
+  const orfao = ocupado !== null && ocupado.registado && !ocupado.temPasta;
+  const valido = nomeOk && ocupado === null;
+
+  const libertar = async (): Promise<void> => {
+    if (!orfao || libertando) return;
+    setLibertando(true);
+    setErro(null);
+    try {
+      await liberarSlug(limpo);
+      setOcupado(null);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "não foi possível libertar o nome");
+    }
+    setLibertando(false);
+  };
 
   const confirmar = async (): Promise<void> => {
     if (!valido || indo) return;
@@ -107,6 +151,42 @@ export function RenomearSite({
             <p className="mt-2 text-[12px] text-pencil">Só minúsculas, números e hífen.</p>
           )}
           {erro && <p className="mt-2 text-[12px] text-pencil">{erro}</p>}
+
+          {ocupado?.temPasta && (
+            <p className="mt-2 text-[12px] text-pencil">
+              Já existe um convite chamado <span className="font-mono">{limpo}</span>. Escolhe
+              outro nome.
+            </p>
+          )}
+
+          {orfao && (
+            <div className="mt-3 border-l-2 border-cyan bg-ground/40 px-4 py-3">
+              <p className="text-[12px] leading-[1.7] text-muted">
+                O nome <span className="font-mono text-text">{limpo}</span> ainda está reservado
+                no Supabase por um convite que já não existe nesta máquina.{" "}
+                {ocupado.recados > 0 ? (
+                  <>
+                    Libertá-lo apaga também{" "}
+                    <span className="text-text">
+                      {ocupado.recados} recado{ocupado.recados === 1 ? "" : "s"}
+                    </span>{" "}
+                    do mural desse convite, e isso não se desfaz.
+                  </>
+                ) : (
+                  <>O mural dele está vazio, então não se perde nenhum recado.</>
+                )}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => void libertar()}
+                disabled={libertando}
+                className="mt-2"
+              >
+                {libertando ? "Libertando…" : `Libertar o nome ${limpo}`}
+              </Button>
+            </div>
+          )}
 
           <p className="mt-5 text-[12px] leading-[1.7] text-muted">
             Os recados já deixados continuam neste convite — o mural não anda

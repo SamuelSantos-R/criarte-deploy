@@ -4,6 +4,7 @@ type Result<T> = { ok: true; data: T } | { ok: false; erro: string };
 type AssetImportado = { nome: string; web: string; bytes: number };
 type Servidor = { siteId: string; url: string; lan: string | null };
 type Copia = { id: string; siteId: string | null; faltam: string[] };
+type EstadoSlug = { slug: string; registado: boolean; temPasta: boolean; recados: number };
 type SaidaCli = { runId: string; stream: "out" | "err"; text: string };
 type FimCli = { runId: string; code: number; erro: string | null };
 type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };
@@ -72,6 +73,10 @@ const api = {
   tokenEstado: (id: string) => invoke<EstadoToken>("token:estado", id),
   tokenInjetar: (id: string) => invoke<EstadoToken>("token:injetar", id),
   renomearSite: (id: string, slug: string) => invoke<{ id: string }>("sites:rename", id, slug),
+  estadoSlug: (categoria: string, slug: string) =>
+    invoke<EstadoSlug>("sites:estadoSlug", categoria, slug),
+  liberarSlug: (slug: string) => invoke<{ recados: number }>("sites:liberar", slug),
+  apagarSite: (id: string) => invoke<{ recados: number }>("sites:apagar", id),
   salvarSessaoComoNovo: (categoria: string, slug: string, doc: unknown) =>
     invoke<Copia>("sites:salvarSessao", categoria, slug, doc),
 

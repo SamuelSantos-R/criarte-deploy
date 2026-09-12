@@ -11,7 +11,8 @@ type Trilha<T> = { pilha: T[]; pos: number };
 
 export type Historico<T> = {
   valor: T | null;
-  definir: (v: T) => void;
+  /** `podeJuntar: false` para gesto que é um passo inteiro (sortear) mesmo repetido em rajada. */
+  definir: (v: T, podeJuntar?: boolean) => void;
   /** Recomeça do zero — usado ao abrir outro convite ou ao descartar. */
   recomecar: (v: T | null) => void;
   desfazer: () => void;
@@ -24,10 +25,11 @@ export function useHistorico<T>(): Historico<T> {
   const [trilha, setTrilha] = useState<Trilha<T>>({ pilha: [], pos: -1 });
   const carimbo = useRef(0);
 
-  const definir = useCallback((v: T) => {
+  const definir = useCallback((v: T, podeJuntar = true) => {
     const agora = Date.now();
-    const juntar = agora - carimbo.current < JANELA_MS;
-    carimbo.current = agora;
+    const juntar = podeJuntar && agora - carimbo.current < JANELA_MS;
+    // Passo inteiro também não aceita que o próximo ajuste se funda nele.
+    carimbo.current = podeJuntar ? agora : 0;
     setTrilha(({ pilha, pos }) => {
       // Refazer morre assim que se digita por cima — é o galho abandonado.
       const cortada = pilha.slice(0, pos + 1);

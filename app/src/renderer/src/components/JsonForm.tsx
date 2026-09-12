@@ -266,7 +266,12 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
           if (ehAsset(chave, v)) {
             return (
               <div key={chave} className="col-span-2">
-                <CampoArquivo valor={v} label={label} onChange={(novo) => onChange(filho, novo)} />
+                <CampoArquivo
+                  valor={v}
+                  label={label}
+                  onChange={(novo) => onChange(filho, novo)}
+                  biblioteca={/^monograma/i.test(chave)}
+                />
               </div>
             );
           }

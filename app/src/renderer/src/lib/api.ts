@@ -152,6 +152,53 @@ export const envelopePasta = () => call(api.envelopePasta()) as Promise<string |
 export const envelopeGerar = (p: PedidoEnvelope) => call(api.envelopeGerar(p)) as Promise<Saida>;
 export const envelopeAbrirSaida = () => call(api.envelopeAbrirSaida());
 
+export type FonteMonograma = { chave: string; nome: string };
+export type RecursosMonograma = {
+  serifada: Uint8Array;
+  milton: Uint8Array;
+  guirlanda: { d: string; viewBox: [number, number, number, number] };
+};
+export type MonogramaExportado = { pasta: string; arquivos: string[] };
+
+export const monogramaRecursos = () => call(api.monogramaRecursos()) as Promise<RecursosMonograma>;
+export const monogramaFontes = () => call(api.monogramaFontes()) as Promise<FonteMonograma[]>;
+export const monogramaLerFonte = (chave: string) => call(api.monogramaLerFonte(chave));
+export const monogramaImportarFonte = (caminho: string) =>
+  call(api.monogramaImportarFonte(caminho)) as Promise<FonteMonograma & { bytes: Uint8Array }>;
+export const monogramaExportar = (carga: { nome: string; svg: string; png: string }) =>
+  call(api.monogramaExportar(carga)) as Promise<MonogramaExportado | null>;
+export const monogramaAbrirPasta = () => call(api.monogramaAbrirPasta());
+
+export type CartaoMonograma = {
+  v: 1;
+  id: string;
+  nome: string;
+  iniciais: string;
+  cor: string;
+  fonte: string;
+  autor: string | null;
+  criado: string;
+  atualizado: string;
+  png: string;
+  svg: string;
+};
+export type PedidoBiblioteca = {
+  id: string | null;
+  nome: string;
+  iniciais: string;
+  cor: string;
+  fonte: string;
+  svg: string;
+  png: string;
+  edicao: unknown;
+};
+export const bibliotecaListar = () => call(api.bibliotecaListar()) as Promise<CartaoMonograma[]>;
+export const bibliotecaSalvar = (p: PedidoBiblioteca) => call(api.bibliotecaSalvar(p)) as Promise<CartaoMonograma>;
+export const bibliotecaAbrir = (id: string) =>
+  call(api.bibliotecaAbrir(id)) as Promise<{ meta: CartaoMonograma; edicao: unknown }>;
+export const bibliotecaApagar = (id: string) => call(api.bibliotecaApagar(id));
+export const bibliotecaBaixarSvg = (id: string) => call(api.bibliotecaBaixarSvg(id));
+
 export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };
 /** Anfitrião a gritar na rede local. O código vem no grito: clicar entra. */

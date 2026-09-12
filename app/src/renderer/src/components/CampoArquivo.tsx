@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, type DragEvent, type ReactElement } from "react";
-import { File as FileIcon, FolderOpen, Upload, X } from "lucide-react";
-import { caminhoDe, coopAsset, coopPickAsset, importAssets, pickAssets } from "@/lib/api";
+import { BookOpen, File as FileIcon, FolderOpen, Upload, X } from "lucide-react";
+import { bibliotecaBaixarSvg, caminhoDe, coopAsset, coopPickAsset, importAssets, pickAssets } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
+import { EscolherMonograma } from "@/components/monograma/EscolherMonograma";
 
 /** `convidado` porque o PC dela não tem a pasta do site: o ficheiro vai pela sessão. */
 export type Destino = { siteId: string | null; convidado: boolean };
@@ -36,6 +37,7 @@ export function CampoArquivo({
   onChange,
   aceita,
   aceitaNota,
+  biblioteca = false,
 }: {
   valor: string;
   label: string;
@@ -43,6 +45,8 @@ export function CampoArquivo({
   /** Restringe o campo a um subconjunto das extensões. Sem isto, aceita tudo. */
   aceita?: RegExp;
   aceitaNota?: string;
+  /** Campo de monograma: oferece puxar da biblioteca feita na tela Monogramas. */
+  biblioteca?: boolean;
 }): ReactElement {
   const { siteId, convidado } = useContext(SiteAtual);
   const pronto = convidado || siteId !== null;
@@ -50,6 +54,7 @@ export function CampoArquivo({
   const [ocupado, setOcupado] = useState(false);
   const [nota, setNota] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [escolhendo, setEscolhendo] = useState(false);
 
   const aplicar = async (acao: Promise<{ nome: string; web: string }[]>): Promise<void> => {
     setOcupado(true);
@@ -133,6 +138,11 @@ export function CampoArquivo({
             <span className="min-w-0 flex-1 truncate text-[12px] text-muted">Arraste aqui</span>
           </>
         )}
+        {biblioteca && (
+          <Button variant="ghost" disabled={!pronto || ocupado} onClick={() => setEscolhendo(true)}>
+            <BookOpen size={13} /> Biblioteca
+          </Button>
+        )}
         <Button
           variant="ghost"
           disabled={!pronto || ocupado}
@@ -151,6 +161,17 @@ export function CampoArquivo({
       </div>
       {nota && <span className="mt-1 block font-mono text-[11px] text-cyan">{nota}</span>}
       {erro && <span className="mt-1 block font-mono text-[11px] text-pencil">{erro}</span>}
+      {escolhendo && (
+        <EscolherMonograma
+          onFechar={() => setEscolhendo(false)}
+          onEscolher={(c) => {
+            setEscolhendo(false);
+            // Baixa pra temp e entra pelo mesmo caminho de um arquivo arrastado,
+            // então vale igual no anfitrião e no convidado da coop.
+            void aplicar(bibliotecaBaixarSvg(c.id).then((caminho) => mandar([caminho])));
+          }}
+        />
+      )}
     </div>
   );
 }

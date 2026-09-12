@@ -34,6 +34,10 @@ extraResources:
   # no convite.json e a página não tinha nada para desenhar.
   - from: resources/secoes
     to: secoes
+  # Fontes e moldura do monograma. A Milton One é licença da Criarte: viaja só
+  # dentro do app, nunca sobe pro R2 nem vai parar num convite.
+  - from: resources/monograma
+    to: monograma
   - from: ../node_modules
     to: cli/node_modules
     filter:

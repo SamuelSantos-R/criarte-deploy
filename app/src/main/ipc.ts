@@ -18,6 +18,8 @@ import {
 import { FILTROS, importAssets, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
+import { exportar, fontesRecentes, importarFonte, lerFonte, recursosMonograma, ultimaPasta } from "./monograma";
+import { abrirDaBiblioteca, apagarDaBiblioteca, baixarSvg, listarBiblioteca, salvarNaBiblioteca } from "./biblioteca";
 import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
 import { atualizarSecao, estadoPlantio, plantarSecao } from "./plantar";
@@ -296,6 +298,33 @@ export function registerIpc(): void {
   handle("envelope:abrirSaida", async () => {
     const pasta = pastaDaSaida();
     if (!pasta) throw new Error("nenhuma pasta de saída ainda");
+    await shell.openPath(pasta);
+  });
+
+  handle("monograma:recursos", () => recursosMonograma());
+  handle("monograma:fontes", () => fontesRecentes());
+  handle("monograma:lerFonte", (_e, chave: unknown) => lerFonte(chave));
+  handle("monograma:importarFonte", (_e, caminho: unknown) => importarFonte(asString(caminho, "caminho")));
+
+  // A pasta sai sempre do diálogo do main; o renderer só manda o conteúdo.
+  handle("monograma:exportar", async (event, carga: unknown) => {
+    const pasta = await abrir(event, {
+      title: "Onde salvar o monograma",
+      defaultPath: ultimaPasta() ?? undefined,
+      properties: ["openDirectory", "createDirectory"],
+    });
+    return pasta ? exportar(pasta, carga) : null;
+  });
+
+  handle("biblioteca:listar", () => listarBiblioteca());
+  handle("biblioteca:salvar", (_e, carga: unknown) => salvarNaBiblioteca(carga));
+  handle("biblioteca:abrir", (_e, id: unknown) => abrirDaBiblioteca(id));
+  handle("biblioteca:apagar", (_e, id: unknown) => apagarDaBiblioteca(id));
+  handle("biblioteca:baixarSvg", (_e, id: unknown) => baixarSvg(id));
+
+  handle("monograma:abrirPasta", async () => {
+    const pasta = ultimaPasta();
+    if (!pasta) throw new Error("nenhum monograma exportado ainda");
     await shell.openPath(pasta);
   });
 

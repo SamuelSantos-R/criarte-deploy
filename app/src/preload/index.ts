@@ -116,6 +116,18 @@ const api = {
   envelopeGerar: (opcoes: unknown) => invoke<unknown>("envelope:gerar", opcoes),
   envelopeAbrirSaida: () => invoke<void>("envelope:abrirSaida"),
 
+  monogramaRecursos: () => invoke<unknown>("monograma:recursos"),
+  monogramaFontes: () => invoke<unknown>("monograma:fontes"),
+  monogramaLerFonte: (chave: string) => invoke<Uint8Array>("monograma:lerFonte", chave),
+  monogramaImportarFonte: (caminho: string) => invoke<unknown>("monograma:importarFonte", caminho),
+  monogramaExportar: (carga: unknown) => invoke<unknown>("monograma:exportar", carga),
+  monogramaAbrirPasta: () => invoke<void>("monograma:abrirPasta"),
+  bibliotecaListar: () => invoke<unknown>("biblioteca:listar"),
+  bibliotecaSalvar: (carga: unknown) => invoke<unknown>("biblioteca:salvar", carga),
+  bibliotecaAbrir: (id: string) => invoke<unknown>("biblioteca:abrir", id),
+  bibliotecaApagar: (id: string) => invoke<void>("biblioteca:apagar", id),
+  bibliotecaBaixarSvg: (id: string) => invoke<string>("biblioteca:baixarSvg", id),
+
   estadoDeps: () => invoke<EstadoDeps>("deps:estado"),
 
   credEstado: () => invoke<EstadoCredenciais>("cred:estado"),

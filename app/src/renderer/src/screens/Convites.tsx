@@ -437,6 +437,8 @@ export function Convites({
   // atalho é interceptado antes do desfazer nativo do <input>.
   useEffect(() => {
     const atalho = (e: KeyboardEvent): void => {
+      // A aba fica montada escondida: sem isto o Cmd+Z de outra tela desfazia o convite às cegas.
+      if (!ativa) return;
       if (!e.metaKey && !e.ctrlKey) return;
       const tecla = e.key.toLowerCase();
       if (tecla === "s") {

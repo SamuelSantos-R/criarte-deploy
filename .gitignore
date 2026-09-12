@@ -8,3 +8,7 @@ app/dist/
 app/*.tsbuildinfo
 # Bundle do main que o electron-vite às vezes deixa cair fora de out/.
 app/index.js
+# Monograma: a Milton One é licença comercial da Criarte e a guirlanda é arte
+# comprada. O repo é público — ficam só no disco de quem gera o .dmg/.exe.
+app/resources/monograma/Milton_One_Bold.otf
+app/resources/monograma/guirlanda.svg

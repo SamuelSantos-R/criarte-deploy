@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
-import { FileText, Image, Rocket, SlidersHorizontal, Smartphone, Stamp } from "lucide-react";
+import { FileText, Image, Rocket, Signature, SlidersHorizontal, Smartphone, Stamp } from "lucide-react";
 import { getSettings, listSites, type Site } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProvaProvider, useProva } from "@/lib/prova";
@@ -11,8 +11,9 @@ import { Fotos } from "@/screens/Fotos";
 import { Preview } from "@/screens/Preview";
 import { Config } from "@/screens/Config";
 import { Envelope } from "@/screens/Envelope";
+import { Monograma } from "@/screens/Monograma";
 
-type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "config";
+type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "monograma" | "config";
 type Item = { id: Tela; label: string; nota: string; Icone: typeof FileText };
 
 // Os semáforos do macOS flutuam por cima da margem de chapa; no Windows não
@@ -26,9 +27,10 @@ const TRABALHO: Item[] = [
   { id: "fotos", label: "Fotos", nota: "galeria do convite", Icone: Image },
 ];
 
-// Fora do fluxo do site: o envelopador não precisa de raiz nem de convite.
+// Fora do fluxo do site: envelopador e monograma não precisam de raiz nem de convite.
 const AVULSO: Item[] = [
   { id: "envelope", label: "Envelopador 3000", nota: "", Icone: Stamp },
+  { id: "monograma", label: "Monogramas", nota: "", Icone: Signature },
   { id: "config", label: "Config", nota: "", Icone: SlidersHorizontal },
 ];
 
@@ -239,7 +241,7 @@ function Estudio(): ReactElement {
         {/* A mesa de luz: a única região clara, e onde tudo se lê e se edita. */}
         <main className="light flex min-h-0 min-w-0 flex-1 flex-col bg-ground text-text">
           {!pronto && <p className="px-6 pt-16 font-mono text-[12px] text-muted">Abrindo…</p>}
-          {pronto && ((semRaiz && tela !== "envelope") || tela === "config") && (
+          {pronto && ((semRaiz && tela !== "envelope" && tela !== "monograma") || tela === "config") && (
             <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
           )}
           {pronto && !semRaiz && visitadas.includes("convites") && (
@@ -269,6 +271,12 @@ function Estudio(): ReactElement {
             </Aba>
           )}
           {pronto && tela === "envelope" && <Envelope />}
+          {/* Montada escondida como as abas do fluxo: trocar de tela não pode apagar o monograma em curso. */}
+          {pronto && visitadas.includes("monograma") && (
+            <Aba ativa={tela === "monograma"}>
+              <Monograma ativa={tela === "monograma"} />
+            </Aba>
+          )}
         </main>
       </div>
 

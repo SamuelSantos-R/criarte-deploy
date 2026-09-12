@@ -149,14 +149,34 @@ function quemPorCima(comp: Composicao, i: number, c: { x: number; y: number }): 
   return i % 2 === 0 ? comp.comeca : outro;
 }
 
+/** Caixa do desenho já cortado, em px da prancheta. */
+export function caixa(aneis: [number, number][][]): { x1: number; y1: number; x2: number; y2: number } | null {
+  let x1 = Infinity;
+  let y1 = Infinity;
+  let x2 = -Infinity;
+  let y2 = -Infinity;
+  for (const a of aneis) {
+    for (const [x, y] of a) {
+      if (x < x1) x1 = x;
+      if (y < y1) y1 = y;
+      if (x > x2) x2 = x;
+      if (y > y2) y2 = y;
+    }
+  }
+  return Number.isFinite(x1) ? { x1, y1, x2, y2 } : null;
+}
+
 export function desenhar(comp: Composicao, glifos: Record<Papel, Glifo>): Desenho {
   const letras: Record<Papel, Polys> = {
     serifada: posicionar(glifos.serifada, comp.serifada, comp.escala),
     cursiva: posicionar(glifos.cursiva, comp.cursiva, comp.escala),
   };
+  // O corte é medido na escala 1 e encolhe junto com o conjunto: numa guirlanda
+  // a 0,55× o respiro tem a mesma cara que ela desenhou, e não fica grosso.
+  const corte = comp.corte * comp.escala;
   const gordas: Record<Papel, Polys> = {
-    serifada: comp.corte > 0 ? engordar(letras.serifada, comp.corte) : letras.serifada,
-    cursiva: comp.corte > 0 ? engordar(letras.cursiva, comp.corte) : letras.cursiva,
+    serifada: corte > 0 ? engordar(letras.serifada, corte) : letras.serifada,
+    cursiva: corte > 0 ? engordar(letras.cursiva, corte) : letras.cursiva,
   };
 
   const regioes = manchas(operar(letras.serifada, letras.cursiva, C.ClipType.ctIntersection))
@@ -170,7 +190,7 @@ export function desenhar(comp: Composicao, glifos: Record<Papel, Glifo>): Desenh
     const baixo: Papel = cima === "serifada" ? "cursiva" : "serifada";
     // O corte fica restrito à vizinhança do cruzamento; senão a letra de cima
     // abriria respiro em todo sítio onde só encosta na de baixo.
-    const vizinhanca = engordar(m, comp.corte * 4 + 6);
+    const vizinhanca = engordar(m, corte * 4 + 6 * comp.escala);
     const faca = operar(gordas[cima], vizinhanca, C.ClipType.ctIntersection);
     cortadas[baixo] = operar(cortadas[baixo], faca, C.ClipType.ctDifference);
     return { ...c, cima };

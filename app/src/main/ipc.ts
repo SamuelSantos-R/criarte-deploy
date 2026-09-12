@@ -18,7 +18,17 @@ import {
 import { FILTROS, importAssets, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
-import { exportar, fontesRecentes, importarFonte, lerFonte, recursosMonograma, ultimaPasta } from "./monograma";
+import {
+  exportar,
+  fontesRecentes,
+  importarFonte,
+  importarMoldura,
+  lerFonte,
+  lerMoldura,
+  moldurasRecentes,
+  recursosMonograma,
+  ultimaPasta,
+} from "./monograma";
 import { abrirDaBiblioteca, apagarDaBiblioteca, baixarSvg, listarBiblioteca, salvarNaBiblioteca } from "./biblioteca";
 import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
@@ -315,6 +325,10 @@ export function registerIpc(): void {
     });
     return pasta ? exportar(pasta, carga) : null;
   });
+
+  handle("monograma:molduras", () => moldurasRecentes());
+  handle("monograma:lerMoldura", (_e, chave: unknown) => lerMoldura(chave));
+  handle("monograma:importarMoldura", (_e, caminho: unknown) => importarMoldura(asString(caminho, "caminho")));
 
   handle("biblioteca:listar", () => listarBiblioteca());
   handle("biblioteca:salvar", (_e, carga: unknown) => salvarNaBiblioteca(carga));

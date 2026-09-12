@@ -3,7 +3,11 @@ export type Papel = "serifada" | "cursiva";
 /** Posição na prancheta de 1000px; `altura` é a altura da letra, `largura` estica só na horizontal. */
 export type Letra = { char: string; x: number; y: number; altura: number; rot: number; largura: number };
 
-export type Moldura = { tipo: "nenhuma" | "guirlanda"; escala: number; rot: number };
+/** `arquivo` é uma moldura arrastada: `chave` aponta pro arquivo guardado nesta máquina. */
+export type Moldura = { tipo: "nenhuma" | "guirlanda" | "arquivo"; chave?: string; nome?: string; escala: number; rot: number };
+
+/** A moldura arrastada já lida: data URL e tamanho natural, pra caber na prancheta. */
+export type MolduraArquivo = { dataUrl: string; largura: number; altura: number };
 
 export type Composicao = {
   serifada: Letra;
@@ -79,15 +83,30 @@ export function transformMoldura(m: Moldura, g: Guirlanda): string {
   return `translate(500 500) rotate(${m.rot}) scale(${s}) translate(${-(vx + vw / 2)} ${-(vy + vh / 2)})`;
 }
 
-export function montarSvg(comp: Composicao, d: string, guirlanda: Guirlanda | null): string {
-  const moldura =
-    comp.moldura.tipo === "guirlanda" && guirlanda
-      ? `<path transform="${transformMoldura(comp.moldura, guirlanda)}" d="${guirlanda.d}"/>`
-      : "";
+/** Moldura arrastada centrada, com o lado maior nos mesmos 76% da guirlanda. */
+export function caixaMolduraArquivo(m: Moldura, a: MolduraArquivo): { x: number; y: number; width: number; height: number; transform: string } {
+  const s = (760 / Math.max(a.largura, a.altura, 1)) * m.escala;
+  const width = a.largura * s;
+  const height = a.altura * s;
+  return { x: -width / 2, y: -height / 2, width, height, transform: `translate(500 500) rotate(${m.rot})` };
+}
+
+const num = (n: number): string => String(Math.round(n * 100) / 100);
+
+export function montarSvg(comp: Composicao, d: string, guirlanda: Guirlanda | null, arquivo: MolduraArquivo | null = null): string {
+  let moldura = "";
+  if (comp.moldura.tipo === "guirlanda" && guirlanda) {
+    moldura = `<path transform="${transformMoldura(comp.moldura, guirlanda)}" d="${guirlanda.d}"/>`;
+  } else if (comp.moldura.tipo === "arquivo" && arquivo && /^data:image\/(png|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(arquivo.dataUrl)) {
+    // Fica de fora do <g fill>: a moldura arrastada guarda as cores dela.
+    const c = caixaMolduraArquivo(comp.moldura, arquivo);
+    moldura = `<image transform="${c.transform}" x="${num(c.x)}" y="${num(c.y)}" width="${num(c.width)}" height="${num(c.height)}" href="${arquivo.dataUrl}"/>`;
+  }
   // A cor entra crua num atributo do SVG exportado: só hex passa.
   const cor = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(comp.cor) ? comp.cor : "#000000";
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">` +
-    `<g fill="${cor}">${moldura}<path d="${d}"/></g></svg>`
+    (comp.moldura.tipo === "arquivo" ? moldura : "") +
+    `<g fill="${cor}">${comp.moldura.tipo === "arquivo" ? "" : moldura}<path d="${d}"/></g></svg>`
   );
 }

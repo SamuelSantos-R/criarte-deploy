@@ -1,10 +1,11 @@
 import { type ReactElement, type ReactNode } from "react";
-import { ArrowLeftRight } from "lucide-react";
+import { AlignCenter, ArrowLeftRight, Pipette } from "lucide-react";
 import type { FonteMonograma } from "@/lib/api";
-import type { Composicao, Letra, Papel } from "@/lib/monograma/composicao";
+import type { Composicao, Letra, Moldura, Papel } from "@/lib/monograma/composicao";
 import { Input } from "@/components/ui/primitives";
 import { SeletorCor } from "@/components/SeletorCor";
 import { FonteCursiva } from "./FonteCursiva";
+import { MolduraMonograma } from "./MolduraMonograma";
 import { ReguaMonograma } from "./ReguaMonograma";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,17 @@ type Props = {
   onSoltarFonte: (caminho: string) => void;
   mostrarCruzamentos: boolean;
   setMostrarCruzamentos: (v: boolean) => void;
+  molduras: FonteMonograma[];
+  lendoMoldura: boolean;
+  onEscolherMoldura: (m: Pick<Moldura, "tipo" | "chave" | "nome">) => void;
+  onSoltarMoldura: (caminho: string) => void;
+  /** Cores mais presentes na moldura arrastada. */
+  paleta: string[];
+  onCentralizar: () => void;
 };
+
+type ContaGotas = { open: () => Promise<{ sRGBHex: string }> };
+const EyeDropper = (window as unknown as { EyeDropper?: new () => ContaGotas }).EyeDropper;
 
 function Titulo({ children }: { children: ReactNode }): ReactElement {
   return (
@@ -135,36 +146,64 @@ export function PainelMonograma(p: Props): ReactElement {
 
       <Titulo>Conjunto</Titulo>
       <ReguaMonograma rotulo="Tamanho" valor={comp.escala} min={0.3} max={1.5} passo={0.01} unidade="×" onChange={(escala) => alterar({ escala })} />
-      <div className="mt-3 flex items-center gap-3">
+      <button
+        type="button"
+        onClick={p.onCentralizar}
+        className="no-drag mt-2 flex w-full items-center justify-center gap-2 border border-rule py-1.5 text-[12px] text-muted hover:border-rule-strong hover:text-text"
+      >
+        <AlignCenter size={13} /> Centralizar na prancheta
+      </button>
+
+      <Titulo>Cor das letras</Titulo>
+      <div className="flex items-center gap-2">
         <SeletorCor valor={comp.cor} rotulo="monograma" onChange={(cor) => alterar({ cor })} />
         <span className="font-mono text-[12px] text-text">{comp.cor}</span>
+        {EyeDropper && (
+          <button
+            type="button"
+            onClick={() => {
+              void new EyeDropper()
+                .open()
+                .then((r) => /^#[0-9a-f]{6}$/i.test(r.sRGBHex) && alterar({ cor: r.sRGBHex.toUpperCase() }, false))
+                .catch(() => undefined);
+            }}
+            title="Pegar uma cor da tela (da moldura, por exemplo)"
+            aria-label="Conta-gotas"
+            className="no-drag ml-auto flex h-7 w-7 items-center justify-center border border-rule text-muted hover:border-rule-strong hover:text-text"
+          >
+            <Pipette size={13} />
+          </button>
+        )}
       </div>
+      {p.paleta.length > 0 && (
+        <div className="mt-2">
+          <span className="block text-[11px] text-muted">Cores da moldura</span>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {p.paleta.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => alterar({ cor: c }, false)}
+                title={c}
+                aria-label={`Usar ${c} nas letras`}
+                className={cn("no-drag h-6 w-6 border", comp.cor.toUpperCase() === c ? "border-text" : "border-rule")}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <Titulo>Moldura</Titulo>
-      <div className="grid grid-cols-2 border border-rule">
-        {(["nenhuma", "guirlanda"] as const).map((tipo) => (
-          <button
-            key={tipo}
-            type="button"
-            aria-pressed={comp.moldura.tipo === tipo}
-            onClick={() =>
-              alterar(
-                // A guirlanda aperta o miolo: sem encolher, as letras atropelam os ramos.
-                { moldura: { ...comp.moldura, tipo }, escala: tipo === "guirlanda" && comp.escala > 0.6 ? 0.55 : comp.escala },
-                false,
-              )
-            }
-            className={cn(
-              "no-drag py-1.5 text-[12px] capitalize",
-              comp.moldura.tipo === tipo ? "bg-surface-2 text-text" : "text-muted hover:text-text",
-            )}
-          >
-            {tipo}
-          </button>
-        ))}
-      </div>
+      <MolduraMonograma
+        moldura={comp.moldura}
+        recentes={p.molduras}
+        ocupado={p.lendoMoldura}
+        onEscolher={p.onEscolherMoldura}
+        onSoltar={p.onSoltarMoldura}
+      />
       {comp.moldura.tipo !== "nenhuma" && (
-        <div className="mt-2">
+        <div className="mt-3">
           <ReguaMonograma rotulo="Tamanho da moldura" valor={comp.moldura.escala} min={0.5} max={1.4} passo={0.01} unidade="×" onChange={(escala) => alterar({ moldura: { ...comp.moldura, escala } })} />
           <ReguaMonograma rotulo="Giro da moldura" valor={comp.moldura.rot} min={-180} max={180} passo={1} unidade="°" onChange={(rot) => alterar({ moldura: { ...comp.moldura, rot } })} />
         </div>

@@ -169,6 +169,12 @@ export const monogramaExportar = (carga: { nome: string; svg: string; png: strin
   call(api.monogramaExportar(carga)) as Promise<MonogramaExportado | null>;
 export const monogramaAbrirPasta = () => call(api.monogramaAbrirPasta());
 
+export type MolduraLida = FonteMonograma & { dataUrl: string };
+export const monogramaMolduras = () => call(api.monogramaMolduras()) as Promise<FonteMonograma[]>;
+export const monogramaLerMoldura = (chave: string) => call(api.monogramaLerMoldura(chave)) as Promise<MolduraLida>;
+export const monogramaImportarMoldura = (caminho: string) =>
+  call(api.monogramaImportarMoldura(caminho)) as Promise<MolduraLida>;
+
 export type CartaoMonograma = {
   v: 1;
   id: string;
@@ -191,11 +197,13 @@ export type PedidoBiblioteca = {
   svg: string;
   png: string;
   edicao: unknown;
+  /** Chave da moldura arrastada em uso; sobe junto pra biblioteca. */
+  moldura: string | null;
 };
 export const bibliotecaListar = () => call(api.bibliotecaListar()) as Promise<CartaoMonograma[]>;
 export const bibliotecaSalvar = (p: PedidoBiblioteca) => call(api.bibliotecaSalvar(p)) as Promise<CartaoMonograma>;
 export const bibliotecaAbrir = (id: string) =>
-  call(api.bibliotecaAbrir(id)) as Promise<{ meta: CartaoMonograma; edicao: unknown }>;
+  call(api.bibliotecaAbrir(id)) as Promise<{ meta: CartaoMonograma; edicao: unknown; moldura: MolduraLida | null }>;
 export const bibliotecaApagar = (id: string) => call(api.bibliotecaApagar(id));
 export const bibliotecaBaixarSvg = (id: string) => call(api.bibliotecaBaixarSvg(id));
 

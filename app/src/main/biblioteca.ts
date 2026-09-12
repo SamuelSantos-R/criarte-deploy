@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { app } from "electron";
 import { configR2, r2Delete, r2Get, r2Listar, r2Put, type ConfigR2 } from "./r2";
-import { svgLimpo } from "./monograma";
+import { bytesDaMoldura, guardarMoldura, svgLimpo, type MolduraLida } from "./monograma";
 
 // ============================================================================
 // BIBLIOTECA DE MONOGRAMAS — uma pasta por monograma no R2, sem índice central.
@@ -128,18 +128,35 @@ export async function salvarNaBiblioteca(carga: unknown): Promise<Cartao> {
   const pasta = `${RAIZ}${id}/`;
   await r2Put(cfg, `${pasta}monograma.svg`, Buffer.from(svg, "utf8"), "image/svg+xml");
   await r2Put(cfg, `${pasta}monograma.png`, Buffer.from(png.slice(PREFIXO.length), "base64"), "image/png");
+  // Moldura arrastada viaja com o monograma: sem ela, quem abre noutra máquina via só as letras.
+  const moldura = await bytesDaMoldura(c.moldura);
+  if (moldura) {
+    const ext = moldura.chave.endsWith(".png") ? "png" : "svg";
+    await r2Put(cfg, `${pasta}moldura.${ext}`, moldura.bytes, ext === "png" ? "image/png" : "image/svg+xml");
+  }
   await r2Put(cfg, `${pasta}edicao.json`, Buffer.from(edicao, "utf8"), "application/json");
   await r2Put(cfg, `${pasta}meta.json`, Buffer.from(JSON.stringify(meta), "utf8"), "application/json");
   return { ...meta, png: publico(cfg, meta, "monograma.png"), svg: publico(cfg, meta, "monograma.svg") };
 }
 
-export async function abrirDaBiblioteca(id: unknown): Promise<{ meta: Meta; edicao: unknown }> {
+export async function abrirDaBiblioteca(
+  id: unknown,
+): Promise<{ meta: Meta; edicao: unknown; moldura: MolduraLida | null }> {
   const cfg = await configR2();
   const alvo = idValido(id);
   const meta = await lerMeta(cfg, alvo);
   const bruto = await r2Get(cfg, `${RAIZ}${alvo}/edicao.json`);
   if (!meta || !bruto) throw new Error("esse monograma já não está na biblioteca");
-  return { meta, edicao: JSON.parse(bruto.toString("utf8")) as unknown };
+  const edicao = JSON.parse(bruto.toString("utf8")) as { comp?: { moldura?: { tipo?: string; chave?: string } } };
+
+  let moldura: MolduraLida | null = null;
+  const chave = edicao.comp?.moldura?.tipo === "arquivo" ? edicao.comp.moldura.chave : undefined;
+  if (typeof chave === "string" && /\.(svg|png)$/.test(chave)) {
+    const bytes = await r2Get(cfg, `${RAIZ}${alvo}/moldura.${chave.endsWith(".png") ? "png" : "svg"}`);
+    // Mesmo nome e mesmos bytes dão a mesma chave: entra na lista desta máquina sem duplicar.
+    if (bytes) moldura = await guardarMoldura(chave.replace(/-[0-9a-f]{8}(\.(?:svg|png))$/, "$1"), bytes);
+  }
+  return { meta, edicao, moldura };
 }
 
 export async function apagarDaBiblioteca(id: unknown): Promise<void> {

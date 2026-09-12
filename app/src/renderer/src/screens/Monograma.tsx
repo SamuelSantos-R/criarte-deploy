@@ -8,19 +8,32 @@ import {
   monogramaExportar,
   monogramaFontes,
   monogramaImportarFonte,
+  monogramaImportarMoldura,
   monogramaLerFonte,
+  monogramaLerMoldura,
+  monogramaMolduras,
   monogramaRecursos,
   type CartaoMonograma,
   type FonteMonograma,
+  type MolduraLida,
   type MonogramaExportado,
   type RecursosMonograma,
 } from "@/lib/api";
 import { useHistorico } from "@/lib/useHistorico";
-import { achatarGlifo, desenhar, type Glifo } from "@/lib/monograma/geometria";
-import { composicaoInicial, FONTE_PADRAO, montarSvg, variar, type Composicao, type Papel } from "@/lib/monograma/composicao";
+import { achatarGlifo, caixa, desenhar, type Glifo } from "@/lib/monograma/geometria";
+import {
+  composicaoInicial,
+  FONTE_PADRAO,
+  montarSvg,
+  variar,
+  type Composicao,
+  type Moldura,
+  type MolduraArquivo,
+  type Papel,
+} from "@/lib/monograma/composicao";
 import { lerEdicao, montarEdicao, type Edicao } from "@/lib/monograma/edicao";
 import { curvasParaD } from "@/lib/monograma/curvas";
-import { paraPng } from "@/lib/monograma/rasterizar";
+import { medirImagem, paletaDe, paraPng } from "@/lib/monograma/rasterizar";
 import { Button } from "@/components/ui/primitives";
 import { Topo } from "@/components/Topo";
 import { PalcoMonograma } from "@/components/monograma/PalcoMonograma";
@@ -58,12 +71,17 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
   const [glifosSalvos, setGlifosSalvos] = useState<Edicao["glifos"] | null>(null);
   const [nomesDeFonte, setNomesDeFonte] = useState<Record<string, string>>({});
   const [versaoBiblioteca, setVersaoBiblioteca] = useState(0);
+  const [molduras, setMolduras] = useState<FonteMonograma[]>([]);
+  const [lendoMoldura, setLendoMoldura] = useState(false);
+  /** A moldura arrastada já decodificada, pela chave — o palco e o export leem daqui. */
+  const [molduraLida, setMolduraLida] = useState<{ chave: string; arq: MolduraArquivo; paleta: string[] } | null>(null);
 
   const { recomecar, definir, desfazer, refazer } = hist;
 
   useEffect(() => {
-    Promise.all([monogramaRecursos(), monogramaFontes()])
-      .then(([r, lista]) => {
+    Promise.all([monogramaRecursos(), monogramaFontes(), monogramaMolduras()])
+      .then(([r, lista, listaMolduras]) => {
+        setMolduras(listaMolduras);
         setRecursos(r);
         setFontes({ serifada: lerFonteBytes(r.serifada), [FONTE_PADRAO]: lerFonteBytes(r.milton) });
         setRecentes(lista);
@@ -94,6 +112,22 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
     return desenhar(comp, { serifada: glifoSerifada, cursiva: glifoCursiva });
   }, [comp, glifoSerifada, glifoCursiva]);
 
+  const carregarMoldura = useCallback(async (m: MolduraLida): Promise<void> => {
+    const tamanho = await medirImagem(m.dataUrl);
+    const paleta = await paletaDe(m.dataUrl).catch(() => []);
+    setMolduraLida({ chave: m.chave, arq: { dataUrl: m.dataUrl, ...tamanho }, paleta });
+  }, []);
+
+  // Monograma aberto ou histórico que volta pra uma moldura arrastada: lê do disco se ainda não está em memória.
+  const chaveMoldura = comp?.moldura.tipo === "arquivo" ? comp.moldura.chave : undefined;
+  useEffect(() => {
+    if (!chaveMoldura || molduraLida?.chave === chaveMoldura) return;
+    monogramaLerMoldura(chaveMoldura)
+      .then(carregarMoldura)
+      .catch((e: Error) => setErro(e.message));
+  }, [chaveMoldura, molduraLida?.chave, carregarMoldura]);
+  const molduraArquivo = chaveMoldura && molduraLida?.chave === chaveMoldura ? molduraLida.arq : null;
+
   const mexeu = (): void => {
     setSaida(null);
     setSalvoEm(null);
@@ -123,7 +157,11 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
     setErro(null);
     setOcupado("abrir");
     try {
-      const { meta, edicao } = await bibliotecaAbrir(c.id);
+      const { meta, edicao, moldura } = await bibliotecaAbrir(c.id);
+      if (moldura) {
+        await carregarMoldura(moldura);
+        setMolduras(await monogramaMolduras());
+      }
       const e = lerEdicao(edicao);
       // Campos que um monograma antigo não tinha nascem com o padrão.
       const base = composicaoInicial(e.comp.serifada.char, e.comp.cursiva.char);
@@ -146,6 +184,49 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
     } finally {
       setOcupado(null);
     }
+  };
+
+  const escolherMoldura = (m: Pick<Moldura, "tipo" | "chave" | "nome">): void => {
+    if (!hist.valor) return;
+    const atual = hist.valor;
+    // Moldura aperta o miolo: sem encolher, as letras atropelam os ramos.
+    const escala = m.tipo !== "nenhuma" && atual.moldura.tipo === "nenhuma" && atual.escala > 0.6 ? 0.55 : atual.escala;
+    alterar({ moldura: { escala: atual.moldura.escala, rot: atual.moldura.rot, ...m }, escala }, false);
+  };
+
+  const soltarMoldura = async (caminho: string): Promise<void> => {
+    setErro(null);
+    setLendoMoldura(true);
+    try {
+      const m = await monogramaImportarMoldura(caminho);
+      await carregarMoldura(m);
+      setMolduras(await monogramaMolduras());
+      escolherMoldura({ tipo: "arquivo", chave: m.chave, nome: m.nome });
+    } catch (e) {
+      setErro(e instanceof Error ? `Não deu pra ler a moldura: ${e.message}` : String(e));
+    } finally {
+      setLendoMoldura(false);
+    }
+  };
+
+  /** Leva o centro do desenho das letras pro centro da prancheta, sem mexer no resto. */
+  const centralizar = (): void => {
+    const c = desenho && hist.valor ? caixa(desenho.aneis) : null;
+    if (!c || !hist.valor) return;
+    const dx = 500 - (c.x1 + c.x2) / 2;
+    const dy = 500 - (c.y1 + c.y2) / 2;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+    const v = hist.valor;
+    const arred = (n: number): number => Math.round(n * 10) / 10;
+    alterar(
+      {
+        serifada: { ...v.serifada, x: arred(v.serifada.x + dx / v.escala), y: arred(v.serifada.y + dy / v.escala) },
+        cursiva: { ...v.cursiva, x: arred(v.cursiva.x + dx / v.escala), y: arred(v.cursiva.y + dy / v.escala) },
+        // Os toques seguem os cruzamentos, senão a troca de quem passa por cima se perde.
+        toques: v.toques.map((t) => ({ ...t, x: t.x + dx, y: t.y + dy })),
+      },
+      false,
+    );
   };
 
   const sortear = (): void => {
@@ -215,7 +296,7 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
   /** SVG com curvas e PNG sem fundo — o mesmo par serve pra exportar e pra biblioteca. */
   const gerarArquivos = async (): Promise<{ svg: string; png: string } | null> => {
     if (!comp || !desenho || !recursos) return null;
-    const svg = montarSvg(comp, curvasParaD(desenho.aneis), recursos.guirlanda);
+    const svg = montarSvg(comp, curvasParaD(desenho.aneis), recursos.guirlanda, molduraArquivo);
     return { svg, png: await paraPng(svg, LADO_PNG) };
   };
 
@@ -248,6 +329,7 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
         iniciais: `${comp.serifada.char}${comp.cursiva.char}`,
         cor: comp.cor,
         fonte: fonteNome,
+        moldura: comp.moldura.tipo === "arquivo" ? (comp.moldura.chave ?? null) : null,
         edicao: montarEdicao(comp, fonteNome, { serifada: glifoSerifada, cursiva: glifoCursiva }),
         ...arquivos,
       });
@@ -352,6 +434,7 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
                   comp={comp}
                   desenho={desenho}
                   guirlanda={recursos?.guirlanda ?? null}
+                  molduraArquivo={molduraArquivo}
                   selecionada={selecionada}
                   mostrarCruzamentos={mostrarCruzamentos}
                   onSelecionar={setSelecionada}
@@ -398,6 +481,12 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
               onSoltarFonte={(caminho) => void soltarFonte(caminho)}
               mostrarCruzamentos={mostrarCruzamentos}
               setMostrarCruzamentos={setMostrarCruzamentos}
+              molduras={molduras}
+              lendoMoldura={lendoMoldura}
+              onEscolherMoldura={escolherMoldura}
+              onSoltarMoldura={(caminho) => void soltarMoldura(caminho)}
+              paleta={molduraArquivo && molduraLida ? molduraLida.paleta : []}
+              onCentralizar={centralizar}
             />
           )}
         </div>

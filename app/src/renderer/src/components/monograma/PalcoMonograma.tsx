@@ -1,11 +1,19 @@
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactElement } from "react";
 import { PRANCHETA, type Desenho } from "@/lib/monograma/geometria";
-import { transformMoldura, type Composicao, type Guirlanda, type Papel } from "@/lib/monograma/composicao";
+import {
+  caixaMolduraArquivo,
+  transformMoldura,
+  type Composicao,
+  type Guirlanda,
+  type MolduraArquivo,
+  type Papel,
+} from "@/lib/monograma/composicao";
 
 type Props = {
   comp: Composicao;
   desenho: Desenho | null;
   guirlanda: Guirlanda | null;
+  molduraArquivo: MolduraArquivo | null;
   selecionada: Papel;
   mostrarCruzamentos: boolean;
   onSelecionar: (p: Papel) => void;
@@ -25,6 +33,7 @@ export function PalcoMonograma({
   comp,
   desenho,
   guirlanda,
+  molduraArquivo,
   selecionada,
   mostrarCruzamentos,
   onSelecionar,
@@ -86,6 +95,9 @@ export function PalcoMonograma({
       role="img"
       aria-label={`Monograma ${comp.serifada.char}${comp.cursiva.char}`}
     >
+      {comp.moldura.tipo === "arquivo" && molduraArquivo && (
+        <image {...caixaMolduraArquivo(comp.moldura, molduraArquivo)} href={molduraArquivo.dataUrl} pointerEvents="none" />
+      )}
       <g fill={comp.cor}>
         {comp.moldura.tipo === "guirlanda" && guirlanda && (
           <path transform={transformMoldura(comp.moldura, guirlanda)} d={guirlanda.d} />

@@ -60,7 +60,7 @@ export function ModalQR({
             type="button"
             onClick={onFechar}
             aria-label="Fechar"
-            className="ml-auto flex h-[28px] w-[28px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
+            className="ml-auto flex h-[28px] w-[28px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
           >
             <X size={14} />
           </button>
@@ -75,12 +75,12 @@ export function ModalQR({
                 className="block w-full border border-rule"
               />
               <p className="mt-4 break-all font-mono text-[12px] text-text">{lan}</p>
-              <p className="mt-2 text-[12px] leading-[1.5] text-muted">
+              <p className="mt-2 text-[12px] leading-normal text-muted">
                 Telefone e Mac no mesmo Wi-Fi. Aponte a câmera.
               </p>
             </>
           ) : (
-            <p className="text-[12px] leading-[1.5] text-muted">
+            <p className="text-[12px] leading-normal text-muted">
               {url
                 ? "Sem IP de rede — o Mac não está numa Wi-Fi alcançável pelo telefone."
                 : "O QR aparece quando o preview subir."}

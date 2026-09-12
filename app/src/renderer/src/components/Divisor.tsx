@@ -106,7 +106,7 @@ export function Divisor({
         e.preventDefault();
       }}
       title="Arraste pra mudar o tamanho · duplo clique volta ao padrão"
-      className="no-drag group relative w-[9px] shrink-0 cursor-col-resize focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-2px] focus-visible:outline-focus"
+      className="no-drag group relative w-[9px] shrink-0 cursor-col-resize focus-visible:outline-solid focus-visible:outline-1 focus-visible:-outline-offset-2 focus-visible:outline-focus"
     >
       <span
         aria-hidden

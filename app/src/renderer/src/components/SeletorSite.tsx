@@ -42,7 +42,7 @@ export function SeletorSite({
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           "no-drag h-[32px] w-full appearance-none bg-surface pl-3 pr-8 text-[13px] text-text",
-          "border border-rule focus:border-focus focus:outline-none disabled:opacity-40",
+          "border border-rule focus:border-focus focus:outline-hidden disabled:opacity-40",
         )}
       >
         <option value="" disabled>

@@ -44,7 +44,7 @@ Button.displayName = "Button";
 // O campo é uma calha fresada: fundo recuado e a régua de baixo é a única
 // aresta. Ao focar, a régua engrossa e toma a tinta da região.
 const campo =
-  "no-drag w-full bg-surface text-[13px] text-text border-b-2 border-rule focus:border-focus focus:outline-none placeholder:text-muted transition-colors duration-0";
+  "no-drag w-full bg-surface text-[13px] text-text border-b-2 border-rule focus:border-focus focus:outline-hidden placeholder:text-muted transition-colors duration-0";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className, ...props }, ref) => (

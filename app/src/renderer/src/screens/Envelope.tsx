@@ -170,7 +170,7 @@ export function Envelope(): ReactElement {
 
         <aside className="w-[268px] shrink-0 overflow-y-auto border-l border-rule px-5 py-6">
           <span className="font-narrow font-semibold text-label uppercase text-muted">Área do botão</span>
-          <p className="mt-2 text-[12px] leading-[1.5] text-muted">
+          <p className="mt-2 text-[12px] leading-normal text-muted">
             {marca
               ? "Arraste de novo pra remarcar."
               : "Arraste por cima do convite onde o convidado vai tocar."}
@@ -184,7 +184,7 @@ export function Envelope(): ReactElement {
                 {lista.total} com link · {lista.unicos} nomes únicos
               </p>
               {lista.repetidos.length > 0 && (
-                <p className="mt-2 border-l-2 border-cyan pl-2 text-[11px] leading-[1.5] text-muted">
+                <p className="mt-2 border-l-2 border-cyan pl-2 text-[11px] leading-normal text-muted">
                   repetidos: {lista.repetidos.map((d) => `${d.nome} (${d.vezes}×)`).join(", ")}
                 </p>
               )}
@@ -199,7 +199,7 @@ export function Envelope(): ReactElement {
               </label>
             </>
           ) : (
-            <p className="mt-2 text-[12px] leading-[1.5] text-muted">
+            <p className="mt-2 text-[12px] leading-normal text-muted">
               Um por linha, com o link. Nome antes ou depois, tanto faz.
             </p>
           )}

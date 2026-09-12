@@ -139,7 +139,7 @@ export function FaixaConflito({
       <span aria-hidden className="h-[30px] w-[2px] shrink-0 bg-pencil" />
       <div className="min-w-0">
         <p className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-pencil">conflito</p>
-        <p className="mt-0.5 text-[12px] leading-[1.5] text-muted">
+        <p className="mt-0.5 text-[12px] leading-normal text-muted">
           O <span className="font-mono">convite.json</span> mudou fora do Studio e você tem alteração
           na tela. Um dos dois vai embora.
         </p>
@@ -151,7 +151,7 @@ export function FaixaConflito({
         <button
           type="button"
           onClick={onGravarPorCima}
-          className="no-drag text-[11px] leading-none text-muted underline decoration-dotted underline-offset-4 transition-colors hover:text-pencil focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          className="no-drag text-[11px] leading-none text-muted underline decoration-dotted underline-offset-4 transition-colors hover:text-pencil focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
           descartar o arquivo
         </button>

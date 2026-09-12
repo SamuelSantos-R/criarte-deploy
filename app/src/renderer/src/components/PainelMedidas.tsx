@@ -341,14 +341,14 @@ export function LinhaMedida({
         aria-label={`${medida.rotulo} em pixels`}
         className={cn(
           "no-drag absolute inset-0 h-full w-full cursor-ew-resize appearance-none bg-transparent opacity-0",
-          "focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+          "focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
         )}
       />
 
       <div className="pointer-events-none relative flex items-center gap-4 py-3 pl-4 pr-2">
         <div className="min-w-0 flex-1">
           <span className="text-[12px] text-text">{medida.rotulo}</span>
-          <p className="mt-0.5 max-w-[44ch] text-[11px] leading-[1.5] text-muted">{medida.dica}</p>
+          <p className="mt-0.5 max-w-[44ch] text-[11px] leading-normal text-muted">{medida.dica}</p>
         </div>
 
         <div className="pointer-events-auto flex shrink-0 items-center gap-1">
@@ -362,7 +362,7 @@ export function LinhaMedida({
               className={cn(
                 "no-drag flex h-7 w-7 items-center justify-center border border-rule text-muted transition-colors",
                 "hover:border-rule-strong hover:text-text",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+                "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
                 "disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-rule disabled:hover:text-muted",
               )}
             >
@@ -383,7 +383,7 @@ export function LinhaMedida({
               aria-label={`${medida.rotulo} em ${unidade}`}
               className={cn(
                 "no-drag w-full min-w-0 bg-transparent text-right gauge font-narrow text-[12px] font-semibold text-text",
-                "focus:bg-surface-2 focus:outline-none",
+                "focus:bg-surface-2 focus:outline-hidden",
               )}
             />
             <span className="shrink-0 text-muted">{unidade}</span>
@@ -397,7 +397,7 @@ export function LinhaMedida({
             title={`Padrão: ${medida.padrao}${unidade}`}
             className={cn(
               "no-drag flex h-7 w-7 items-center justify-center text-muted transition-colors hover:text-text",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+              "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
               "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
             )}
           >
@@ -457,7 +457,7 @@ function LinhaEspaco({
               aria-label={`${bloco.rotulo}, folga de ${lado} em pixels`}
               className={cn(
                 "no-drag w-[52px] border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold text-text",
-                "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-none",
+                "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-hidden",
               )}
             />
           </label>
@@ -475,7 +475,7 @@ function LinhaEspaco({
         title={`Origem: ${bloco.topo} / ${bloco.base}px`}
         className={cn(
           "no-drag flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-text",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+          "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
           "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
         )}
       >
@@ -668,7 +668,7 @@ export function PainelMedidas({
               className={cn(
                 "no-drag flex shrink-0 items-center gap-1.5 self-center border border-rule px-2.5 py-1 font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted transition-colors",
                 "hover:border-rule-strong hover:text-text",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+                "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
                 "disabled:cursor-not-allowed disabled:opacity-40",
               )}
             >
@@ -706,7 +706,7 @@ export function PainelMedidas({
                 key={f.chave}
                 className={cn(
                   "no-drag flex cursor-pointer items-center gap-3 border-b border-rule py-2.5 pl-4 pr-3 last:border-b-0",
-                  "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-cyan",
+                  "focus-within:outline-solid focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-cyan",
                   f.chave === fonte ? "bg-cyan/10" : "hover:bg-surface-2/40",
                 )}
               >

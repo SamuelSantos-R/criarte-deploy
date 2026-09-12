@@ -26,7 +26,7 @@ export function SeletorAparelho({
         onChange={(e) => onChange(acharAparelho(e.target.value))}
         className={cn(
           "no-drag h-[30px] w-full appearance-none bg-surface pl-3 pr-8 text-[13px] text-text",
-          "border border-rule focus:border-focus focus:outline-none",
+          "border border-rule focus:border-focus focus:outline-hidden",
         )}
       >
         {GRUPOS.map(([nome, filtro]) => (

@@ -167,7 +167,7 @@ function Paleta({
             daPosicao(e);
           }}
           onPointerMove={(e) => e.buttons === 1 && daPosicao(e)}
-          className="relative h-[132px] w-full cursor-crosshair focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-cyan"
+          className="relative h-[132px] w-full cursor-crosshair focus:outline-solid focus:outline-2 focus:-outline-offset-2 focus:outline-cyan"
           style={{
             background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h} 100% 50%))`,
           }}
@@ -187,7 +187,7 @@ function Paleta({
             value={Math.round(hsv.h)}
             aria-label="Matiz"
             onChange={(e) => aplicar({ ...hsv, h: Number(e.target.value) })}
-            className="no-drag h-3 flex-1 cursor-pointer appearance-none rounded-none bg-transparent focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-cyan [&::-webkit-slider-runnable-track]:h-3 [&::-webkit-slider-runnable-track]:bg-[linear-gradient(to_right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-[7px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[#101010] [&::-webkit-slider-thumb]:bg-white"
+            className="no-drag h-3 flex-1 cursor-pointer appearance-none rounded-none bg-transparent focus:outline-solid focus:outline-2 focus:outline-offset-2 focus:outline-cyan [&::-webkit-slider-runnable-track]:h-3 [&::-webkit-slider-runnable-track]:bg-[linear-gradient(to_right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)] [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-[7px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[#101010] [&::-webkit-slider-thumb]:bg-white"
           />
           {conta_gotas && (
             <button
@@ -200,7 +200,7 @@ function Paleta({
                   .then((r) => aplicar(hexParaHsv(r.sRGBHex)))
                   .catch(() => undefined);
               }}
-              className="no-drag grid h-7 w-7 shrink-0 place-items-center border border-rule text-muted hover:border-cyan hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-cyan"
+              className="no-drag grid h-7 w-7 shrink-0 place-items-center border border-rule text-muted hover:border-cyan hover:text-text focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-cyan"
             >
               <Pipette size={13} strokeWidth={1.7} aria-hidden />
             </button>
@@ -227,7 +227,7 @@ function Paleta({
             }}
             className={cn(
               "no-drag min-w-0 flex-1 bg-transparent px-2.5 py-2 font-mono text-[12px] uppercase",
-              "focus:bg-surface-2 focus:outline-none",
+              "focus:bg-surface-2 focus:outline-hidden",
               hexValido(rascunho) ? "text-text" : "text-pencil",
             )}
           />
@@ -265,7 +265,7 @@ export function SeletorCor({
         style={valido ? { backgroundColor: valor, color: contraste(valor) } : undefined}
         className={cn(
           "no-drag relative w-[46px] shrink-0 self-stretch",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+          "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
           !valido && "bg-surface-2 text-pencil",
         )}
       >

@@ -141,7 +141,7 @@ function Linha({
           )}
         </div>
         {papel.onde && (
-          <p className="mt-0.5 text-[12px] leading-[1.5] text-muted">{papel.onde}</p>
+          <p className="mt-0.5 text-[12px] leading-normal text-muted">{papel.onde}</p>
         )}
       </div>
 
@@ -152,7 +152,7 @@ function Linha({
         aria-label={`Hex de ${papel.rotulo}`}
         className={cn(
           "no-drag w-[92px] shrink-0 self-start bg-transparent py-2.5 pr-3 text-right font-mono text-[12px] uppercase",
-          "focus:bg-surface-2 focus:outline-none",
+          "focus:bg-surface-2 focus:outline-hidden",
           valido ? "text-muted" : "text-pencil",
         )}
       />
@@ -249,7 +249,7 @@ export function PainelTema({
           <span className="font-narrow font-semibold text-label uppercase text-text">paletas prontas</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
-        <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted">
+        <p className="mb-3 max-w-[52ch] text-[12px] leading-normal text-muted">
           Põe a paleta inteira de uma vez. Depois dá para mexer linha a linha — e o que ficar
           diferente já não conta como paleta posta.
         </p>
@@ -265,7 +265,7 @@ export function PainelTema({
             <span className="font-narrow font-semibold text-label uppercase text-text">{grupo.titulo}</span>
             <span className="h-px flex-1 bg-rule" />
           </div>
-          <p className="mb-3 max-w-[52ch] text-[12px] leading-[1.5] text-muted">{grupo.nota}</p>
+          <p className="mb-3 max-w-[52ch] text-[12px] leading-normal text-muted">{grupo.nota}</p>
           <div className="border-t border-rule">
             {grupo.papeis.map((papel) => (
               <Linha

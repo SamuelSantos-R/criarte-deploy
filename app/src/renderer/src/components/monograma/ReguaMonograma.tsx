@@ -45,7 +45,7 @@ export function ReguaMonograma({ rotulo, valor, min, max, passo, unidade = "", o
         aria-label={rotulo}
         className={cn(
           "no-drag absolute inset-0 h-full w-full cursor-ew-resize appearance-none bg-transparent opacity-0",
-          "focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+          "focus-visible:opacity-100 focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
         )}
       />
       <div className="pointer-events-none relative flex items-center gap-2 py-2 pl-3 pr-1">
@@ -73,7 +73,7 @@ export function ReguaMonograma({ rotulo, valor, min, max, passo, unidade = "", o
                 if (e.key === "Escape") setRascunho(null);
               }}
               aria-label={`${rotulo}, valor`}
-              className="no-drag w-full bg-transparent text-right focus:outline-none"
+              className="no-drag w-full bg-transparent text-right focus:outline-hidden"
             />
             {unidade && <span className="text-muted">{unidade}</span>}
           </span>

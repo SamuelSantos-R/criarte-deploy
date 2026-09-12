@@ -73,7 +73,7 @@ export function OpcoesDeploy({
             value={valor.validade}
             disabled={travado}
             onChange={(e) => set({ validade: e.target.value })}
-            className="no-drag h-[30px] w-full appearance-none border border-rule bg-surface pl-2.5 pr-8 text-[12px] text-text focus:border-focus focus:outline-none disabled:opacity-40"
+            className="no-drag h-[30px] w-full appearance-none border border-rule bg-surface pl-2.5 pr-8 text-[12px] text-text focus:border-focus focus:outline-hidden disabled:opacity-40"
           >
             {VALIDADES.map((v) => (
               <option key={v.valor} value={v.valor}>
@@ -134,7 +134,7 @@ export function OpcoesDeploy({
               onClick={() => set({ convidados: null })}
               aria-label="Tirar a lista de convidados"
               title="Sem lista o convite sobe em prévia, sem token por convidado"
-              className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
+              className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
             >
               <X size={13} />
             </button>

@@ -89,7 +89,7 @@ function LinhaAncora({
             title={l === "left" ? "Arte no canto esquerdo" : "Arte no canto direito"}
             className={cn(
               "no-drag flex h-7 w-7 items-center justify-center transition-colors",
-              "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+              "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
               ladoAtual === l
                 ? "bg-cyan/15 text-text"
                 : "text-muted hover:text-text",
@@ -123,7 +123,7 @@ function LinhaAncora({
         aria-label={`Subir ou descer a arte de ${ancora.rotulo}, em pixels`}
         className={cn(
           "no-drag w-[58px] shrink-0 border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold",
-          "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-none",
+          "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-hidden",
           proprio ? "text-text" : "text-muted",
         )}
       />
@@ -135,7 +135,7 @@ function LinhaAncora({
         title="Voltar a herdar o deslocamento geral"
         className={cn(
           "no-drag flex h-7 w-7 shrink-0 items-center justify-center text-muted transition-colors hover:text-text",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
+          "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
           "disabled:cursor-not-allowed disabled:opacity-20 disabled:hover:text-muted",
         )}
       >
@@ -171,7 +171,7 @@ function LinhaCor({
             <span className="shrink-0 font-narrow font-semibold text-gauge uppercase text-pencil">hex inválido</span>
           )}
         </div>
-        <p className="mt-0.5 max-w-[42ch] text-[12px] leading-[1.5] text-muted">
+        <p className="mt-0.5 max-w-[42ch] text-[12px] leading-normal text-muted">
           {pintado
             ? "A arte sai chapada nesta cor. Serve a desenho de traço único."
             : "A arte sai com as cores do ficheiro."}
@@ -185,7 +185,7 @@ function LinhaCor({
           className={cn(
             "no-drag shrink-0 self-start px-3 py-2.5 font-narrow font-semibold text-gauge uppercase tracking-[0.14em]",
             "text-muted hover:text-text",
-            "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
+            "focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
           )}
         >
           limpar
@@ -200,7 +200,7 @@ function LinhaCor({
         aria-label="Hex da cor da arte"
         className={cn(
           "no-drag w-[92px] shrink-0 self-start bg-transparent py-2.5 pr-3 text-right font-mono text-[12px] uppercase",
-          "placeholder:normal-case placeholder:text-muted focus:bg-surface-2 focus:outline-none",
+          "placeholder:normal-case placeholder:text-muted focus:bg-surface-2 focus:outline-hidden",
           valido ? "text-muted" : "text-pencil",
         )}
       />
@@ -246,7 +246,7 @@ export function PainelOrnamentos({
                 aceita={SVG_OU_PNG}
                 aceitaNota="só SVG ou PNG"
               />
-              <p className="mt-1.5 max-w-[46ch] text-[11px] leading-[1.5] text-muted">
+              <p className="mt-1.5 max-w-[46ch] text-[11px] leading-normal text-muted">
                 {slot.dica}
               </p>
             </div>
@@ -296,7 +296,7 @@ export function PainelOrnamentos({
         <label
           className={cn(
             "no-drag mb-4 flex cursor-pointer items-center gap-3 border-y border-rule py-2.5 pl-4 pr-3",
-            "focus-within:outline focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-cyan",
+            "focus-within:outline-solid focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-cyan",
           )}
         >
           <input
@@ -307,7 +307,7 @@ export function PainelOrnamentos({
           />
           <span className="min-w-0 flex-1">
             <span className="text-[12px] text-text">arte no rodapé</span>
-            <span className="mt-0.5 block max-w-[42ch] text-[11px] leading-[1.5] text-muted">
+            <span className="mt-0.5 block max-w-[42ch] text-[11px] leading-normal text-muted">
               É a única que entra por baixo do bloco todo. Desligada, o rodapé fica
               limpo — o slot continua aqui para o próximo convite.
             </span>

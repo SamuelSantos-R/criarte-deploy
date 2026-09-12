@@ -81,7 +81,7 @@ export function SalvarComoNovo({
           <h2 id="dup-titulo" className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
             Salvar como novo
           </h2>
-          <p className="mt-1.5 text-[12px] leading-[1.5] text-muted">
+          <p className="mt-1.5 text-[12px] leading-normal text-muted">
             {daSessao ? (
               <>
                 Traz <span className="font-mono text-text">{origemId}</span> do anfitrião pela rede e

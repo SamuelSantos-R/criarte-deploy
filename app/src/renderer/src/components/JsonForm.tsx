@@ -134,7 +134,7 @@ function Pega({
       className={cn(
         "no-drag flex h-7 w-5 shrink-0 cursor-grab items-center justify-center text-muted",
         "transition-colors hover:text-text active:cursor-grabbing",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus",
+        "focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus",
         pegado === i && "text-cyan",
       )}
     >
@@ -214,7 +214,7 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
           >
             {deObjetos ? (
               <>
-                <span className="absolute -left-[9px] top-4 bg-ground px-1 font-narrow font-semibold text-gauge text-muted">
+                <span className="absolute left-[-9px] top-4 bg-ground px-1 font-narrow font-semibold text-gauge text-muted">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div className="absolute right-9 top-3">

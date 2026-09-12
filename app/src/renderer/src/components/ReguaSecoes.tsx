@@ -61,7 +61,7 @@ export function Regua({
                 className={cn(
                   "no-drag flex w-full items-center gap-2 px-3 py-[7px] text-left text-[12px] transition-colors",
                   "text-muted hover:bg-surface-2/40 hover:text-text",
-                  "focus-visible:outline focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-cyan",
+                  "focus-visible:outline-solid focus-visible:outline-1 focus-visible:-outline-offset-1 focus-visible:outline-cyan",
                 )}
               >
                 <span className="w-[15px] shrink-0 text-center font-narrow font-semibold text-gauge text-muted">+</span>
@@ -98,7 +98,7 @@ export function ChaveSecao({
       title={ligada ? `Tirar ${nome} da página` : `Devolver ${nome} à página`}
       className={cn(
         "no-drag flex h-[28px] shrink-0 items-center gap-2 px-1 transition-colors",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus",
+        "focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus",
         ligada ? "text-text hover:text-cyan" : "text-muted hover:text-text",
       )}
     >
@@ -142,7 +142,7 @@ export function BotaoTrilha({
       className={cn(
         "flex h-[28px] w-[32px] items-center justify-center transition-colors",
         "text-muted hover:bg-surface-2 hover:text-text",
-        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
+        "focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
         "disabled:pointer-events-none disabled:text-muted",
       )}
     >

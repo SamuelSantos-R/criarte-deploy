@@ -59,7 +59,7 @@ export function Console({
         {linhas.map((l) => (
           <div
             key={l.n}
-            className={cn("whitespace-pre-wrap break-words", l.stream === "err" ? "text-pencil" : "text-text")}
+            className={cn("whitespace-pre-wrap wrap-break-word", l.stream === "err" ? "text-pencil" : "text-text")}
           >
             {l.texto || "\u00a0"}
           </div>

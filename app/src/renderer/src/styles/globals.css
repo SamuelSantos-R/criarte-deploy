@@ -1,12 +1,80 @@
-@import "@fontsource/archivo/400.css";
-@import "@fontsource/archivo/500.css";
-@import "@fontsource/archivo/600.css";
-@import "@fontsource/archivo-narrow/400.css";
-@import "@fontsource/archivo-narrow/600.css";
+@import '@fontsource/archivo/400.css' layer(base);
+@import '@fontsource/archivo/500.css' layer(base);
+@import '@fontsource/archivo/600.css' layer(base);
+@import '@fontsource/archivo-narrow/400.css' layer(base);
+@import '@fontsource/archivo-narrow/600.css' layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-muted: var(--muted);
+  --color-text: var(--text);
+  --color-focus: var(--focus);
+  --color-cyan: var(--cyan);
+  --color-magenta: var(--magenta);
+  --color-yellow: var(--yellow);
+  --color-reg: var(--reg);
+  --color-pencil: var(--pencil);
+
+  --font-sans: Archivo, ui-sans-serif, sans-serif;
+  --font-narrow: 'Archivo Narrow', Archivo, ui-sans-serif, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-gauge: 10px;
+  --text-gauge--line-height: 1.1;
+  --text-gauge--letter-spacing: 0.18em;
+  --text-label: 11px;
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.14em;
+  --text-body: 13px;
+  --text-body--line-height: 1.5;
+  --text-read: 15px;
+  --text-read--line-height: 1.5;
+  --text-head: 20px;
+  --text-head--line-height: 1.15;
+  --text-head--letter-spacing: -0.01em;
+  --text-readout: 34px;
+  --text-readout--line-height: 1;
+  --text-readout--letter-spacing: 0.18em;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility drag-region {
+  -webkit-app-region: drag;
+}
+
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}
+
+@utility gauge {
+  /* Mostrador de instrumento: algarismo que se lê de relance e não dança
+     de largura quando o número muda. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
 
 @layer base {
   :root {
@@ -102,22 +170,6 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: var(--muted);
-  }
-}
-
-@layer components {
-  .drag-region {
-    -webkit-app-region: drag;
-  }
-  .no-drag {
-    -webkit-app-region: no-drag;
-  }
-
-  /* Mostrador de instrumento: algarismo que se lê de relance e não dança
-     de largura quando o número muda. */
-  .gauge {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum" 1;
   }
 }
 

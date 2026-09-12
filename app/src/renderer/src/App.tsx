@@ -98,11 +98,11 @@ function MargemDeChapa({ sites }: { sites: number }): ReactElement {
       <span className="font-narrow text-gauge font-semibold uppercase text-muted">Criarte Studio</span>
       <span className="h-3 w-px bg-rule-strong" />
       {prova.site ? (
-        <span className="truncate font-narrow text-[15px] font-semibold uppercase tracking-[0.1em] text-text">
+        <span className="truncate font-narrow text-[15px] font-semibold uppercase tracking-widest text-text">
           {prova.site}
         </span>
       ) : (
-        <span className="font-narrow text-[15px] uppercase tracking-[0.1em] text-muted">
+        <span className="font-narrow text-[15px] uppercase tracking-widest text-muted">
           sem convite na mesa
         </span>
       )}

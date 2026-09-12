@@ -89,7 +89,7 @@ function PertoDaqui({
   // vai aparecer nada por mais que se espere.
   if (lista.length === 0 && !vivo) {
     return (
-      <p className="mb-3 border-l-2 border-pencil bg-pencil/5 py-2 pl-3 text-[12px] leading-[1.5] text-pencil">
+      <p className="mb-3 border-l-2 border-pencil bg-pencil/5 py-2 pl-3 text-[12px] leading-normal text-pencil">
         A rede local está bloqueada para o Studio — nada é ouvido nem anunciado. Abre
         Ajustes do Sistema › Privacidade e Segurança › Rede Local e liga o Criarte
         Studio. Até lá, dá para entrar escrevendo o endereço à mão.
@@ -217,7 +217,7 @@ export function PainelCoop({
               <span className="font-narrow font-semibold text-gauge text-muted">01</span>
               <span className="h-px flex-1 bg-rule" />
             </div>
-            <p className="mb-4 text-[12px] leading-[1.5] text-muted">
+            <p className="mb-4 text-[12px] leading-normal text-muted">
               Serve o convite aberto. Só esta máquina grava em disco.
             </p>
             <Button

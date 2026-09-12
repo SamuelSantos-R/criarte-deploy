@@ -40,12 +40,57 @@ function credenciais(): Credenciais {
   return { url: url.replace(/\/+$/, ""), serviceKey };
 }
 
+/** "naida-fabio" → "Naida Fabio". Sem acentos, mas nunca mente. */
+function tituloDoSlug(slug: string): string {
+  return slug.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+}
+
 function tituloDe(convite: unknown, slug: string): string {
   const noivos = (convite as { noivos?: { noiva?: unknown; noivo?: unknown } })?.noivos;
   const noiva = typeof noivos?.noiva === "string" ? noivos.noiva.trim() : "";
   const noivo = typeof noivos?.noivo === "string" ? noivos.noivo.trim() : "";
   if (noiva && noivo) return `${noiva} & ${noivo}`;
-  return slug.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+  return tituloDoSlug(slug);
+}
+
+/**
+ * O título no banco acompanha os noivos, mas só depois de eles serem escritos.
+ *
+ * No momento de registar, o convite novo é uma cópia: os noivos ainda são os do
+ * molde. Usar `tituloDe` aqui foi o que encheu a `cr_sites` de nomes trocados —
+ * `cremilde-jose` registado como "Isalú & Kaiser" — e nada corrigia depois,
+ * porque editar os noivos nunca voltava a tocar no registo.
+ *
+ * O campo não é lido por código nenhum; o mural anda pelo uuid. Mas é a única
+ * coisa legível na tabela, e foi a olhar para ele que se decidiu o que apagar a
+ * 2026-09-12. Num sítio onde se tomam decisões destrutivas, um rótulo errado é
+ * pior que rótulo nenhum: o vazio faz perguntar, o errado faz decidir.
+ *
+ * Então o registo nasce com o nome que o Heatz escreveu — que é sempre verdade
+ * — e `sincronizarTitulo` troca-o pelos noivos reais assim que existirem.
+ */
+const tituloSincronizado = new Map<string, string>();
+
+export async function sincronizarTitulo(id: string, doc: unknown): Promise<void> {
+  if (!podeRegistrar()) return;
+  const slug = id.split("/")[1] ?? "";
+  if (!NOME.test(slug)) return;
+
+  const titulo = tituloDe(doc, slug);
+  if (tituloSincronizado.get(id) === titulo) return;
+
+  try {
+    const { url, serviceKey } = credenciais();
+    const r = await fetch(`${url}/rest/v1/cr_sites?slug=eq.${encodeURIComponent(slug)}`, {
+      method: "PATCH",
+      headers: { ...auth(serviceKey), "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ titulo }),
+    });
+    if (r.ok) tituloSincronizado.set(id, titulo);
+  } catch {
+    // Sem rede o título fica para a gravação seguinte. Nunca estraga a gravação:
+    // o convite é que importa, isto é rótulo.
+  }
 }
 
 /** Registra o site e devolve o uuid que o banco gerou — é ele o NEXT_PUBLIC_SITE_ID. */
@@ -104,20 +149,39 @@ async function destinoLivre(categoria: string, slug: string): Promise<string> {
 }
 
 /**
- * Ordem proposital: registra no Supabase **antes** de escrever os ficheiros. Se
- * a cópia falhar sobra uma linha órfã no banco, que não faz mal a ninguém; na
+ * Ordem proposital: registra no Supabase **antes** de escrever os ficheiros. Na
  * ordem inversa sobraria uma pasta carregando o uuid do casal anterior, e o
  * mural de recados do convite novo escreveria em cima do antigo.
+ *
+ * O preço é a linha órfã quando a cópia falha. Isso já foi descrito aqui como
+ * não fazendo "mal a ninguém" — fazia: prendia o nome, e o Studio respondia 409
+ * para sempre a quem tentasse reusá-lo. Agora há `libertarSlug` para o soltar.
  */
 export async function duplicarSite(origemId: string, categoria: string, slug: string): Promise<Copia> {
   const origem = await siteDir(origemId);
   const destino = await destinoLivre(categoria, slug);
-  const { dados } = await readConvite(origemId);
-  const siteId = await registrar(slug, tituloDe(dados, slug));
+  // Lido para validar que a origem tem um convite legível antes de registar seja
+  // o que for; o conteúdo já não serve para o título.
+  await readConvite(origemId);
+  // O nome que o Heatz escreveu, não os noivos do molde: a cópia ainda traz os
+  // do convite de origem. `sincronizarTitulo` põe os certos na primeira gravação.
+  const siteId = await registrar(slug, tituloDoSlug(slug));
 
-  await cp(origem, destino, { recursive: true, filter: (src) => copiavel(src, origem) });
-
-  return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+  try {
+    // O `.env.local` da origem viaja na cópia com o uuid do casal anterior lá
+    // dentro, e só o `gravarSiteId` a seguir é que o troca. Entre uma coisa e
+    // outra existe uma pasta que escreve no mural de outro casal.
+    await cp(origem, destino, { recursive: true, filter: (src) => copiavel(src, origem) });
+    return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+  } catch (erro) {
+    // Falhando qualquer um dos dois, desfaz-se tudo: a pasta sai (senão fica a
+    // apontar ao mural do casal de origem) e o nome é solto (senão fica preso e
+    // o Studio recusa-o para sempre). Nenhuma das limpezas pode tapar o erro
+    // original — é esse que diz o que correu mal.
+    await rm(destino, { recursive: true, force: true }).catch(() => {});
+    await libertarSlug(slug).catch(() => {});
+    throw erro;
+  }
 }
 
 /**
@@ -135,13 +199,21 @@ export async function salvarSessaoComoNovo(
   }
   const destino = await destinoLivre(categoria, slug);
   const pacote = await baixarFonte();
-  const siteId = podeRegistrar() ? await registrar(slug, tituloDe(doc, slug)) : null;
+  const siteId = podeRegistrar() ? await registrar(slug, tituloDoSlug(slug)) : null;
 
-  await mkdir(destino, { recursive: true });
-  await desempacotar(pacote, destino);
-  await writeFile(join(destino, "convite.json"), `${JSON.stringify(doc, null, 2)}\n`, "utf8");
-
-  return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+  try {
+    await mkdir(destino, { recursive: true });
+    await desempacotar(pacote, destino);
+    await writeFile(join(destino, "convite.json"), `${JSON.stringify(doc, null, 2)}\n`, "utf8");
+    return { id: `${categoria}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+  } catch (erro) {
+    // Aqui a fonte vem limpa, sem `.env.local` de ninguém, então o risco é só o
+    // nome preso — mas desfaz-se na mesma, para os dois caminhos de criação se
+    // comportarem igual. Sem registo (`siteId` nulo) não há nada a soltar.
+    await rm(destino, { recursive: true, force: true }).catch(() => {});
+    if (siteId) await libertarSlug(slug).catch(() => {});
+    throw erro;
+  }
 }
 
 /**

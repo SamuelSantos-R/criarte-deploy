@@ -13,6 +13,7 @@ import {
   libertarSlug,
   renomearSite,
   salvarSessaoComoNovo,
+  sincronizarTitulo,
 } from "./duplicar";
 import { FILTROS, importAssets, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
@@ -159,9 +160,15 @@ export function registerIpc(): void {
 
   handle("sites:list", () => listSites());
   handle("convite:read", (_e, id: unknown) => readConvite(asString(id, "id")));
-  handle("convite:write", (_e, id: unknown, data: unknown, marca: unknown) =>
-    writeConvite(asString(id, "id"), data, typeof marca === "number" ? marca : undefined),
-  );
+  handle("convite:write", async (_e, id: unknown, data: unknown, marca: unknown) => {
+    const alvo = asString(id, "id");
+    const r = await writeConvite(alvo, data, typeof marca === "number" ? marca : undefined);
+    // O título do banco segue os noivos, mas sem nunca atrasar nem estragar a
+    // gravação: sai sem `await`, e a própria função engole a falha. Gravação em
+    // conflito não conta — o disco não é o que está no ecrã.
+    if (!r.conflito) void sincronizarTitulo(alvo, data);
+    return r;
+  });
   handle("convite:watch", (_e, id: unknown) =>
     vigiarConvite(id === null ? null : asString(id, "id")),
   );

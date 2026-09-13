@@ -6,6 +6,7 @@ import { killAll } from "./cli";
 import { origensDoPreview, pararServidor } from "./preview";
 import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
+import { limparAtualizacao } from "./atualizar";
 
 /**
  * A raiz do bundle. Era `__dirname`, que não existe quando o main sai em ESM —
@@ -108,6 +109,7 @@ app.whenReady().then(() => {
   registerIpc();
   app.on("browser-window-created", (_, w) => optimizer.watchWindowShortcuts(w));
   createWindow();
+  limparAtualizacao();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

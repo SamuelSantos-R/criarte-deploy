@@ -168,16 +168,26 @@ export async function apagarDaBiblioteca(id: unknown): Promise<void> {
   for (const k of chaves) await r2Delete(cfg, k);
 }
 
-/** Traz o SVG pra uma pasta temporária, pro convite importar como qualquer asset. */
-export async function baixarSvg(id: unknown): Promise<string> {
+/** O SVG como está na biblioteca — prancheta 1000×1000 inteira, sobra incluída. */
+export async function lerSvg(id: unknown): Promise<{ nome: string; svg: string }> {
   const cfg = await configR2();
   const alvo = idValido(id);
   const meta = await lerMeta(cfg, alvo);
   const svg = await r2Get(cfg, `${RAIZ}${alvo}/monograma.svg`);
   if (!meta || !svg) throw new Error("esse monograma já não está na biblioteca");
+  return { nome: meta.nome, svg: svg.toString("utf8") };
+}
+
+/**
+ * Grava numa pasta temporária, pro convite importar como qualquer asset. O SVG
+ * volta do renderer já cortado na caixa do desenho, então passa pelo mesmo
+ * filtro de quando sobe pra biblioteca.
+ */
+export async function svgParaTemp(nome: unknown, svg: unknown): Promise<string> {
+  if (!svgLimpo(svg, SVG_MAX)) throw new Error("svg inválido");
   const pasta = join(app.getPath("temp"), "criarte-monogramas");
   await mkdir(pasta, { recursive: true });
-  const destino = join(pasta, `monograma-${slug(meta.nome)}.svg`);
-  await writeFile(destino, svg);
+  const destino = join(pasta, `monograma-${slug(texto(nome, 80))}.svg`);
+  await writeFile(destino, svg, "utf8");
   return destino;
 }

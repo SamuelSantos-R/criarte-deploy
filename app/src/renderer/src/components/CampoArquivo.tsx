@@ -1,6 +1,15 @@
 import { createContext, useContext, useState, type DragEvent, type ReactElement } from "react";
 import { BookOpen, File as FileIcon, FolderOpen, Upload, X } from "lucide-react";
-import { bibliotecaBaixarSvg, caminhoDe, coopAsset, coopPickAsset, importAssets, pickAssets } from "@/lib/api";
+import {
+  bibliotecaLerSvg,
+  bibliotecaSvgParaTemp,
+  caminhoDe,
+  coopAsset,
+  coopPickAsset,
+  importAssets,
+  pickAssets,
+} from "@/lib/api";
+import { recortarAoDesenho } from "@/lib/monograma/rasterizar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
 import { EscolherMonograma } from "@/components/monograma/EscolherMonograma";
@@ -166,9 +175,13 @@ export function CampoArquivo({
           onFechar={() => setEscolhendo(false)}
           onEscolher={(c) => {
             setEscolhendo(false);
-            // Baixa pra temp e entra pelo mesmo caminho de um arquivo arrastado,
-            // então vale igual no anfitrião e no convidado da coop.
-            void aplicar(bibliotecaBaixarSvg(c.id).then((caminho) => mandar([caminho])));
+            // Corta a sobra da prancheta, baixa pra temp e entra pelo mesmo caminho
+            // de um arquivo arrastado — vale igual no anfitrião e no convidado da coop.
+            void aplicar(
+              bibliotecaLerSvg(c.id)
+                .then(async ({ nome, svg }) => bibliotecaSvgParaTemp(nome, await recortarAoDesenho(svg)))
+                .then((caminho) => mandar([caminho])),
+            );
           }}
         />
       )}

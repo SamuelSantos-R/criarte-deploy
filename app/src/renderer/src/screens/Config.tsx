@@ -13,6 +13,7 @@ import {
 import { useJob } from "@/lib/useJob";
 import { Button, Rule } from "@/components/ui/primitives";
 import { Console } from "@/components/Console";
+import { AtualizacaoStudio } from "@/components/AtualizacaoStudio";
 import { Topo } from "@/components/Topo";
 
 const NODE_URL = "https://nodejs.org/en/download";
@@ -91,6 +92,8 @@ export function Config({
       </Topo>
 
       <div className="border-b border-rule px-8 pb-7">
+        <AtualizacaoStudio />
+
         <Rule>Pasta dos sites</Rule>
         <div className="flex items-center gap-4">
           <code className="min-w-0 flex-1 truncate border-b border-rule bg-surface px-3 py-2 font-mono text-[12px] text-text">

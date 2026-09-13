@@ -208,7 +208,8 @@ export const bibliotecaSalvar = (p: PedidoBiblioteca) => call(api.bibliotecaSalv
 export const bibliotecaAbrir = (id: string) =>
   call(api.bibliotecaAbrir(id)) as Promise<{ meta: CartaoMonograma; edicao: unknown; moldura: MolduraLida | null }>;
 export const bibliotecaApagar = (id: string) => call(api.bibliotecaApagar(id));
-export const bibliotecaBaixarSvg = (id: string) => call(api.bibliotecaBaixarSvg(id));
+export const bibliotecaLerSvg = (id: string) => call(api.bibliotecaLerSvg(id));
+export const bibliotecaSvgParaTemp = (nome: string, svg: string) => call(api.bibliotecaSvgParaTemp(nome, svg));
 
 export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };
@@ -250,6 +251,13 @@ export const onCoopTrancas = api.onCoopTrancas;
 export const onCoopCaiu = api.onCoopCaiu;
 
 export const estadoDeps = () => call(api.estadoDeps()) as Promise<EstadoDeps>;
+
+export type EstadoAtualizacao = { atual: string; nova: string | null; notas: string; bytes: number; impedimento: string | null };
+export type ProgressoAtualizacao = { fase: "baixar" | "verificar" | "preparar" | "reiniciar"; feito: number; total: number };
+export const atualizacaoVerificar = () => call(api.atualizacaoVerificar()) as Promise<EstadoAtualizacao>;
+export const atualizacaoInstalar = () => call(api.atualizacaoInstalar());
+export const onAtualizacaoProgresso = (cb: (p: ProgressoAtualizacao) => void) =>
+  api.onAtualizacaoProgresso((p) => cb(p as ProgressoAtualizacao));
 
 /** O que esta máquina consegue fazer com o `~/.criarte-deploy/config.json` que tem. */
 export type EstadoCredenciais = {

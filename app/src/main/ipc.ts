@@ -6,6 +6,7 @@ import { estadoCredenciais, exportarCredenciais, importarCredenciais } from "./c
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
 import { cancelJob, destinoPublicacao, startJob, type Job } from "./cli";
 import { estadoDeps } from "./deps";
+import { instalarAtualizacao, verificarAtualizacao } from "./atualizar";
 import {
   apagarSite,
   duplicarSite,
@@ -29,7 +30,7 @@ import {
   recursosMonograma,
   ultimaPasta,
 } from "./monograma";
-import { abrirDaBiblioteca, apagarDaBiblioteca, baixarSvg, listarBiblioteca, salvarNaBiblioteca } from "./biblioteca";
+import { abrirDaBiblioteca, apagarDaBiblioteca, lerSvg, listarBiblioteca, salvarNaBiblioteca, svgParaTemp } from "./biblioteca";
 import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
 import { atualizarSecao, estadoPlantio, plantarSecao } from "./plantar";
@@ -340,7 +341,8 @@ export function registerIpc(): void {
   handle("biblioteca:salvar", (_e, carga: unknown) => salvarNaBiblioteca(carga));
   handle("biblioteca:abrir", (_e, id: unknown) => abrirDaBiblioteca(id));
   handle("biblioteca:apagar", (_e, id: unknown) => apagarDaBiblioteca(id));
-  handle("biblioteca:baixarSvg", (_e, id: unknown) => baixarSvg(id));
+  handle("biblioteca:lerSvg", (_e, id: unknown) => lerSvg(id));
+  handle("biblioteca:svgParaTemp", (_e, nome: unknown, svg: unknown) => svgParaTemp(nome, svg));
 
   handle("monograma:abrirPasta", async () => {
     const pasta = ultimaPasta();
@@ -381,6 +383,12 @@ export function registerIpc(): void {
   handle("coop:vizinhos", () => ({ lista: vizinhos(), vivo: farolVivo() }));
 
   handle("deps:estado", () => estadoDeps());
+  handle("atualizacao:verificar", () => verificarAtualizacao());
+  handle("atualizacao:instalar", (event) =>
+    instalarAtualizacao((p) => {
+      if (!event.sender.isDestroyed()) event.sender.send("atualizacao:progresso", p);
+    }),
+  );
 
   handle("preview:repintar", (event, doc: unknown) => repintarPreview(event.sender, doc));
   handle("preview:recarregar", (event) => forcarRepinte(event.sender));

@@ -131,9 +131,13 @@ const api = {
   bibliotecaSalvar: (carga: unknown) => invoke<unknown>("biblioteca:salvar", carga),
   bibliotecaAbrir: (id: string) => invoke<unknown>("biblioteca:abrir", id),
   bibliotecaApagar: (id: string) => invoke<void>("biblioteca:apagar", id),
-  bibliotecaBaixarSvg: (id: string) => invoke<string>("biblioteca:baixarSvg", id),
+  bibliotecaLerSvg: (id: string) => invoke<{ nome: string; svg: string }>("biblioteca:lerSvg", id),
+  bibliotecaSvgParaTemp: (nome: string, svg: string) => invoke<string>("biblioteca:svgParaTemp", nome, svg),
 
   estadoDeps: () => invoke<EstadoDeps>("deps:estado"),
+  atualizacaoVerificar: () => invoke<unknown>("atualizacao:verificar"),
+  atualizacaoInstalar: () => invoke<void>("atualizacao:instalar"),
+  onAtualizacaoProgresso: ouvir<unknown>("atualizacao:progresso"),
 
   credEstado: () => invoke<EstadoCredenciais>("cred:estado"),
   credImportar: () => invoke<EstadoCredenciais | null>("cred:importar"),

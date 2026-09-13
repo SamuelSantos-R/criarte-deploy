@@ -52,7 +52,7 @@ async function pedir(
   cfg: ConfigR2,
   metodo: "GET" | "PUT" | "DELETE",
   chave: string,
-  opcoes: { query?: Record<string, string>; corpo?: Buffer; tipo?: string } = {},
+  opcoes: { query?: Record<string, string>; corpo?: Buffer; tipo?: string; tempoMs?: number } = {},
 ): Promise<Response> {
   const url = new URL(cfg.endpoint);
   // Sem chave é operação no bucket (listar): a URL canónica acaba no nome dele.
@@ -96,7 +96,7 @@ async function pedir(
       authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKeyId}/${escopo}, SignedHeaders=${assinados.join(";")}, Signature=${assinatura}`,
     },
     body: metodo === "PUT" ? new Uint8Array(corpo) : undefined,
-    signal: AbortSignal.timeout(TEMPO_MAX_MS),
+    signal: AbortSignal.timeout(opcoes.tempoMs ?? TEMPO_MAX_MS),
   });
 }
 
@@ -106,8 +106,8 @@ async function falhou(r: Response, oQue: string): Promise<never> {
   throw new Error(`R2 recusou ${oQue} (${r.status}${codigo ? ` ${codigo}` : ""})`);
 }
 
-export async function r2Put(cfg: ConfigR2, chave: string, corpo: Buffer, tipo: string): Promise<void> {
-  const r = await pedir(cfg, "PUT", chave, { corpo, tipo });
+export async function r2Put(cfg: ConfigR2, chave: string, corpo: Buffer, tipo: string, tempoMs?: number): Promise<void> {
+  const r = await pedir(cfg, "PUT", chave, { corpo, tipo, tempoMs });
   if (!r.ok) await falhou(r, "a gravação");
 }
 
@@ -116,6 +116,24 @@ export async function r2Get(cfg: ConfigR2, chave: string): Promise<Buffer | null
   if (r.status === 404) return null;
   if (!r.ok) await falhou(r, "a leitura");
   return Buffer.from(await r.arrayBuffer());
+}
+
+/** GET que devolve o corpo em stream, pra ficheiro grande não ter de caber na memória. */
+export async function r2Stream(cfg: ConfigR2, chave: string, tempoMs: number): Promise<Response | null> {
+  const r = await pedir(cfg, "GET", chave, { tempoMs });
+  if (r.status === 404) return null;
+  if (!r.ok) await falhou(r, "a leitura");
+  return r;
+}
+
+/**
+ * Onde moram as atualizações do Studio. O bucket é público pelo r2.dev e o app
+ * leva a Milton One, que é licença da Criarte: o instalador não pode estar num
+ * endereço adivinhável. A pasta sai da chave secreta — quem tem as credenciais
+ * da equipa chega lá, quem só tem o link público não.
+ */
+export function prefixoAtualizacoes(cfg: ConfigR2): string {
+  return `studio-${createHmac("sha256", cfg.secretAccessKey).update("criarte-studio-atualizacoes").digest("hex").slice(0, 32)}/`;
 }
 
 export async function r2Delete(cfg: ConfigR2, chave: string): Promise<void> {

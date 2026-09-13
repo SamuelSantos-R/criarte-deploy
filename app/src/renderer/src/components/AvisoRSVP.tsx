@@ -13,7 +13,7 @@ import type { Caminho } from "@/components/JsonForm";
 const CURTO = /^https:\/\/forms\.gle\/[A-Za-z0-9_-]+\/?$/;
 
 function Linha({ children }: { children: React.ReactNode }): ReactElement {
-  return <p className="border-l-2 border-cyan pl-3 text-[13px] text-text">{children}</p>;
+  return <p className="rounded-lg bg-cyan/10 px-3 py-2 text-[13px] text-text">{children}</p>;
 }
 
 /**

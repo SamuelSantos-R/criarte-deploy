@@ -91,7 +91,7 @@ export function PalcoMonograma({
     <svg
       ref={svg}
       viewBox={`0 0 ${PRANCHETA} ${PRANCHETA}`}
-      className="block aspect-square h-full max-h-full w-auto max-w-full select-none bg-white"
+      className="block aspect-square h-full max-h-full w-auto max-w-full select-none rounded-xl bg-white shadow-flutua"
       role="img"
       aria-label={`Monograma ${comp.serifada.char}${comp.cursiva.char}`}
     >

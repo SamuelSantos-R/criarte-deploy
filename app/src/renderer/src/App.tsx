@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
-import { FileText, Image, Rocket, Signature, SlidersHorizontal, Smartphone, Stamp } from "lucide-react";
+import { FileText, Image, Rocket, Settings, Signature, Smartphone, Stamp } from "lucide-react";
 import { getSettings, listSites, type Site } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProvaProvider, useProva } from "@/lib/prova";
 import { usarServidor } from "@/lib/servidor";
-import { BarraDeCor } from "@/components/BarraDeCor";
+import { BarraTopo } from "@/components/shell/BarraTopo";
+import { ItemTrilho } from "@/components/shell/ItemTrilho";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Convites } from "@/screens/Convites";
 import { Deploy } from "@/screens/Deploy";
 import { Fotos } from "@/screens/Fotos";
@@ -14,107 +16,20 @@ import { Envelope } from "@/screens/Envelope";
 import { Monograma } from "@/screens/Monograma";
 
 type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "monograma" | "config";
-type Item = { id: Tela; label: string; nota: string; Icone: typeof FileText };
-
-// Os semáforos do macOS flutuam por cima da margem de chapa; no Windows não
-// existem e o slug tem de encostar à esquerda. PRODUCT.md proíbe assumir um.
-const MAC = navigator.userAgent.includes("Macintosh");
+type Item = { id: Tela; label: string; Icone: typeof FileText };
 
 const TRABALHO: Item[] = [
-  { id: "convites", label: "Convites", nota: "montar e afinar", Icone: FileText },
-  { id: "preview", label: "Preview", nota: "ver no aparelho", Icone: Smartphone },
-  { id: "deploy", label: "Publicar", nota: "pôr no ar", Icone: Rocket },
-  { id: "fotos", label: "Fotos", nota: "galeria do convite", Icone: Image },
+  { id: "convites", label: "Convites", Icone: FileText },
+  { id: "preview", label: "Preview", Icone: Smartphone },
+  { id: "deploy", label: "Publicar", Icone: Rocket },
+  { id: "fotos", label: "Fotos", Icone: Image },
 ];
 
 // Fora do fluxo do site: envelopador e monograma não precisam de raiz nem de convite.
 const AVULSO: Item[] = [
-  { id: "envelope", label: "Envelopador 3000", nota: "", Icone: Stamp },
-  { id: "monograma", label: "Monogramas", nota: "", Icone: Signature },
-  { id: "config", label: "Config", nota: "", Icone: SlidersHorizontal },
+  { id: "envelope", label: "Envelopes", Icone: Stamp },
+  { id: "monograma", label: "Monogramas", Icone: Signature },
 ];
-
-/**
- * Instrumento rotulado. Aceso, a linha inverte para a mesa de luz — é o único
- * sítio claro da coluna, e custa zero tinta de processo. Quem entra de vez em
- * quando lê o nome; não tem de decifrar um ícone.
- */
-function Instrumento({
-  item,
-  ativo,
-  bloqueado,
-  onClick,
-}: {
-  item: Item;
-  ativo: boolean;
-  bloqueado: boolean;
-  onClick: () => void;
-}): ReactElement {
-  const { label, nota, Icone } = item;
-  return (
-    <button
-      disabled={bloqueado}
-      onClick={onClick}
-      aria-current={ativo ? "page" : undefined}
-      className={cn(
-        "no-drag flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors duration-0",
-        "disabled:pointer-events-none disabled:opacity-30",
-        ativo ? "light bg-ground text-text" : "text-muted hover:bg-surface-2 hover:text-text",
-      )}
-    >
-      <Icone size={15} strokeWidth={1.75} className="shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium leading-tight">{label}</span>
-        {nota && (
-          <span className={cn("block truncate text-[10px] leading-tight", ativo ? "text-muted" : "text-muted")}>
-            {nota}
-          </span>
-        )}
-      </span>
-    </button>
-  );
-}
-
-function Grupo({ children }: { children: ReactNode }): ReactElement {
-  return <div className="flex flex-col">{children}</div>;
-}
-
-function Etiqueta({ children }: { children: ReactNode }): ReactElement {
-  return (
-    <span className="px-3 pb-1.5 pt-4 font-narrow text-gauge font-semibold uppercase text-muted">
-      {children}
-    </span>
-  );
-}
-
-/** Margem de chapa: a faixa gravada no topo que diz que folha está sob o vidro. */
-function MargemDeChapa({ sites }: { sites: number }): ReactElement {
-  const { prova } = useProva();
-  return (
-    <header
-      className="drag-region flex h-[44px] shrink-0 items-center gap-3 border-b border-rule bg-surface-2 pr-4"
-      style={{ paddingLeft: MAC ? 84 : 16 }}
-    >
-      <span className="font-narrow text-gauge font-semibold uppercase text-muted">Criarte Studio</span>
-      <span className="h-3 w-px bg-rule-strong" />
-      {prova.site ? (
-        <span className="truncate font-narrow text-[15px] font-semibold uppercase tracking-widest text-text">
-          {prova.site}
-        </span>
-      ) : (
-        <span className="font-narrow text-[15px] uppercase tracking-widest text-muted">
-          sem convite na mesa
-        </span>
-      )}
-      <span
-        className="gauge ml-auto font-narrow text-gauge font-semibold uppercase text-muted"
-        title={`${sites} ${sites === 1 ? "convite" : "convites"} na raiz`}
-      >
-        {String(sites).padStart(3, "0")} convites
-      </span>
-    </header>
-  );
-}
 
 /**
  * Uma tela de trabalho nunca é desmontada depois da primeira visita: o preview
@@ -188,99 +103,85 @@ function Estudio(): ReactElement {
   const semRaiz = pronto && !sitesRoot;
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-ground">
-      <MargemDeChapa sites={sites.length} />
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-ground text-text">
+      <BarraTopo sites={sites.length} />
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        <nav
-          aria-label="Instrumentos"
-          className="flex w-[208px] shrink-0 flex-col border-r border-rule bg-surface"
-        >
-          <Etiqueta>Bancada</Etiqueta>
-          <Grupo>
-            {TRABALHO.map((item) => (
-              <Instrumento
-                key={item.id}
-                item={item}
-                ativo={tela === item.id}
-                bloqueado={semRaiz}
-                onClick={() => irPara(item.id)}
-              />
-            ))}
-          </Grupo>
+        <nav aria-label="Ferramentas" className="flex w-[84px] shrink-0 flex-col items-center px-1.5 pb-3 pt-1">
+          {TRABALHO.map((item) => (
+            <ItemTrilho
+              key={item.id}
+              rotulo={item.label}
+              Icone={item.Icone}
+              ativo={tela === item.id}
+              bloqueado={semRaiz}
+              onClick={() => irPara(item.id)}
+            />
+          ))}
+
+          <span className="my-2 h-px w-8 bg-rule" />
+
+          {AVULSO.map((item) => (
+            <ItemTrilho
+              key={item.id}
+              rotulo={item.label}
+              Icone={item.Icone}
+              ativo={tela === item.id}
+              bloqueado={false}
+              onClick={() => irPara(item.id)}
+            />
+          ))}
 
           <span className="flex-1" />
 
           {erro && (
-            <p
-              title={erro}
-              className="mx-3 mb-2 border-l-2 border-pencil bg-surface-2 px-2 py-1.5 text-[11px] leading-snug text-text"
-            >
-              <span className="mb-0.5 block font-narrow text-gauge font-semibold uppercase text-muted">
-                Não deu para ler a raiz
-              </span>
-              <span className="line-clamp-2">{erro}</span>
-            </p>
+            <span
+              title={`Não deu para ler a pasta de sites: ${erro}`}
+              className="mb-2 h-2 w-2 rounded-full bg-pencil"
+              role="status"
+              aria-label="Não deu para ler a pasta de sites"
+            />
           )}
-
-          <Etiqueta>À parte</Etiqueta>
-          <Grupo>
-            {AVULSO.map((item) => (
-              <Instrumento
-                key={item.id}
-                item={item}
-                ativo={tela === item.id}
-                bloqueado={false}
-                onClick={() => irPara(item.id)}
-              />
-            ))}
-          </Grupo>
-          <span className="h-3" />
+          <ItemTrilho rotulo="Config" Icone={Settings} ativo={tela === "config"} bloqueado={false} onClick={() => irPara("config")} />
         </nav>
 
-        {/* A mesa de luz: a única região clara, e onde tudo se lê e se edita. */}
-        <main className="light flex min-h-0 min-w-0 flex-1 flex-col bg-ground text-text">
-          {!pronto && <p className="px-6 pt-16 font-mono text-[12px] text-muted">Abrindo…</p>}
-          {pronto && ((semRaiz && tela !== "envelope" && tela !== "monograma") || tela === "config") && (
-            <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
-          )}
-          {pronto && !semRaiz && visitadas.includes("convites") && (
-            <Aba ativa={tela === "convites"}>
-              <Convites
-                sites={sites}
-                recarregar={recarregar}
-                id={site}
-                setId={setSite}
-                ativa={tela === "convites"}
-              />
-            </Aba>
-          )}
-          {pronto && !semRaiz && visitadas.includes("preview") && (
-            <Aba ativa={tela === "preview"}>
-              <Preview sites={sites} id={site} setId={setSite} />
-            </Aba>
-          )}
-          {pronto && !semRaiz && visitadas.includes("deploy") && (
-            <Aba ativa={tela === "deploy"}>
-              <Deploy sites={sites} id={site} setId={setSite} />
-            </Aba>
-          )}
-          {pronto && !semRaiz && visitadas.includes("fotos") && (
-            <Aba ativa={tela === "fotos"}>
-              <Fotos sites={sites} id={site} setId={setSite} />
-            </Aba>
-          )}
-          {pronto && tela === "envelope" && <Envelope />}
-          {/* Montada escondida como as abas do fluxo: trocar de tela não pode apagar o monograma em curso. */}
-          {pronto && visitadas.includes("monograma") && (
-            <Aba ativa={tela === "monograma"}>
-              <Monograma ativa={tela === "monograma"} />
-            </Aba>
-          )}
+        {/* A área de trabalho: um painel só, macio, apoiado no chão do tema — a prancheta do Canva. */}
+        <main className="flex min-h-0 min-w-0 flex-1 pb-3 pr-3">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-painel">
+            {!pronto && <p className="px-6 pt-16 text-[13px] text-muted">Abrindo…</p>}
+            {pronto && ((semRaiz && tela !== "envelope" && tela !== "monograma") || tela === "config") && (
+              <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
+            )}
+            {pronto && !semRaiz && visitadas.includes("convites") && (
+              <Aba ativa={tela === "convites"}>
+                <Convites sites={sites} recarregar={recarregar} id={site} setId={setSite} ativa={tela === "convites"} />
+              </Aba>
+            )}
+            {pronto && !semRaiz && visitadas.includes("preview") && (
+              <Aba ativa={tela === "preview"}>
+                <Preview sites={sites} id={site} setId={setSite} />
+              </Aba>
+            )}
+            {pronto && !semRaiz && visitadas.includes("deploy") && (
+              <Aba ativa={tela === "deploy"}>
+                <Deploy sites={sites} id={site} setId={setSite} />
+              </Aba>
+            )}
+            {pronto && !semRaiz && visitadas.includes("fotos") && (
+              <Aba ativa={tela === "fotos"}>
+                <Fotos sites={sites} id={site} setId={setSite} />
+              </Aba>
+            )}
+            {pronto && tela === "envelope" && <Envelope />}
+            {/* Montada escondida como as abas do fluxo: trocar de tela não pode apagar o monograma em curso. */}
+            {pronto && visitadas.includes("monograma") && (
+              <Aba ativa={tela === "monograma"}>
+                <Monograma ativa={tela === "monograma"} />
+              </Aba>
+            )}
+          </div>
         </main>
       </div>
-
-      <BarraDeCor />
     </div>
   );
 }
@@ -288,7 +189,9 @@ function Estudio(): ReactElement {
 export default function App(): ReactElement {
   return (
     <ProvaProvider>
-      <Estudio />
+      <TooltipProvider delayDuration={300}>
+        <Estudio />
+      </TooltipProvider>
     </ProvaProvider>
   );
 }

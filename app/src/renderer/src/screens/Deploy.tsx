@@ -95,7 +95,7 @@ export function Deploy({
             onChange={(e) => setEnsaio(e.target.checked)}
             className="h-4 w-4 accent-cyan"
           />
-          <span className="font-narrow font-semibold text-label uppercase text-muted">Ensaio</span>
+          <span className="font-narrow font-semibold text-label text-muted">Ensaio</span>
         </label>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Button

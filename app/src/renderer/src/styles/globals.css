@@ -1,10 +1,9 @@
-@import '@fontsource/archivo/400.css' layer(base);
-@import '@fontsource/archivo/500.css' layer(base);
-@import '@fontsource/archivo/600.css' layer(base);
-@import '@fontsource/archivo-narrow/400.css' layer(base);
-@import '@fontsource/archivo-narrow/600.css' layer(base);
+@import '@fontsource-variable/plus-jakarta-sans/wght.css' layer(base);
 
 @import 'tailwindcss';
+
+/* Os temas mudam por atributo na raiz; sem isto o `dark:` do Tailwind não sabe qual é qual. */
+@custom-variant dark (&:where([data-tema="noturno"], [data-tema="noturno"] *));
 
 @theme {
   --color-ground: var(--ground);
@@ -20,45 +19,60 @@
   --color-yellow: var(--yellow);
   --color-reg: var(--reg);
   --color-pencil: var(--pencil);
+  --color-on-cyan: var(--on-cyan);
+  --color-on-yellow: var(--on-yellow);
+  --color-on-magenta: var(--on-magenta);
 
-  --font-sans: Archivo, ui-sans-serif, sans-serif;
-  --font-narrow: 'Archivo Narrow', Archivo, ui-sans-serif, sans-serif;
+  /* shadcn lê estes nomes; apontam pros mesmos papéis dos temas. */
+  --color-background: var(--ground);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--cyan);
+  --color-primary-foreground: var(--on-cyan);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--pencil);
+  --color-border: var(--rule);
+  --color-input: var(--rule);
+  --color-ring: var(--focus);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+
+  --shadow-painel: 0 1px 2px rgb(17 17 19 / 0.05), 0 12px 32px -16px rgb(17 17 19 / 0.18);
+  --shadow-flutua: 0 2px 6px rgb(17 17 19 / 0.08), 0 24px 56px -20px rgb(17 17 19 / 0.32);
+
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
+  /* O Archivo Narrow em versalete era a voz da "cabine". O Canva fala baixo e em
+     frase normal: o nome ficou pra não mexer em cem classes, mas é a mesma sans. */
+  --font-narrow: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --text-gauge: 10px;
-  --text-gauge--line-height: 1.1;
-  --text-gauge--letter-spacing: 0.18em;
-  --text-label: 11px;
-  --text-label--line-height: 1.2;
-  --text-label--letter-spacing: 0.14em;
+  --text-gauge: 11px;
+  --text-gauge--line-height: 1.2;
+  --text-gauge--letter-spacing: 0;
+  --text-label: 12px;
+  --text-label--line-height: 1.3;
+  --text-label--letter-spacing: 0;
   --text-body: 13px;
   --text-body--line-height: 1.5;
   --text-read: 15px;
   --text-read--line-height: 1.5;
   --text-head: 20px;
-  --text-head--line-height: 1.15;
-  --text-head--letter-spacing: -0.01em;
-  --text-readout: 34px;
+  --text-head--line-height: 1.2;
+  --text-head--letter-spacing: -0.015em;
+  --text-readout: 32px;
   --text-readout--line-height: 1;
-  --text-readout--letter-spacing: 0.18em;
-}
-
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
+  --text-readout--letter-spacing: -0.02em;
 }
 
 @utility drag-region {
@@ -70,60 +84,98 @@
 }
 
 @utility gauge {
-  /* Mostrador de instrumento: algarismo que se lê de relance e não dança
-     de largura quando o número muda. */
+  /* Algarismo que não dança de largura quando o número muda. */
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
 }
 
 @layer base {
-  :root {
-    /* ------------------------------------------------------------------
-       TINTA DE PROCESSO — fixa em toda a tela. Cada tinta tem um cargo e
-       não o empresta a ninguém. Contra a bancada só o amarelo passa como
-       texto (5,5:1); as outras entram como bloco cheio, com o tipo por
-       cima em registo (ciano 5,1:1 · amarelo 14,4:1) ou branco (magenta
-       4,5:1). Sobre a mesa de luz o lápis lê a 4,9:1.
-       ------------------------------------------------------------------ */
-    --cyan: #0093d3; /* servidor a correr, ação primária */
-    --magenta: #e5007e; /* coop — a outra mão */
-    --yellow: #ffed00; /* por gravar */
-    --reg: #1a1a1a; /* registo: estrutura, carimbo de publicado */
-    --pencil: #d0202a; /* lápis vermelho: erro */
+  /* ------------------------------------------------------------------
+     TEMAS. Os papéis são os mesmos em todos — chão (a área de trabalho,
+     como o cinza atrás da prancheta do Canva), superfície (os painéis),
+     régua, texto, e cinco tintas com cargo fixo: ciano = ação principal e
+     servidor, magenta = coop, amarelo = por gravar, lápis = erro.
+     Contraste medido: texto secundário ≥ 5,2:1 no chão e nos painéis de
+     todos os temas; texto por cima de cada tinta ≥ 5,4:1.
+     ------------------------------------------------------------------ */
 
-    /* ------------------------------------------------------------------
-       PAPÉIS. As mesmas seis funções — chão, superfície, régua, texto —
-       mudam de valor conforme a região. A cabine é o predefinido; a mesa
-       de luz redefine-as em .light. Assim uma peça sabe onde está sem
-       saber que cor tem.
-       ------------------------------------------------------------------ */
-    --ground: #5a5d5f;
-    --surface: #4e5153;
-    --surface-2: #3e4145;
-    --rule: #6e7173;
-    --rule-strong: #87898b;
-    --muted: #d4d9de; /* 4,67:1 */
-    --text: #f1f3f5; /* 5,90:1 */
-
-    /* Cabine: o anel de foco e o marcador de ativo são amarelos, porque o
-       ciano afoga-se no cinzento. */
-    --focus: var(--yellow);
+  /* Preto e branco — o predefinido. */
+  :root,
+  [data-tema='pb'] {
+    --ground: #f1f1f2;
+    --surface: #ffffff;
+    --surface-2: #f4f4f5;
+    --rule: #e6e6e9;
+    --rule-strong: #cfcfd5;
+    --muted: #63636b;
+    --text: #111113;
+    --focus: #111113;
+    --cyan: #111113;
+    --on-cyan: #ffffff;
+    --magenta: #4a4a52;
+    --on-magenta: #ffffff;
+    --yellow: #111113;
+    --on-yellow: #ffffff;
+    --reg: #111113;
+    --pencil: #c22b2b;
+    --selecao: #111113;
+    --on-selecao: #ffffff;
+    color-scheme: light;
   }
 
-  /* Mesa de luz D50 — a única região clara. Toda a leitura e toda a
-     edição acontecem aqui em cima; a cabine só segura instrumentos. */
-  .light {
-    --ground: #f4f5f6;
-    --surface: #eaecee;
-    --surface-2: #dfe2e5;
-    --rule: #d6d9dc;
-    --rule-strong: #b9bdc1;
-    --muted: #5a5e63; /* 5,98:1 */
-    --text: #1a1a1a; /* 15,9:1 */
-    --focus: var(--cyan);
+  /* Rosa claro e branco. */
+  [data-tema='rosa'] {
+    --ground: #faeef2;
+    --surface: #ffffff;
+    --surface-2: #fdf3f6;
+    --rule: #f2dce3;
+    --rule-strong: #e6c2ce;
+    --muted: #7d5864;
+    --text: #2b1a20;
+    --focus: #b0426a;
+    --cyan: #b0426a;
+    --on-cyan: #ffffff;
+    --magenta: #7c4ea8;
+    --on-magenta: #ffffff;
+    --yellow: #f2b8c9;
+    --on-yellow: #2b1a20;
+    --reg: #2b1a20;
+    --pencil: #b8322a;
+    --selecao: #f2b8c9;
+    --on-selecao: #2b1a20;
+    color-scheme: light;
   }
 
-  * {
+  /* Noturno — a paleta Dracula. */
+  [data-tema='noturno'] {
+    --ground: #1e1f29;
+    --surface: #282a36;
+    --surface-2: #313341;
+    --rule: #3b3e50;
+    --rule-strong: #565a75;
+    --muted: #a9b1cf;
+    --text: #f8f8f2;
+    --focus: #bd93f9;
+    --cyan: #bd93f9;
+    --on-cyan: #1e1f29;
+    --magenta: #ff79c6;
+    --on-magenta: #1e1f29;
+    --yellow: #f1fa8c;
+    --on-yellow: #1e1f29;
+    --reg: #f8f8f2;
+    --pencil: #ff6e6e;
+    --selecao: #44475a;
+    --on-selecao: #f8f8f2;
+    --shadow-painel: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    --shadow-flutua: 0 2px 6px rgb(0 0 0 / 0.35), 0 24px 56px -20px rgb(0 0 0 / 0.7);
+    color-scheme: dark;
+  }
+
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
     border-color: var(--rule);
   }
 
@@ -131,30 +183,27 @@
     margin: 0;
     background: var(--ground);
     color: var(--text);
-    font-family: Archivo, ui-sans-serif, sans-serif;
+    font-family: var(--font-sans);
     font-size: 13px;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
     user-select: none;
   }
 
-  /* Foco sempre visível — nunca outline:none sem substituto. Aresta viva. */
   :focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
-    border-radius: 0;
   }
 
   input,
   textarea {
     user-select: text;
-    caret-color: var(--magenta);
+    caret-color: var(--cyan);
   }
 
-  /* Marca-texto sobre a prova. */
   ::selection {
-    background: var(--yellow);
-    color: var(--reg);
+    background: var(--selecao);
+    color: var(--on-selecao);
   }
 
   ::-webkit-scrollbar {
@@ -166,10 +215,16 @@
   }
   ::-webkit-scrollbar-thumb {
     background: var(--rule-strong);
-    border-radius: 0;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--muted);
+    background-color: var(--muted);
+  }
+
+  input[type='checkbox'] {
+    accent-color: var(--cyan);
   }
 }
 

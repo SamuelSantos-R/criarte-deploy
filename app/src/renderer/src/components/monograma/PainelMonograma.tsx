@@ -3,6 +3,7 @@ import { AlignCenter, ArrowLeftRight, Pipette } from "lucide-react";
 import type { FonteMonograma } from "@/lib/api";
 import type { Composicao, Letra, Moldura, Papel } from "@/lib/monograma/composicao";
 import { Input } from "@/components/ui/primitives";
+import { Segmentado } from "@/components/ui/Segmentado";
 import { SeletorCor } from "@/components/SeletorCor";
 import { FonteCursiva } from "./FonteCursiva";
 import { MolduraMonograma } from "./MolduraMonograma";
@@ -37,7 +38,7 @@ const EyeDropper = (window as unknown as { EyeDropper?: new () => ContaGotas }).
 
 function Titulo({ children }: { children: ReactNode }): ReactElement {
   return (
-    <span className="mb-2 mt-7 block font-narrow text-label font-semibold uppercase text-muted first:mt-0">
+    <span className="mb-2.5 mt-8 block text-[13px] font-bold text-text first:mt-0">
       {children}
     </span>
   );
@@ -88,7 +89,7 @@ export function PainelMonograma(p: Props): ReactElement {
           onClick={trocarLetras}
           title="Trocar as letras de lugar"
           aria-label="Trocar as letras de lugar"
-          className="no-drag flex h-[32px] w-[32px] shrink-0 items-center justify-center border border-rule text-muted hover:text-text"
+          className="no-drag flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rule text-muted transition-colors hover:bg-surface-2 hover:text-text"
         >
           <ArrowLeftRight size={14} />
         </button>
@@ -106,22 +107,16 @@ export function PainelMonograma(p: Props): ReactElement {
       <p className="mt-1 text-[11px] text-muted">A serifada é sempre Cormorant Garamond.</p>
 
       <Titulo>Letra selecionada</Titulo>
-      <div className="mb-2 grid grid-cols-2 border border-rule">
-        {(["serifada", "cursiva"] as const).map((papel) => (
-          <button
-            key={papel}
-            type="button"
-            aria-pressed={selecionada === papel}
-            onClick={() => p.setSelecionada(papel)}
-            className={cn(
-              "no-drag py-1.5 text-[12px]",
-              selecionada === papel ? "bg-surface-2 text-text" : "text-muted hover:text-text",
-            )}
-          >
-            {papel === "serifada" ? "Serifada" : "Cursiva"} · {comp[papel].char}
-          </button>
-        ))}
-      </div>
+      <Segmentado
+        rotulo="Letra selecionada"
+        className="mb-2 flex w-full"
+        valor={selecionada}
+        onChange={p.setSelecionada}
+        opcoes={[
+          { valor: "serifada", rotulo: `Serifada · ${comp.serifada.char}` },
+          { valor: "cursiva", rotulo: `Cursiva · ${comp.cursiva.char}` },
+        ]}
+      />
       <ReguaMonograma rotulo="Altura" valor={letra.altura} min={150} max={1100} passo={5} unidade="px" onChange={(altura) => mexerLetra({ altura })} />
       <ReguaMonograma rotulo="Largura" valor={letra.largura} min={0.5} max={1.6} passo={0.01} unidade="×" onChange={(largura) => mexerLetra({ largura })} />
       <ReguaMonograma rotulo="Inclinação" valor={letra.rot} min={-45} max={45} passo={0.5} unidade="°" onChange={(rot) => mexerLetra({ rot })} />
@@ -149,7 +144,7 @@ export function PainelMonograma(p: Props): ReactElement {
       <button
         type="button"
         onClick={p.onCentralizar}
-        className="no-drag mt-2 flex w-full items-center justify-center gap-2 border border-rule py-1.5 text-[12px] text-muted hover:border-rule-strong hover:text-text"
+        className="no-drag mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-rule text-[12px] font-semibold text-text transition-colors hover:border-rule-strong hover:bg-surface-2"
       >
         <AlignCenter size={13} /> Centralizar na prancheta
       </button>
@@ -169,7 +164,7 @@ export function PainelMonograma(p: Props): ReactElement {
             }}
             title="Pegar uma cor da tela (da moldura, por exemplo)"
             aria-label="Conta-gotas"
-            className="no-drag ml-auto flex h-7 w-7 items-center justify-center border border-rule text-muted hover:border-rule-strong hover:text-text"
+            className="no-drag ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-rule text-muted transition-colors hover:border-rule-strong hover:text-text"
           >
             <Pipette size={13} />
           </button>
@@ -186,7 +181,7 @@ export function PainelMonograma(p: Props): ReactElement {
                 onClick={() => alterar({ cor: c }, false)}
                 title={c}
                 aria-label={`Usar ${c} nas letras`}
-                className={cn("no-drag h-6 w-6 border", comp.cor.toUpperCase() === c ? "border-text" : "border-rule")}
+                className={cn("no-drag h-7 w-7 rounded-full border-2 transition-transform hover:scale-110", comp.cor.toUpperCase() === c ? "border-text" : "border-surface ring-1 ring-rule")}
                 style={{ backgroundColor: c }}
               />
             ))}

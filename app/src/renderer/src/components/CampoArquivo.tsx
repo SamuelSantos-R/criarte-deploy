@@ -100,7 +100,7 @@ export function CampoArquivo({
 
   return (
     <div className="block">
-      <span className="mb-1.5 block font-narrow font-semibold text-label uppercase text-muted">{label}</span>
+      <span className="mb-1.5 block font-narrow font-semibold text-label text-muted">{label}</span>
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -109,7 +109,7 @@ export function CampoArquivo({
         onDragLeave={() => setSobre(false)}
         onDrop={soltar}
         className={cn(
-          "no-drag flex items-center gap-2 border border-dashed px-2.5 py-2 transition-colors",
+          "no-drag flex items-center gap-2 border border-dashed px-2.5 py-2 transition-colors rounded-xl",
           sobre ? "border-focus bg-focus/10" : "border-rule bg-surface",
           ocupado && "opacity-50",
         )}

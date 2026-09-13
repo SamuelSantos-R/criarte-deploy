@@ -72,7 +72,8 @@ export function Palco({
     <div ref={caixa} className={className}>
       {url ? (
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-          <div className="relative shrink-0" style={{ width: largura * zoom, height: altura * zoom }}>
+          <div className="relative shrink-0 rounded-xl shadow-flutua" style={{ width: largura * zoom, height: altura * zoom }}>
+            <div className="absolute inset-0 overflow-hidden rounded-xl">
             <iframe
               // A `key` sem o zoom e sem a recarga: trocar de aparelho só
               // re-escala, e recarregar acontece por dentro do frame (o main
@@ -85,12 +86,10 @@ export function Palco({
               className="absolute left-0 top-0 block border-0 bg-white"
               style={{ width: largura, height: altura, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
             />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 outline-solid outline-1 outline-rule-strong shadow-[14px_14px_0_-1px_rgba(0,0,0,0.5)]"
-            />
+            </div>
+            <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl outline-solid outline-1 outline-rule" />
             {legenda && (
-              <span className="pointer-events-none absolute left-0 top-full mt-3 font-narrow font-semibold text-gauge uppercase tracking-[0.16em] text-muted">
+              <span className="pointer-events-none absolute left-0 top-full mt-3 font-narrow font-semibold text-gauge text-muted">
                 {aparelho.nome} · {largura}×{altura} · {Math.round(zoom * 100)}%
               </span>
             )}

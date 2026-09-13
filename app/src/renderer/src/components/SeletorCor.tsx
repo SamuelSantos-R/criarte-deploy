@@ -153,7 +153,7 @@ function Paleta({
         aria-label="Escolher cor"
         style={{ top: pos.top, left: pos.left }}
         onKeyDown={(e) => e.key === "Escape" && onFechar()}
-        className="fixed z-50 w-[236px] border border-rule-strong bg-surface shadow-[0_18px_50px_-12px_rgba(0,0,0,0.65)]"
+        className="fixed z-50 w-[236px] overflow-hidden rounded-xl border border-rule bg-surface shadow-flutua"
       >
         <div
           ref={areaRef}
@@ -200,7 +200,7 @@ function Paleta({
                   .then((r) => aplicar(hexParaHsv(r.sRGBHex)))
                   .catch(() => undefined);
               }}
-              className="no-drag grid h-7 w-7 shrink-0 place-items-center border border-rule text-muted hover:border-cyan hover:text-text focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-cyan"
+              className="no-drag grid h-7 w-7 shrink-0 place-items-center border border-rule text-muted hover:border-cyan hover:text-text focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-cyan rounded-lg"
             >
               <Pipette size={13} strokeWidth={1.7} aria-hidden />
             </button>

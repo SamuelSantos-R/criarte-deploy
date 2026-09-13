@@ -72,10 +72,10 @@ export function Tokenizar({
         role="dialog"
         aria-modal="true"
         aria-labelledby="token-titulo"
-        className="w-[520px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[520px] bg-surface rounded-2xl border border-rule shadow-flutua"
       >
         <div className="border-b border-rule px-7 py-4">
-          <h2 id="token-titulo" className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
+          <h2 id="token-titulo" className="font-narrow font-semibold text-label text-text">
             Tokenizar convite
           </h2>
         </div>
@@ -93,7 +93,7 @@ export function Tokenizar({
 
           {estado && !estado.tokenizado && (
             <>
-              <span className="font-narrow font-semibold text-label uppercase text-muted">Vai acrescentar</span>
+              <span className="font-narrow font-semibold text-label text-muted">Vai acrescentar</span>
               <ul className="mt-3 space-y-1.5">
                 {estado.faltam.map((f) => (
                   <li key={f} className="border-l-[3px] border-cyan bg-surface-2 px-4 py-2 font-mono text-[12px] text-text">

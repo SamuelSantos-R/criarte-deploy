@@ -83,12 +83,12 @@ export function ApagarSite({
           e.preventDefault();
           void confirmar();
         }}
-        className="w-[480px] border-l-2 border-pencil bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[480px] bg-surface rounded-2xl border border-rule shadow-flutua"
       >
         <div className="border-b border-rule px-7 py-4">
           <h2
             id="apagar-titulo"
-            className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text"
+            className="font-narrow font-semibold text-label text-text"
           >
             Apagar convite
           </h2>

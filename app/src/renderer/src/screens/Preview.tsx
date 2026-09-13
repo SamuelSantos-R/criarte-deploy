@@ -67,7 +67,7 @@ export function Preview({
           className="w-[200px]"
         />
         <SeletorAparelho valor={aparelho} onChange={setAparelho} className="w-[210px]" />
-        <span className="font-narrow font-semibold text-gauge uppercase tracking-[0.16em] text-muted">
+        <span className="font-narrow font-semibold text-gauge text-muted">
           {largura}×{altura}
         </span>
 
@@ -126,7 +126,7 @@ export function Preview({
               </>
             )}
             {erro && (
-              <pre className="mt-3 max-w-[560px] whitespace-pre-wrap border-l-2 border-pencil pl-3 text-left font-mono text-[11px] text-pencil">
+              <pre className="mt-3 max-w-[560px] whitespace-pre-wrap text-left font-mono text-[11px] text-pencil">
                 {erro}
               </pre>
             )}

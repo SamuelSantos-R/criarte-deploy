@@ -36,6 +36,7 @@ import { curvasParaD } from "@/lib/monograma/curvas";
 import { medirImagem, paletaDe, paraPng } from "@/lib/monograma/rasterizar";
 import { Button } from "@/components/ui/primitives";
 import { Topo } from "@/components/Topo";
+import { Segmentado } from "@/components/ui/Segmentado";
 import { PalcoMonograma } from "@/components/monograma/PalcoMonograma";
 import { PainelMonograma } from "@/components/monograma/PainelMonograma";
 import { BibliotecaMonogramas } from "@/components/monograma/BibliotecaMonogramas";
@@ -365,21 +366,15 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       <Topo>
-        <div className="flex border border-rule">
-          {(["biblioteca", "editor"] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={vista === v}
-              disabled={v === "editor" && !comp}
-              onClick={() => setVista(v)}
-              className={`no-drag flex h-[28px] items-center gap-1.5 px-3 text-[12px] disabled:opacity-40 ${vista === v ? "bg-surface-2 text-text" : "text-muted hover:text-text"}`}
-            >
-              {v === "biblioteca" ? <BookOpen size={13} /> : null}
-              {v === "biblioteca" ? "Biblioteca" : "Editor"}
-            </button>
-          ))}
-        </div>
+        <Segmentado
+          rotulo="Vista"
+          valor={vista}
+          onChange={setVista}
+          opcoes={[
+            { valor: "biblioteca", rotulo: <><BookOpen size={13} /> Biblioteca</> },
+            { valor: "editor", rotulo: "Editor", disabled: !comp },
+          ]}
+        />
         <Button variant="ghost" onClick={novo} disabled={!recursos}>
           <Plus size={13} /> Novo
         </Button>
@@ -399,7 +394,7 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {desenho && (
-                <span className="mr-1 font-narrow text-gauge font-semibold uppercase text-muted">
+                <span className="mr-1 font-narrow text-gauge font-semibold text-muted">
                   {desenho.cruzamentos.length} {desenho.cruzamentos.length === 1 ? "cruzamento" : "cruzamentos"}
                 </span>
               )}
@@ -421,7 +416,7 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
 
       {vista === "biblioteca" ? (
         <div className="flex min-h-0 flex-1 flex-col px-6 pt-5">
-          {erro && <p className="mb-3 border-l-2 border-pencil pl-2 font-mono text-[11px] text-pencil">{erro}</p>}
+          {erro && <p className="mb-3 rounded-lg bg-pencil/10 px-3 py-2 font-mono text-[11px] text-pencil">{erro}</p>}
           {ocupado === "abrir" && <p className="mb-3 font-mono text-[12px] text-muted">Abrindo…</p>}
           <BibliotecaMonogramas acao="Abrir" onEscolher={(c) => void abrir(c)} podeApagar versao={versaoBiblioteca} />
         </div>
@@ -445,25 +440,25 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
             )}
 
             {fonteAusente && (
-              <p className="border-l-2 border-pencil pl-2 text-[12px] text-text">
+              <p className="rounded-lg bg-pencil/10 px-3 py-2 text-[12px] text-text">
                 A fonte {fonteAusente} não está nesta máquina — arraste o arquivo dela pra trocar a letra.
               </p>
             )}
             {letraFaltando && (
-              <p className="border-l-2 border-pencil pl-2 text-[12px] text-text">A fonte não tem a letra “{letraFaltando}”.</p>
+              <p className="rounded-lg bg-pencil/10 px-3 py-2 text-[12px] text-text">A fonte não tem a letra “{letraFaltando}”.</p>
             )}
             {salvoEm && (
-              <p className="border-l-2 border-focus pl-3 text-[12px] text-text">Salvo na biblioteca — {editando?.nome}</p>
+              <p className="rounded-lg bg-focus/10 px-3 py-2 text-[12px] text-text">Salvo na biblioteca — {editando?.nome}</p>
             )}
             {saida && (
-              <div className="flex items-center gap-3 border-l-2 border-focus pl-3 text-[12px] text-text">
+              <div className="flex items-center gap-3 rounded-lg bg-focus/10 px-3 py-2 text-[12px] text-text">
                 <span>{saida.arquivos.join(" · ")}</span>
                 <Button variant="ghost" className="px-1" onClick={() => void monogramaAbrirPasta()}>
                   <FolderOpen size={13} /> Abrir pasta
                 </Button>
               </div>
             )}
-            {erro && <pre className="whitespace-pre-wrap border-l-2 border-pencil pl-3 font-mono text-[11px] text-pencil">{erro}</pre>}
+            {erro && <pre className="whitespace-pre-wrap rounded-lg bg-pencil/10 px-3 py-2 font-mono text-[11px] text-pencil">{erro}</pre>}
           </div>
 
           {comp && (

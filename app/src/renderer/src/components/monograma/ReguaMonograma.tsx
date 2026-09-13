@@ -33,7 +33,7 @@ export function ReguaMonograma({ rotulo, valor, min, max, passo, unidade = "", o
 
   return (
     <div className="relative border-b border-rule focus-within:bg-surface-2/40">
-      <div className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/15" style={{ width: `${pct}%` }} aria-hidden />
+      <div className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/[0.07]" style={{ width: `${pct}%` }} aria-hidden />
       <div className="pointer-events-none absolute inset-y-0 w-px bg-cyan" style={{ left: `${pct}%` }} aria-hidden />
       <input
         type="range"
@@ -58,7 +58,7 @@ export function ReguaMonograma({ rotulo, valor, min, max, passo, unidade = "", o
               onClick={() => mudar(atual + d)}
               disabled={d < 0 ? atual <= min : atual >= max}
               aria-label={`${d < 0 ? "Diminuir" : "Aumentar"} ${rotulo}`}
-              className="no-drag flex h-6 w-6 items-center justify-center border border-rule text-muted hover:border-rule-strong hover:text-text disabled:opacity-30"
+              className="no-drag flex h-6 w-6 items-center justify-center rounded-md border border-rule bg-surface text-muted hover:border-rule-strong hover:text-text disabled:opacity-30"
             >
               {d < 0 ? <Minus size={12} /> : <Plus size={12} />}
             </button>

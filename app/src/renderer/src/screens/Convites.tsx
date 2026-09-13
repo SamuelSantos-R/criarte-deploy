@@ -506,7 +506,7 @@ export function Convites({
         />
         {/* Par segmentado, encostado e com régua no meio: desfazer e refazer são
             a mesma ação em dois sentidos, não dois botões que por acaso vizinham. */}
-        <div className="no-drag flex shrink-0 items-center border border-rule">
+        <div className="no-drag flex shrink-0 items-center border border-rule rounded-lg">
           <BotaoTrilha
             rotuloAcao="Desfazer"
             atalho="⌘Z"
@@ -525,7 +525,7 @@ export function Convites({
         </div>
 
         {emSessao && (
-          <span className="font-narrow text-gauge font-semibold uppercase text-muted">
+          <span className="font-narrow text-gauge font-semibold text-muted">
             {convidado ? "grava no anfitrião" : "grava sozinho"}
           </span>
         )}
@@ -545,7 +545,7 @@ export function Convites({
             className={cn(
               "no-drag flex h-[28px] shrink-0 items-center gap-2 px-2.5 text-[12px] font-medium transition-colors duration-0",
               coop.ligado
-                ? "bg-magenta text-white"
+                ? "bg-magenta text-on-magenta"
                 : mostrarCoop
                   ? "bg-surface-2 text-text"
                   : "text-muted hover:bg-surface-2 hover:text-text",
@@ -621,8 +621,8 @@ export function Convites({
         )}
 
         <section className="min-w-0 flex-1 overflow-auto px-7 pb-16 pt-6">
-          {erro && <p className="border-l-2 border-pencil pl-3 text-[13px] text-pencil">{erro}</p>}
-          {aviso && <p className="border-l-2 border-cyan pl-3 text-[13px] text-text">{aviso}</p>}
+          {erro && <p className="rounded-lg bg-pencil/10 px-3 py-2 text-[13px] text-pencil">{erro}</p>}
+          {aviso && <p className="rounded-lg bg-cyan/10 px-3 py-2 text-[13px] text-text">{aviso}</p>}
           {mostrarCoop ? (
             <PainelCoop
               estado={coop.estado}
@@ -648,7 +648,7 @@ export function Convites({
               {dados && secao && (
                 <>
                   <div className="mb-5 flex items-center gap-3 border-b border-rule pb-2">
-                    <h2 className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
+                    <h2 className="font-narrow font-semibold text-label text-text">
                       {rotulo(secao)}
                     </h2>
                     {podeDesligar(secao) && !bloqueio && (
@@ -666,7 +666,7 @@ export function Convites({
                         meio da edição precisa saber de quem é a mão, não só que
                         a caixa não responde. */}
                     {bloqueio && (
-                      <span className="flex items-center gap-1.5 font-narrow font-semibold text-label uppercase tracking-[0.14em] text-muted">
+                      <span className="flex items-center gap-1.5 font-narrow font-semibold text-label text-muted">
                         <Lock size={12} strokeWidth={1.8} aria-hidden />
                         {bloqueio.nome} está aqui
                       </span>
@@ -678,7 +678,7 @@ export function Convites({
                   >
                     {incompletas.includes(secao) && (
                       <div className="mb-4 flex items-start gap-3">
-                        <p className="border-l-2 border-cyan pl-3 text-[13px] text-text">
+                        <p className="rounded-lg bg-cyan/10 px-3 py-2 text-[13px] text-text">
                           Esta secção ganhou campos novos desde que este convite foi feito. Trazê-los
                           não mexe no que já está escrito — só acrescenta o que falta.
                         </p>

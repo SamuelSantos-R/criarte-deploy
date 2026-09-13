@@ -43,7 +43,7 @@ export function PainelAoVivo({
   return (
     <aside className="flex shrink-0 flex-col bg-surface" style={{ width: largura }}>
       <div className="no-drag flex h-[38px] shrink-0 items-center gap-2 border-b border-rule px-4">
-        <span className="shrink-0 font-narrow font-semibold text-label uppercase text-muted">Ao vivo</span>
+        <span className="shrink-0 font-narrow font-semibold text-label text-muted">Ao vivo</span>
         {url && (
           <>
             <span
@@ -78,7 +78,7 @@ export function PainelAoVivo({
             </>
           )}
           {emprestado ? (
-            <span className="font-narrow font-semibold text-label uppercase tracking-[0.16em] text-muted">
+            <span className="font-narrow font-semibold text-label text-muted">
               do anfitrião
             </span>
           ) : url ? (
@@ -138,7 +138,7 @@ export function FaixaConflito({
     >
       <span aria-hidden className="h-[30px] w-[2px] shrink-0 bg-pencil" />
       <div className="min-w-0">
-        <p className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-pencil">conflito</p>
+        <p className="font-narrow font-semibold text-label text-pencil">conflito</p>
         <p className="mt-0.5 text-[12px] leading-normal text-muted">
           O <span className="font-mono">convite.json</span> mudou fora do Studio e você tem alteração
           na tela. Um dos dois vai embora.

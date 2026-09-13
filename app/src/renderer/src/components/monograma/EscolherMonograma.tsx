@@ -31,10 +31,10 @@ export function EscolherMonograma({
         role="dialog"
         aria-modal="true"
         aria-labelledby="escolher-monograma-titulo"
-        className="light flex h-[min(720px,90vh)] w-[min(960px,92vw)] flex-col border-l-2 border-cyan bg-ground text-text shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="flex h-[min(720px,90vh)] w-[min(960px,92vw)] flex-col bg-ground text-text rounded-2xl border border-rule shadow-flutua"
       >
         <div className="flex items-center border-b border-rule px-6 py-4">
-          <h2 id="escolher-monograma-titulo" className="font-narrow text-label font-semibold uppercase tracking-[0.18em] text-text">
+          <h2 id="escolher-monograma-titulo" className="font-narrow text-label font-semibold text-text">
             Monograma da biblioteca
           </h2>
           <button type="button" onClick={onFechar} aria-label="Fechar" className="ml-auto p-1 text-muted hover:text-text">

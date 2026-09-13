@@ -6,7 +6,7 @@ import { type ReactElement, type ReactNode } from "react";
  */
 export function Topo({ children }: { children: ReactNode }): ReactElement {
   return (
-    <header className="flex h-[46px] shrink-0 items-center gap-3 border-b border-rule bg-surface px-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-rule bg-surface px-3">
       {children}
     </header>
   );

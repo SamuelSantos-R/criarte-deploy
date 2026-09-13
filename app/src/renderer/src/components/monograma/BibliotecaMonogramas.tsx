@@ -66,12 +66,12 @@ export function BibliotecaMonogramas({ acao, onEscolher, podeApagar = false, ver
         <Button variant="ghost" onClick={carregar} title="Recarregar a biblioteca" aria-label="Recarregar a biblioteca">
           <RefreshCw size={13} />
         </Button>
-        <span className="ml-auto font-narrow text-gauge font-semibold uppercase text-muted">
+        <span className="ml-auto font-narrow text-gauge font-semibold text-muted">
           {lista ? `${lista.length} ${lista.length === 1 ? "monograma" : "monogramas"}` : ""}
         </span>
       </div>
 
-      {erro && <p className="mb-3 border-l-2 border-pencil pl-2 font-mono text-[11px] text-pencil">{erro}</p>}
+      {erro && <p className="mb-3 rounded-lg bg-pencil/10 px-3 py-2 font-mono text-[11px] text-pencil">{erro}</p>}
       {!lista && !erro && <p className="font-mono text-[12px] text-muted">Lendo a biblioteca…</p>}
       {lista && visiveis.length === 0 && (
         <p className="text-[13px] text-muted">{lista.length === 0 ? "A biblioteca ainda está vazia." : "Nada com esse nome."}</p>
@@ -79,11 +79,11 @@ export function BibliotecaMonogramas({ acao, onEscolher, podeApagar = false, ver
 
       <ul className="grid min-h-0 grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 overflow-y-auto pb-4">
         {visiveis.map((c) => (
-          <li key={c.id} className="group flex flex-col border border-rule bg-surface">
+          <li key={c.id} className="group flex flex-col overflow-hidden rounded-xl border border-rule bg-surface transition-shadow duration-200 hover:shadow-painel">
             <button
               type="button"
               onClick={() => onEscolher(c)}
-              className="no-drag block aspect-square w-full bg-white p-3"
+              className="no-drag block aspect-square w-full bg-white p-4"
               title={`${acao} ${c.nome}`}
             >
               <img src={c.png} alt={`Monograma ${c.nome}`} loading="lazy" className="h-full w-full object-contain" />

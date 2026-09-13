@@ -116,12 +116,12 @@ export function RenomearSite({
           e.preventDefault();
           void confirmar();
         }}
-        className="w-[480px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[480px] bg-surface rounded-2xl border border-rule shadow-flutua"
       >
         <div className="border-b border-rule px-7 py-4">
           <h2
             id="renomear-titulo"
-            className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text"
+            className="font-narrow font-semibold text-label text-text"
           >
             Renomear convite
           </h2>
@@ -160,7 +160,7 @@ export function RenomearSite({
           )}
 
           {orfao && (
-            <div className="mt-3 border-l-2 border-cyan bg-ground/40 px-4 py-3">
+            <div className="mt-3 rounded-xl bg-ground/40 px-4 py-3">
               <p className="text-[12px] leading-[1.7] text-muted">
                 O nome <span className="font-mono text-text">{limpo}</span> ainda está reservado
                 no Supabase por um convite que já não existe nesta máquina.{" "}

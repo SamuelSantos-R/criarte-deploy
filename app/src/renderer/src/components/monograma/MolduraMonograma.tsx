@@ -43,11 +43,11 @@ export function MolduraMonograma({ moldura, recentes, ocupado, onEscolher, onSol
               onClick={() => onEscolher(o.valor)}
               aria-pressed={o.id === atual}
               className={cn(
-                "no-drag flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px]",
-                o.id === atual ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2 hover:text-text",
+                "no-drag flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[12.5px] transition-colors",
+                o.id === atual ? "bg-surface-2 font-semibold text-text" : "text-muted hover:bg-surface-2/60 hover:text-text",
               )}
             >
-              <span className={cn("h-1.5 w-1.5 shrink-0", o.id === atual ? "bg-cyan" : "bg-transparent")} />
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", o.id === atual ? "bg-cyan" : "bg-transparent")} />
               <span className="truncate">{o.nome}</span>
             </button>
           </li>
@@ -61,8 +61,8 @@ export function MolduraMonograma({ moldura, recentes, ocupado, onEscolher, onSol
         onDragLeave={() => setSobre(false)}
         onDrop={soltar}
         className={cn(
-          "no-drag mt-2 flex items-center gap-2 border border-dashed px-2.5 py-3 transition-colors",
-          sobre ? "border-focus bg-focus/10" : "border-rule bg-surface",
+          "no-drag mt-2 flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-3.5 transition-colors",
+          sobre ? "border-focus bg-focus/10" : "border-rule-strong bg-surface-2/50 hover:border-muted",
           ocupado && "opacity-50",
         )}
       >

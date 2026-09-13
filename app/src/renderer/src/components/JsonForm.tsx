@@ -177,7 +177,7 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
   return (
     <section className="mt-6">
       <div className="mb-3 flex items-center gap-3">
-        <span className="font-narrow font-semibold text-label uppercase text-muted">{label}</span>
+        <span className="font-narrow font-semibold text-label text-muted">{label}</span>
         <span className="font-narrow font-semibold text-gauge text-muted">{String(valor.length).padStart(2, "0")}</span>
         <span className="h-px flex-1 bg-rule" />
         <Button
@@ -203,7 +203,7 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
             }}
             className={cn(
               deObjetos
-                ? "relative border-l-2 border-rule-strong bg-surface/60 py-4 pl-5 pr-4"
+                ? "relative rounded-lg bg-surface-2 px-3 py-2 bg-surface/60 py-4 pl-5 pr-4"
                 : "flex items-center gap-2",
               // A marca do destino é uma linha, não um realce do bloco inteiro:
               // o que interessa saber é entre que dois itens ele vai cair.
@@ -302,7 +302,7 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
                 onChange={(e) => onChange(filho, e.target.checked)}
                 className="no-drag h-4 w-4 accent-cyan"
               />
-              <span className="font-narrow font-semibold text-label uppercase text-muted">{label}</span>
+              <span className="font-narrow font-semibold text-label text-muted">{label}</span>
             </label>
           );
         }

@@ -79,7 +79,7 @@ function LinhaAncora({
       <span className="min-w-0 flex-1 truncate text-[12px] text-text">
         {ancora.rotulo}
       </span>
-      <div className="flex shrink-0 border border-rule" role="group" aria-label={`Lado da arte de ${ancora.rotulo}`}>
+      <div className="flex shrink-0 border border-rule rounded-lg" role="group" aria-label={`Lado da arte de ${ancora.rotulo}`}>
         {(["left", "right"] as const).map((l) => (
           <button
             key={l}
@@ -91,7 +91,7 @@ function LinhaAncora({
               "no-drag flex h-7 w-7 items-center justify-center transition-colors",
               "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
               ladoAtual === l
-                ? "bg-cyan/15 text-text"
+                ? "bg-cyan/[0.07] text-text"
                 : "text-muted hover:text-text",
             )}
           >
@@ -100,7 +100,7 @@ function LinhaAncora({
         ))}
       </div>
       {!proprio && (
-        <span className="shrink-0 font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted">
+        <span className="shrink-0 font-narrow font-semibold text-gauge text-muted">
           herda
         </span>
       )}
@@ -122,7 +122,7 @@ function LinhaAncora({
         inputMode="decimal"
         aria-label={`Subir ou descer a arte de ${ancora.rotulo}, em pixels`}
         className={cn(
-          "no-drag w-[58px] shrink-0 border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold",
+          "no-drag w-[58px] shrink-0 border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold rounded-lg",
           "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-hidden",
           proprio ? "text-text" : "text-muted",
         )}
@@ -168,7 +168,7 @@ function LinhaCor({
         <div className="flex items-baseline gap-2.5">
           <span className="text-[13px] text-text">cor da arte</span>
           {!valido && (
-            <span className="shrink-0 font-narrow font-semibold text-gauge uppercase text-pencil">hex inválido</span>
+            <span className="shrink-0 font-narrow font-semibold text-gauge text-pencil">hex inválido</span>
           )}
         </div>
         <p className="mt-0.5 max-w-[42ch] text-[12px] leading-normal text-muted">
@@ -183,7 +183,7 @@ function LinhaCor({
           type="button"
           onClick={() => onChange("")}
           className={cn(
-            "no-drag shrink-0 self-start px-3 py-2.5 font-narrow font-semibold text-gauge uppercase tracking-[0.14em]",
+            "no-drag shrink-0 self-start px-3 py-2.5 font-narrow font-semibold text-gauge",
             "text-muted hover:text-text",
             "focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-[-3px] focus-visible:outline-focus",
           )}
@@ -232,7 +232,7 @@ export function PainelOrnamentos({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">arte</span>
+          <span className="font-narrow font-semibold text-label text-text">arte</span>
           <span className="font-narrow font-semibold text-gauge text-muted">02</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
@@ -263,7 +263,7 @@ export function PainelOrnamentos({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">ajuste</span>
+          <span className="font-narrow font-semibold text-label text-text">ajuste</span>
           <span className="font-narrow font-semibold text-gauge text-muted">02</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
@@ -281,7 +281,7 @@ export function PainelOrnamentos({
 
       <section>
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">por secção</span>
+          <span className="font-narrow font-semibold text-label text-text">por secção</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(ANCORAS_ORNAMENTO.length).padStart(2, "0")}
           </span>

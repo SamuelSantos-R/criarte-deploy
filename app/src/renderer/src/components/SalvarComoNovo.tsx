@@ -75,10 +75,10 @@ export function SalvarComoNovo({
         role="dialog"
         aria-modal="true"
         aria-labelledby="dup-titulo"
-        className="w-[440px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[440px] bg-surface rounded-2xl border border-rule shadow-flutua"
       >
         <div className="border-b border-rule px-6 py-4">
-          <h2 id="dup-titulo" className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
+          <h2 id="dup-titulo" className="font-narrow font-semibold text-label text-text">
             Salvar como novo
           </h2>
           <p className="mt-1.5 text-[12px] leading-normal text-muted">
@@ -123,7 +123,7 @@ export function SalvarComoNovo({
             de recados cairia em cima do casal antigo.
           </p>
 
-          {erro && <p className="border-l-2 border-pencil pl-3 text-[12px] text-pencil">{erro}</p>}
+          {erro && <p className="rounded-lg bg-pencil/10 px-3 py-2 text-[12px] text-pencil">{erro}</p>}
         </div>
 
         <div className="flex items-center gap-3 border-t border-rule px-6 py-4">

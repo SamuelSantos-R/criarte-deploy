@@ -44,7 +44,7 @@ export function validadeEmPalavras(o: Opcoes): string {
 }
 
 const Rotulo = ({ children }: { children: string }): ReactElement => (
-  <span className="font-narrow font-semibold text-label uppercase tracking-[0.16em] text-muted">{children}</span>
+  <span className="font-narrow font-semibold text-label text-muted">{children}</span>
 );
 
 /**
@@ -73,7 +73,7 @@ export function OpcoesDeploy({
             value={valor.validade}
             disabled={travado}
             onChange={(e) => set({ validade: e.target.value })}
-            className="no-drag h-[30px] w-full appearance-none border border-rule bg-surface pl-2.5 pr-8 text-[12px] text-text focus:border-focus focus:outline-hidden disabled:opacity-40"
+            className="no-drag h-[30px] w-full appearance-none border border-rule bg-surface pl-2.5 pr-8 text-[12px] text-text focus:border-focus focus:outline-hidden disabled:opacity-40 rounded-lg"
           >
             {VALIDADES.map((v) => (
               <option key={v.valor} value={v.valor}>

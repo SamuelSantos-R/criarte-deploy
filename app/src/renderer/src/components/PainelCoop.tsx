@@ -18,7 +18,7 @@ import {
 function Codigo({ valor }: { valor: string }): ReactElement {
   return (
     <div>
-      <span className="mb-2 block font-narrow font-semibold text-label uppercase text-muted">código</span>
+      <span className="mb-2 block font-narrow font-semibold text-label text-muted">código</span>
       <span className="gauge inline-block bg-magenta px-4 py-2 font-narrow text-readout font-semibold text-white">
         {valor}
       </span>
@@ -30,7 +30,7 @@ function Pares({ pares, trancas }: { pares: string[]; trancas: Tranca[] }): Reac
   return (
     <div className="mt-7">
       <div className="mb-3 flex items-baseline gap-3">
-        <span className="font-narrow font-semibold text-label uppercase text-text">na mesa</span>
+        <span className="font-narrow font-semibold text-label text-text">na mesa</span>
         <span className="font-narrow font-semibold text-gauge text-muted">
           {String(pares.length + 1).padStart(2, "0")}
         </span>
@@ -89,7 +89,7 @@ function PertoDaqui({
   // vai aparecer nada por mais que se espere.
   if (lista.length === 0 && !vivo) {
     return (
-      <p className="mb-3 border-l-2 border-pencil bg-pencil/5 py-2 pl-3 text-[12px] leading-normal text-pencil">
+      <p className="mb-3 rounded-xl bg-pencil/5 py-2 pl-3 text-[12px] leading-normal text-pencil">
         A rede local está bloqueada para o Studio — nada é ouvido nem anunciado. Abre
         Ajustes do Sistema › Privacidade e Segurança › Rede Local e liga o Criarte
         Studio. Até lá, dá para entrar escrevendo o endereço à mão.
@@ -176,17 +176,17 @@ export function PainelCoop({
       </p>
 
       {erro && (
-        <p className="mb-5 border-l-2 border-pencil bg-pencil/5 py-2 pl-3 font-mono text-[12px] text-pencil">
+        <p className="mb-5 rounded-xl bg-pencil/5 py-2 pl-3 font-mono text-[12px] text-pencil">
           {erro}
         </p>
       )}
 
       {estado.papel === "anfitriao" && (
         <section>
-          <div className="flex items-end justify-between gap-6 border-l-2 border-cyan bg-surface/60 py-5 pl-5 pr-4">
+          <div className="flex items-end justify-between gap-6 rounded-xl bg-surface/60 py-5 pl-5 pr-4">
             <Codigo valor={estado.codigo ?? ""} />
             <div className="text-right">
-              <span className="mb-1 block font-narrow font-semibold text-label uppercase text-muted">endereço</span>
+              <span className="mb-1 block font-narrow font-semibold text-label text-muted">endereço</span>
               <span className="block font-mono text-[13px] text-text">{estado.endereco}</span>
             </div>
           </div>
@@ -199,7 +199,7 @@ export function PainelCoop({
 
       {estado.papel === "convidado" && (
         <section>
-          <p className="border-l-2 border-cyan bg-surface/60 py-4 pl-5 text-[13px] text-text">
+          <p className="rounded-xl bg-surface/60 py-4 pl-5 text-[13px] text-text">
             Ligada a <span className="font-mono">{estado.endereco}</span> — a editar{" "}
             <span className="font-mono">{estado.siteId || "…"}</span>.
           </p>
@@ -213,7 +213,7 @@ export function PainelCoop({
         <div className="grid grid-cols-2 gap-x-8">
           <section>
             <div className="mb-4 flex items-baseline gap-3">
-              <span className="font-narrow font-semibold text-label uppercase text-text">abrir</span>
+              <span className="font-narrow font-semibold text-label text-text">abrir</span>
               <span className="font-narrow font-semibold text-gauge text-muted">01</span>
               <span className="h-px flex-1 bg-rule" />
             </div>
@@ -232,7 +232,7 @@ export function PainelCoop({
 
           <section>
             <div className="mb-4 flex items-baseline gap-3">
-              <span className="font-narrow font-semibold text-label uppercase text-text">entrar</span>
+              <span className="font-narrow font-semibold text-label text-text">entrar</span>
               <span className="font-narrow font-semibold text-gauge text-muted">02</span>
               <span className="h-px flex-1 bg-rule" />
             </div>

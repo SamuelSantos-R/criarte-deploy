@@ -110,7 +110,7 @@ export function Envelope(): ReactElement {
 
         <div className="ml-auto flex shrink-0 items-center gap-3">
           {pronto && (
-            <span className="font-narrow font-semibold text-gauge uppercase tracking-[0.16em] text-muted">
+            <span className="font-narrow font-semibold text-gauge text-muted">
               {quantos} {quantos === 1 ? "pdf" : "pdfs"}
             </span>
           )}
@@ -152,7 +152,7 @@ export function Envelope(): ReactElement {
                     height: `${marca.a * 100}%`,
                   }}
                 >
-                  <span className="absolute -top-5 left-0 whitespace-nowrap font-narrow font-semibold text-gauge uppercase tracking-[0.14em] text-focus">
+                  <span className="absolute -top-5 left-0 whitespace-nowrap font-narrow font-semibold text-gauge text-focus">
                     {emPontos(marca, modelo).join(" ")}
                   </span>
                 </div>
@@ -169,14 +169,14 @@ export function Envelope(): ReactElement {
         </div>
 
         <aside className="w-[268px] shrink-0 overflow-y-auto border-l border-rule px-5 py-6">
-          <span className="font-narrow font-semibold text-label uppercase text-muted">Área do botão</span>
+          <span className="font-narrow font-semibold text-label text-muted">Área do botão</span>
           <p className="mt-2 text-[12px] leading-normal text-muted">
             {marca
               ? "Arraste de novo pra remarcar."
               : "Arraste por cima do convite onde o convidado vai tocar."}
           </p>
 
-          <span className="mt-8 block font-narrow font-semibold text-label uppercase text-muted">Convidados</span>
+          <span className="mt-8 block font-narrow font-semibold text-label text-muted">Convidados</span>
           {lista ? (
             <>
               <p className="mt-2 break-all font-mono text-[11px] text-text">{lista.nome}</p>
@@ -184,7 +184,7 @@ export function Envelope(): ReactElement {
                 {lista.total} com link · {lista.unicos} nomes únicos
               </p>
               {lista.repetidos.length > 0 && (
-                <p className="mt-2 border-l-2 border-cyan pl-2 text-[11px] leading-normal text-muted">
+                <p className="mt-2 rounded-lg bg-cyan/10 px-3 py-2 text-[11px] leading-normal text-muted">
                   repetidos: {lista.repetidos.map((d) => `${d.nome} (${d.vezes}×)`).join(", ")}
                 </p>
               )}
@@ -204,7 +204,7 @@ export function Envelope(): ReactElement {
             </p>
           )}
 
-          <span className="mt-8 block font-narrow font-semibold text-label uppercase text-muted">Nome do arquivo</span>
+          <span className="mt-8 block font-narrow font-semibold text-label text-muted">Nome do arquivo</span>
           <Input
             value={padrao}
             onChange={(e) => setPadrao(e.target.value)}
@@ -213,13 +213,13 @@ export function Envelope(): ReactElement {
           />
           <p className="mt-1 text-[11px] text-muted">{"{nome}"} vira o nome do convidado.</p>
 
-          <span className="mt-8 block font-narrow font-semibold text-label uppercase text-muted">Salvar em</span>
+          <span className="mt-8 block font-narrow font-semibold text-label text-muted">Salvar em</span>
           <p className="mt-2 break-all font-mono text-[11px] text-text">
             {pasta ?? "saida/ ao lado do .txt"}
           </p>
 
           {saida && (
-            <div className="mt-8 border-l-2 border-focus pl-3">
+            <div className="mt-8 rounded-lg bg-focus/10 px-3 py-2">
               <p className="text-[12px] text-text">
                 {saida.feitos} {saida.feitos === 1 ? "PDF pronto" : "PDFs prontos"}
               </p>
@@ -233,7 +233,7 @@ export function Envelope(): ReactElement {
           )}
 
           {erro && (
-            <pre className="mt-6 whitespace-pre-wrap border-l-2 border-pencil pl-3 font-mono text-[11px] text-pencil">
+            <pre className="mt-6 whitespace-pre-wrap rounded-lg bg-pencil/10 px-3 py-2 font-mono text-[11px] text-pencil">
               {erro}
             </pre>
           )}

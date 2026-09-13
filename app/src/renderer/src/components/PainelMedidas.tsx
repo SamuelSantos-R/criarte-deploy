@@ -325,7 +325,7 @@ export function LinhaMedida({
       {/* A régua não é um widget colado embaixo do rótulo: é a própria linha que
           enche. Arrastar em qualquer ponto move o valor; os botões ficam por cima. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/15"
+        className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/[0.07]"
         style={{ width: `${pct}%` }}
         aria-hidden
       />
@@ -360,7 +360,7 @@ export function LinhaMedida({
               disabled={noLimite(d)}
               aria-label={`${d < 0 ? "Diminuir" : "Aumentar"} ${medida.rotulo}`}
               className={cn(
-                "no-drag flex h-7 w-7 items-center justify-center border border-rule text-muted transition-colors",
+                "no-drag flex h-7 w-7 items-center justify-center border border-rule text-muted transition-colors rounded-lg",
                 "hover:border-rule-strong hover:text-text",
                 "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
                 "disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-rule disabled:hover:text-muted",
@@ -439,7 +439,7 @@ function LinhaEspaco({
         const atual = typeof bruto === "number" && Number.isFinite(bruto) ? bruto : bloco[lado];
         return (
           <label key={lado} className="flex shrink-0 items-baseline gap-1.5">
-            <span className="font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted">
+            <span className="font-narrow font-semibold text-gauge text-muted">
               {lado}
             </span>
             <input
@@ -456,7 +456,7 @@ function LinhaEspaco({
               inputMode="decimal"
               aria-label={`${bloco.rotulo}, folga de ${lado} em pixels`}
               className={cn(
-                "no-drag w-[52px] border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold text-text",
+                "no-drag w-[52px] border border-rule bg-transparent px-1.5 py-1 text-right gauge font-narrow text-[12px] font-semibold text-text rounded-lg",
                 "hover:border-rule-strong focus:border-cyan focus:bg-surface-2 focus:outline-hidden",
               )}
             />
@@ -538,7 +538,7 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">tamanhos</span>
+          <span className="font-narrow font-semibold text-label text-text">tamanhos</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(MEDIDAS.length).padStart(2, "0")}
           </span>
@@ -558,7 +558,7 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">nome dos noivos</span>
+          <span className="font-narrow font-semibold text-label text-text">nome dos noivos</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(ESPACAMENTOS.length).padStart(2, "0")}
           </span>
@@ -583,7 +583,7 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">rodapé</span>
+          <span className="font-narrow font-semibold text-label text-text">rodapé</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(RODAPE.length).padStart(2, "0")}
           </span>
@@ -607,7 +607,7 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">altura das secções</span>
+          <span className="font-narrow font-semibold text-label text-text">altura das secções</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(BLOCOS.length).padStart(2, "0")}
           </span>
@@ -631,7 +631,7 @@ export function PainelMedidas({
 
       <section className="mb-8">
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">opacidades</span>
+          <span className="font-narrow font-semibold text-label text-text">opacidades</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(OPACIDADES.length).padStart(2, "0")}
           </span>
@@ -655,7 +655,7 @@ export function PainelMedidas({
 
       <section>
         <div className="mb-3 flex items-baseline gap-3">
-          <span className="font-narrow font-semibold text-label uppercase text-text">fonte dos noivos</span>
+          <span className="font-narrow font-semibold text-label text-text">fonte dos noivos</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
             {String(fontes.length).padStart(2, "0")}
           </span>
@@ -666,7 +666,7 @@ export function PainelMedidas({
               onClick={() => void carregar()}
               disabled={carregando}
               className={cn(
-                "no-drag flex shrink-0 items-center gap-1.5 self-center border border-rule px-2.5 py-1 font-narrow font-semibold text-gauge uppercase tracking-[0.12em] text-muted transition-colors",
+                "no-drag flex shrink-0 items-center gap-1.5 self-center border border-rule px-2.5 py-1 font-narrow font-semibold text-gauge text-muted transition-colors rounded-lg",
                 "hover:border-rule-strong hover:text-text",
                 "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
                 "disabled:cursor-not-allowed disabled:opacity-40",
@@ -688,7 +688,7 @@ export function PainelMedidas({
         </p>
 
         {erroFonte && (
-          <p className="mb-3 border-l-2 border-pencil bg-pencil/5 py-2 pl-3 font-mono text-[11px] leading-[1.6] text-pencil">
+          <p className="mb-3 rounded-xl bg-pencil/5 py-2 pl-3 font-mono text-[11px] leading-[1.6] text-pencil">
             {erroFonte}
           </p>
         )}
@@ -725,7 +725,7 @@ export function PainelMedidas({
                 >
                   {f.nome}
                 </span>
-                <span className="ml-auto shrink-0 font-narrow font-semibold text-gauge uppercase tabular-nums text-muted">
+                <span className="ml-auto shrink-0 font-narrow font-semibold text-gauge tabular-nums text-muted">
                   {f.ausente ? "não está no banco" : `${Math.round(f.bytes / 1024)} kb`}
                 </span>
               </label>

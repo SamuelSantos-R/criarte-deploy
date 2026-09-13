@@ -50,10 +50,10 @@ export function ModalQR({
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-titulo"
-        className="w-[380px] border-l-2 border-cyan bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[380px] bg-surface rounded-2xl border border-rule shadow-flutua"
       >
         <div className="flex items-center gap-3 border-b border-rule px-6 py-4">
-          <h2 id="qr-titulo" className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text">
+          <h2 id="qr-titulo" className="font-narrow font-semibold text-label text-text">
             Ver no telefone
           </h2>
           <button
@@ -72,7 +72,7 @@ export function ModalQR({
               <img
                 src={qr}
                 alt={`QR code para abrir ${lan} no telefone`}
-                className="block w-full border border-rule"
+                className="block w-full border border-rule rounded-lg"
               />
               <p className="mt-4 break-all font-mono text-[12px] text-text">{lan}</p>
               <p className="mt-2 text-[12px] leading-normal text-muted">
@@ -89,7 +89,7 @@ export function ModalQR({
 
           {url && (
             <>
-              <span className="mt-7 block font-narrow font-semibold text-label uppercase text-muted">Neste Mac</span>
+              <span className="mt-7 block font-narrow font-semibold text-label text-muted">Neste Mac</span>
               <p className="mt-2 break-all font-mono text-[11px] text-text">{url}</p>
             </>
           )}

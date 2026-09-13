@@ -137,7 +137,7 @@ function Linha({
         <div className="flex items-baseline gap-2.5">
           <span className="text-[13px] text-text">{papel.rotulo}</span>
           {!valido && (
-            <span className="shrink-0 font-narrow font-semibold text-gauge uppercase text-pencil">hex inválido</span>
+            <span className="shrink-0 font-narrow font-semibold text-gauge text-pencil">hex inválido</span>
           )}
         </div>
         {papel.onde && (
@@ -201,7 +201,7 @@ function Paletas({
             </span>
             <span className="flex items-baseline justify-between border-t border-rule px-2 py-1.5">
               <span className="text-[12px] text-text">{p.nome}</span>
-              {posta && <span className="font-narrow font-semibold text-gauge uppercase text-muted">posta</span>}
+              {posta && <span className="font-narrow font-semibold text-gauge text-muted">posta</span>}
             </span>
           </button>
         );
@@ -246,7 +246,7 @@ export function PainelTema({
       <section className="mb-9">
         <div className="mb-2 flex items-baseline gap-3">
           <span className="font-narrow font-semibold text-gauge text-muted">01</span>
-          <span className="font-narrow font-semibold text-label uppercase text-text">paletas prontas</span>
+          <span className="font-narrow font-semibold text-label text-text">paletas prontas</span>
           <span className="h-px flex-1 bg-rule" />
         </div>
         <p className="mb-3 max-w-[52ch] text-[12px] leading-normal text-muted">
@@ -262,7 +262,7 @@ export function PainelTema({
             <span className="font-narrow font-semibold text-gauge text-muted">
               {String(i + 2).padStart(2, "0")}
             </span>
-            <span className="font-narrow font-semibold text-label uppercase text-text">{grupo.titulo}</span>
+            <span className="font-narrow font-semibold text-label text-text">{grupo.titulo}</span>
             <span className="h-px flex-1 bg-rule" />
           </div>
           <p className="mb-3 max-w-[52ch] text-[12px] leading-normal text-muted">{grupo.nota}</p>

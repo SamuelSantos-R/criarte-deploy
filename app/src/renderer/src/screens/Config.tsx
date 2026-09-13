@@ -87,7 +87,7 @@ export function Config({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
       <Topo>
-        <span className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-muted">Configurações</span>
+        <span className="font-narrow font-semibold text-label text-muted">Configurações</span>
       </Topo>
 
       <div className="border-b border-rule px-8 pb-7">
@@ -130,7 +130,7 @@ export function Config({
         </div>
 
         {deps != null && deps.npm == null && (
-          <div className="mt-3 border-l-2 border-cyan bg-surface px-4 py-3">
+          <div className="mt-3 rounded-xl bg-surface px-4 py-3">
             <p className="text-[13px] text-text">
               Falta o <strong className="font-semibold">Node</strong> nesta máquina — é ele que baixa as
               dependências. Instale uma vez e nunca mais:
@@ -179,7 +179,7 @@ export function Config({
             </Button>
           </div>
         </div>
-        {credAviso && <p className="mt-3 border-l-2 border-cyan pl-3 text-[13px] text-text">{credAviso}</p>}
+        {credAviso && <p className="mt-3 rounded-lg bg-cyan/10 px-3 py-2 text-[13px] text-text">{credAviso}</p>}
 
         <Rule>Diagnóstico</Rule>
         <div className="flex items-center gap-4">

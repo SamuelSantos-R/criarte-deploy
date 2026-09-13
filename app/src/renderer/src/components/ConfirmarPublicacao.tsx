@@ -65,19 +65,19 @@ export function ConfirmarPublicacao({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="publicar-titulo"
-        className="w-[520px] border-l-2 border-pencil bg-surface shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)]"
+        className="w-[520px] bg-surface rounded-2xl border border-rule shadow-flutua"
       >
         <div className="border-b border-rule px-7 py-4">
           <h2
             id="publicar-titulo"
-            className="font-narrow font-semibold text-label uppercase tracking-[0.18em] text-text"
+            className="font-narrow font-semibold text-label text-text"
           >
             Publicar a sério
           </h2>
         </div>
 
         <div className="px-7 py-6">
-          <span className="font-narrow font-semibold text-label uppercase text-muted">Vai substituir</span>
+          <span className="font-narrow font-semibold text-label text-muted">Vai substituir</span>
           <p className="mt-3 border-l-[3px] border-pencil bg-surface-2 px-4 py-3 font-mono text-[15px] leading-[1.4] text-text">
             {lendo ? "…" : (url ?? `${siteId} — destino desconhecido`)}
           </p>
@@ -90,9 +90,9 @@ export function ConfirmarPublicacao({
           )}
 
           <dl className="mt-5 grid grid-cols-[auto_1fr] gap-x-5 gap-y-1.5 text-[12px]">
-            <dt className="font-narrow font-semibold text-label uppercase text-muted">Validade</dt>
+            <dt className="font-narrow font-semibold text-label text-muted">Validade</dt>
             <dd className="text-text">{validade}</dd>
-            <dt className="font-narrow font-semibold text-label uppercase text-muted">Convidados</dt>
+            <dt className="font-narrow font-semibold text-label text-muted">Convidados</dt>
             <dd className="text-text">
               {convidados ? convidados.split("/").pop() : "sem lista — sobe em prévia"}
             </dd>

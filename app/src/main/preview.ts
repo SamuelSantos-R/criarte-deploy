@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
+import { createSocket } from "node:dgram";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { siteDir } from "./sites";
@@ -17,16 +18,45 @@ let servidor: (Servidor & { child: ChildProcess }) | null = null;
  * virtuais: todas respondem HTTP no próprio Mac e enganam o teste, mas o
  * celular nunca alcança. O que sobra é o IP que dá pra ler no QR.
  */
-export function ipDaRede(): string | null {
+export function ipsDaRede(): string[] {
+  const ips: string[] = [];
   for (const [nome, addrs] of Object.entries(networkInterfaces())) {
     if (/^(feth|bridge|utun|awdl|llw|ap\d)/.test(nome)) continue;
     for (const a of addrs ?? []) {
       if (a.family !== "IPv4" || a.internal) continue;
       if (a.address.startsWith("169.254.")) continue;
-      return a.address;
+      ips.push(a.address);
     }
   }
-  return null;
+  return ips;
+}
+
+export function ipDaRede(): string | null {
+  return ipsDaRede()[0] ?? null;
+}
+
+/**
+ * O IP da placa por onde o Mac sai de facto. "A primeira placa da lista" não é
+ * isso: com adaptador, VPN ou segunda rede, a primeira pode ser uma que ninguém
+ * da casa alcança. `connect` em UDP só consulta a tabela de rotas — não sai
+ * pacote nenhum. Sem rota (rede sem internet) cai na primeira placa.
+ */
+export function ipDaRotaPadrao(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const s = createSocket("udp4");
+    const fim = (ip: string | null): void => {
+      s.close();
+      resolve(ip && ipsDaRede().includes(ip) ? ip : ipDaRede());
+    };
+    s.once("error", () => fim(null));
+    s.connect(53, "1.1.1.1", () => {
+      try {
+        fim(s.address().address);
+      } catch {
+        fim(null);
+      }
+    });
+  });
 }
 
 /**

@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { BrowserWindow } from "electron";
 import { copiavel, empacotar } from "./pacote";
-import { aoMudarPreview, estadoPreview, ipDaRede } from "./preview";
+import { aoMudarPreview, estadoPreview, ipDaRotaPadrao, ipsDaRede } from "./preview";
 import { ligarEspelho, pararEspelho, urlDoEspelho } from "./espelho";
 import { readConvite, siteDir, writeConvite } from "./sites";
 import { listarFontes, type Fonte } from "./fontes";
@@ -328,6 +328,9 @@ function lerBytes(req: IncomingMessage): Promise<Buffer> {
 
 async function atender(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!anfitriao) return recusar(res, 503, "sessão encerrada");
+  // Escuta em todas as placas, mas só atende quem chegou por uma placa da LAN.
+  const local = (req.socket.localAddress ?? "").replace(/^::ffff:/, "");
+  if (!ipsDaRede().includes(local)) return recusar(res, 403, "fora da rede local");
   const ip = req.socket.remoteAddress ?? "?";
   if (emCastigo(ip)) return recusar(res, 429, "muitas tentativas");
 
@@ -458,7 +461,7 @@ async function atender(req: IncomingMessage, res: ServerResponse): Promise<void>
 
 export async function abrirSessao(siteId: string): Promise<EstadoCoop> {
   await fecharSessao();
-  const ip = ipDaRede();
+  const ip = await ipDaRotaPadrao();
   if (!ip) throw new Error("sem rede local — liga o Wi-Fi e tenta de novo");
   const { dados, marca } = await readConvite(siteId);
 
@@ -470,9 +473,11 @@ export async function abrirSessao(siteId: string): Promise<EstadoCoop> {
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    // Só na interface da LAN: em 0.0.0.0 o servidor também atenderia por
-    // interfaces virtuais que ninguém desta sala alcança.
-    server.listen(PORTA, ip, () => resolve());
+    // Em todas as placas: presa a uma só, bastava o Mac ter adaptador ou VPN
+    // listado antes do Wi-Fi para a sessão abrir onde ninguém da casa chega
+    // (o anúncio saía, a porta não respondia). O `atender` recusa o que não
+    // entrou por uma placa da LAN, então as virtuais continuam de fora.
+    server.listen(PORTA, "0.0.0.0", () => resolve());
   });
 
   anfitriao = {

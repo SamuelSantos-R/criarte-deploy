@@ -40,6 +40,7 @@ import { Segmentado } from "@/components/ui/Segmentado";
 import { PalcoMonograma } from "@/components/monograma/PalcoMonograma";
 import { PainelMonograma } from "@/components/monograma/PainelMonograma";
 import { BibliotecaMonogramas } from "@/components/monograma/BibliotecaMonogramas";
+import { ZoomPrancheta } from "@/components/monograma/ZoomPrancheta";
 
 const LADO_PNG = 1000;
 /** Sorteio que não cruza as letras não é monograma; tenta de novo algumas vezes. */
@@ -422,9 +423,9 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
         </div>
       ) : (
         <div className="flex min-h-0 min-w-0 flex-1">
-          <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden bg-surface-2/40 p-8">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 overflow-hidden bg-surface-2/40 pb-3">
             {comp && (
-              <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+              <ZoomPrancheta ativo={ativa && vista === "editor"}>
                 <PalcoMonograma
                   comp={comp}
                   desenho={desenho}
@@ -436,7 +437,7 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
                   onMover={mover}
                   onTrocarCruzamento={trocarCruzamento}
                 />
-              </div>
+              </ZoomPrancheta>
             )}
 
             {fonteAusente && (

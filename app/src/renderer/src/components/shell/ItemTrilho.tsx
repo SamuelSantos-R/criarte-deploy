@@ -38,7 +38,7 @@ export function ItemTrilho({
       </span>
       <span
         className={cn(
-          "max-w-[72px] truncate text-[11px] leading-tight transition-colors",
+          "whitespace-nowrap text-[10.5px] leading-tight tracking-[-0.01em] transition-colors",
           ativo ? "font-bold text-text" : "font-medium text-muted group-hover:text-text",
         )}
       >

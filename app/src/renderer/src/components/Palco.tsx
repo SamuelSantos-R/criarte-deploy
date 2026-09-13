@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { corpoDe, MolduraAparelho } from "@/components/MolduraAparelho";
 
 export type Aparelho = { id: string; nome: string; l: number; a: number; dpr: number; movel: boolean };
 
@@ -48,6 +49,10 @@ export function Palco({
 
   const largura = deitado ? aparelho.a : aparelho.l;
   const altura = deitado ? aparelho.l : aparelho.a;
+  const corpo = corpoDe(aparelho);
+  // O que tem de caber no painel é o aparelho inteiro, não só a tela.
+  const bx = corpo ? (deitado ? corpo.bordaY : corpo.bordaX) : 0;
+  const by = corpo ? (deitado ? corpo.bordaX : corpo.bordaY) : 0;
 
   const medir = useCallback(() => {
     const el = caixa.current;
@@ -58,8 +63,8 @@ export function Palco({
     // Painel escondido (aba inativa) mede 0: manter o zoom antigo evita
     // recalcular pra zero e piscar quando a aba voltar.
     if (w < 2 || h < 2) return;
-    setZoom(Math.min(w / largura, h / altura, 1));
-  }, [margem, largura, altura]);
+    setZoom(Math.min(w / (largura + bx * 2), h / (altura + by * 2), 1));
+  }, [margem, largura, altura, bx, by]);
 
   useLayoutEffect(() => {
     medir();
@@ -72,28 +77,41 @@ export function Palco({
     <div ref={caixa} className={className}>
       {url ? (
         <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-          <div className="relative shrink-0 rounded-xl shadow-flutua" style={{ width: largura * zoom, height: altura * zoom }}>
-            <div className="absolute inset-0 overflow-hidden rounded-xl">
-            <iframe
-              // A `key` sem o zoom e sem a recarga: trocar de aparelho só
-              // re-escala, e recarregar acontece por dentro do frame (o main
-              // manda um location.reload). Remontar o elemento dava o branco de
-              // montar um iframe do zero e perdia a posição do scroll.
-              key={url}
-              src={url ? `${url}${url.includes("?") ? "&" : "?"}studio=1` : url}
-              title="Preview do convite"
-              allow="autoplay; fullscreen"
-              className="absolute left-0 top-0 block border-0 bg-white"
-              style={{ width: largura, height: altura, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
-            />
-            </div>
-            <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl outline-solid outline-1 outline-rule" />
-            {legenda && (
-              <span className="pointer-events-none absolute left-0 top-full mt-3 font-narrow font-semibold text-gauge text-muted">
+          {(() => {
+            const iframe = (
+              <iframe
+                // A `key` sem o zoom e sem a recarga: trocar de aparelho só
+                // re-escala, e recarregar acontece por dentro do frame (o main
+                // manda um location.reload). Remontar o elemento dava o branco de
+                // montar um iframe do zero e perdia a posição do scroll.
+                key={url}
+                src={`${url}${url.includes("?") ? "&" : "?"}studio=1`}
+                title="Preview do convite"
+                allow="autoplay; fullscreen"
+                className="absolute left-0 top-0 block border-0 bg-white"
+                style={{ width: largura, height: altura, transform: `scale(${zoom})`, transformOrigin: "0 0" }}
+              />
+            );
+            const rotulo = legenda && (
+              <span className="pointer-events-none absolute left-1/2 top-full mt-4 -translate-x-1/2 whitespace-nowrap text-[11px] font-medium text-muted">
                 {aparelho.nome} · {largura}×{altura} · {Math.round(zoom * 100)}%
               </span>
-            )}
-          </div>
+            );
+            return corpo ? (
+              <div className="relative">
+                <MolduraAparelho corpo={corpo} largura={largura} altura={altura} zoom={zoom} deitado={deitado}>
+                  {iframe}
+                </MolduraAparelho>
+                {rotulo}
+              </div>
+            ) : (
+              // Computador não tem aparelho a desenhar: uma janela de canto macio basta.
+              <div className="relative shrink-0 rounded-xl shadow-flutua" style={{ width: largura * zoom, height: altura * zoom }}>
+                <div className="absolute inset-0 overflow-hidden rounded-xl ring-1 ring-rule">{iframe}</div>
+                {rotulo}
+              </div>
+            );
+          })()}
         </div>
       ) : (
         children

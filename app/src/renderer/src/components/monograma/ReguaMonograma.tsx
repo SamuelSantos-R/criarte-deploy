@@ -33,7 +33,7 @@ export function ReguaMonograma({ rotulo, valor, min, max, passo, unidade = "", o
 
   return (
     <div className="relative border-b border-rule focus-within:bg-surface-2/40">
-      <div className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/[0.07]" style={{ width: `${pct}%` }} aria-hidden />
+      <div className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/[0.045]" style={{ width: `${pct}%` }} aria-hidden />
       <div className="pointer-events-none absolute inset-y-0 w-px bg-cyan" style={{ left: `${pct}%` }} aria-hidden />
       <input
         type="range"

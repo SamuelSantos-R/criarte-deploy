@@ -4,7 +4,7 @@ export type Tema = "pb" | "rosa" | "noturno";
 
 export const TEMAS: { id: Tema; nome: string; amostra: [string, string] }[] = [
   { id: "pb", nome: "Preto e branco", amostra: ["#ffffff", "#111113"] },
-  { id: "rosa", nome: "Rosa claro", amostra: ["#faeef2", "#b0426a"] },
+  { id: "rosa", nome: "Rosa claro", amostra: ["#fbedf0", "#e096a4"] },
   { id: "noturno", nome: "Noturno", amostra: ["#282a36", "#bd93f9"] },
 ];
 

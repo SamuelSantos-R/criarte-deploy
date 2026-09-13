@@ -325,7 +325,7 @@ export function LinhaMedida({
       {/* A régua não é um widget colado embaixo do rótulo: é a própria linha que
           enche. Arrastar em qualquer ponto move o valor; os botões ficam por cima. */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/[0.07]"
+        className="pointer-events-none absolute inset-y-0 left-0 bg-cyan/[0.045]"
         style={{ width: `${pct}%` }}
         aria-hidden
       />

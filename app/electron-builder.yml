@@ -84,6 +84,11 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Criarte Studio
+  # Remove todas as versões anteriores antes de instalar (mesmo noutra pasta)
+  # e põe "Desinstalar Criarte Studio" no menu Iniciar. Ver o .nsh.
+  include: resources/installer.nsh
+  uninstallDisplayName: Criarte Studio
+  deleteAppDataOnUninstall: false
 
 dmg:
   title: Criarte Studio

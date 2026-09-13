@@ -91,7 +91,7 @@ function LinhaAncora({
               "no-drag flex h-7 w-7 items-center justify-center transition-colors",
               "focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-cyan",
               ladoAtual === l
-                ? "bg-cyan/[0.07] text-text"
+                ? "bg-cyan/[0.045] text-text"
                 : "text-muted hover:text-text",
             )}
           >

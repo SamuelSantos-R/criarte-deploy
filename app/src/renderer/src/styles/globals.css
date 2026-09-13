@@ -123,25 +123,26 @@
     color-scheme: light;
   }
 
-  /* Rosa claro e branco. */
+  /* Rosa claro e branco — o rosa da casa é #E096A4. Por cima dele o texto é
+     escuro (7,1:1): branco daria 2,3:1 e sumia. */
   [data-tema='rosa'] {
-    --ground: #faeef2;
+    --ground: #fbedf0;
     --surface: #ffffff;
-    --surface-2: #fdf3f6;
-    --rule: #f2dce3;
-    --rule-strong: #e6c2ce;
-    --muted: #7d5864;
+    --surface-2: #fdf4f6;
+    --rule: #f3d9df;
+    --rule-strong: #e7bfc8;
+    --muted: #7a5862;
     --text: #2b1a20;
-    --focus: #b0426a;
-    --cyan: #b0426a;
-    --on-cyan: #ffffff;
+    --focus: #e096a4;
+    --cyan: #e096a4;
+    --on-cyan: #2b1a20;
     --magenta: #7c4ea8;
     --on-magenta: #ffffff;
-    --yellow: #f2b8c9;
+    --yellow: #f6cdd5;
     --on-yellow: #2b1a20;
     --reg: #2b1a20;
     --pencil: #b8322a;
-    --selecao: #f2b8c9;
+    --selecao: #e096a4;
     --on-selecao: #2b1a20;
     color-scheme: light;
   }
@@ -235,4 +236,10 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* No rosa a tinta é clara demais pra texto corrido (2,3:1 no branco): o que é
+   texto ou ícone na cor da ação escurece pro mesmo tom, a 5,9:1. */
+[data-tema='rosa'] .text-cyan {
+  color: #9e4a5c;
 }

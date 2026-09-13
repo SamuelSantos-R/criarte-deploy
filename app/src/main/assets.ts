@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { app } from "electron";
@@ -123,6 +123,39 @@ export async function semearAsset(siteId: string, secao: string): Promise<AssetI
     : resolve(app.getAppPath(), "resources", "rsvp", nome);
   const [importado] = await importAssets(siteId, [molde]);
   return importado ?? null;
+}
+
+const MIME_IMAGEM: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".gif": "image/gif",
+};
+
+const PRE_VIA_MAX = 20 * 1024 * 1024;
+
+/**
+ * A imagem de um campo do convite, em `data:` — é o que a ferramenta de recorte
+ * usa pra mostrar a foto de verdade sem abrir a CSP pra `file://` nenhum. Já
+ * publicado no R2 (`https://…`) volta tal e qual: a CSP já deixa passar esse
+ * domínio, e ler o ficheiro de novo aqui seria trabalho a mais pro mesmo byte.
+ */
+export async function previaDeAsset(siteId: string, caminhoBruto: unknown): Promise<string | null> {
+  if (typeof caminhoBruto !== "string" || !caminhoBruto) return null;
+  if (/^https?:\/\//i.test(caminhoBruto)) return caminhoBruto;
+  const semQuery = caminhoBruto.split("?")[0].replace(/^\/+/, "");
+  const ext = extname(semQuery).toLowerCase();
+  const mime = MIME_IMAGEM[ext];
+  if (!mime) return null;
+  const dir = await siteDir(siteId);
+  const arquivo = await containedPath(dir, "public", semQuery);
+  if (!existsSync(arquivo)) return null;
+  const info = await stat(arquivo);
+  if (info.size > PRE_VIA_MAX) return null;
+  const bytes = await readFile(arquivo);
+  return `data:${mime};base64,${bytes.toString("base64")}`;
 }
 
 export const FILTROS = [

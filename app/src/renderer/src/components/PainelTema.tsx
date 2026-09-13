@@ -76,6 +76,11 @@ export const PAPEIS: Grupo[] = [
         rotulo: "Contagem — contorno",
         onde: "A moldura à volta dos números.",
       },
+      {
+        chave: "realce-escuro",
+        rotulo: "Galeria",
+        onde: "O texto por baixo do título, entre o chapéu e as fotos.",
+      },
       { chave: "versiculo", rotulo: "Versículo", onde: "O versículo e a referência." },
       { chave: "bencao", rotulo: "Bênção", onde: "A frase da bênção, por cima dos nomes dos pais." },
       { chave: "pais", rotulo: "Pais", onde: "Nome dos pais e a linha que os separa." },

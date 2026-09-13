@@ -6,6 +6,8 @@ import { AvisoRSVP } from "@/components/AvisoRSVP";
 import { PainelTema } from "@/components/PainelTema";
 import { PainelMedidas } from "@/components/PainelMedidas";
 import { PainelOrnamentos } from "@/components/PainelOrnamentos";
+import { PainelHero } from "@/components/PainelHero";
+import { PainelGaleria } from "@/components/PainelGaleria";
 import { rotulo } from "@/lib/secoes";
 import { cn } from "@/lib/utils";
 
@@ -382,6 +384,24 @@ export function JsonForm({
     return (
       <PainelOrnamentos
         ornamentos={valor as Record<string, unknown>}
+        onChange={(caminho, novo) => alterar([secao, ...caminho], novo)}
+      />
+    );
+  }
+  if (secao === "hero" && valor !== null && typeof valor === "object" && !Array.isArray(valor)) {
+    return (
+      <PainelHero
+        hero={valor as Record<string, unknown>}
+        siteId={siteId}
+        onChange={(caminho, novo) => alterar([secao, ...caminho], novo)}
+      />
+    );
+  }
+  if (secao === "galeria" && valor !== null && typeof valor === "object" && !Array.isArray(valor)) {
+    return (
+      <PainelGaleria
+        galeria={valor as Record<string, unknown>}
+        siteId={siteId}
         onChange={(caminho, novo) => alterar([secao, ...caminho], novo)}
       />
     );

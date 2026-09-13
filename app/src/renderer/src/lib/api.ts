@@ -75,6 +75,9 @@ export const pickAssets = (id: string, pasta: boolean) =>
   call(api.pickAssets(id, pasta)) as Promise<AssetImportado[]>;
 export const semearAsset = (id: string, secao: string) =>
   call(api.semearAsset(id, secao)) as Promise<AssetImportado | null>;
+/** A imagem de um campo em `data:`, pra recorte visual. Vazio ou sem foto ainda dá `null`. */
+export const previaDeAsset = (id: string, caminho: string) =>
+  call(api.previaDeAsset(id, caminho)) as Promise<string | null>;
 
 /** O componente da secção, posto dentro do convite e ligado na página. */
 export type Plantio = {

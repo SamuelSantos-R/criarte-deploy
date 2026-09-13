@@ -15,7 +15,7 @@ import {
   salvarSessaoComoNovo,
   sincronizarTitulo,
 } from "./duplicar";
-import { FILTROS, importAssets, semearAsset } from "./assets";
+import { FILTROS, importAssets, previaDeAsset, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import {
@@ -213,6 +213,12 @@ export function registerIpc(): void {
 
   handle("assets:semente", (_e, id: unknown, secao: unknown) =>
     semearAsset(asString(id, "id"), asString(secao, "secao")),
+  );
+
+  // A ferramenta de recorte lê a foto de verdade pra arrastar em cima dela;
+  // sem isto o "posicao"/"zoom" da galeria e do hero eram números às cegas.
+  handle("assets:previa", (_e, id: unknown, caminho: unknown) =>
+    previaDeAsset(asString(id, "id"), caminho),
   );
 
   handle("secao:plantar", (_e, id: unknown, secao: unknown) =>

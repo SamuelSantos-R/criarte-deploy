@@ -1,6 +1,9 @@
 import { type ReactElement, type ReactNode } from "react";
 import type { Aparelho } from "@/components/Palco";
 
+/** Espessura do aro de metal, em CSS px do aparelho. */
+const ARO = 3;
+
 type Recorte = "ilha" | "entalhe" | "botao-inicio" | "nenhum";
 
 /** Medidas do corpo em CSS px do aparelho — proporções dos iPhones e iPads de verdade. */
@@ -64,10 +67,18 @@ export function MolduraAparelho({
         width: z(corpoL),
         height: z(corpoA),
         borderRadius: z(raioCorpo),
-        background: "linear-gradient(145deg, #3b3b40 0%, #1c1c1f 38%, #111113 62%, #2c2c30 100%)",
-        boxShadow: `inset 0 0 0 ${z(1.5)}px rgb(255 255 255 / 0.16), inset 0 0 0 ${z(4)}px #0b0b0c, 0 ${z(30)}px ${z(60)}px -${z(22)}px rgb(0 0 0 / 0.45), 0 ${z(6)}px ${z(14)}px -${z(6)}px rgb(0 0 0 / 0.25)`,
+        // Só o aro é metal: 3px de titânio com brilho na aresta de fora.
+        background: "linear-gradient(145deg, #5a5a60 0%, #2a2a2e 30%, #1a1a1d 55%, #46464c 100%)",
+        boxShadow: `inset 0 0 0 ${z(0.75)}px rgb(255 255 255 / 0.22), 0 ${z(30)}px ${z(60)}px -${z(22)}px rgb(0 0 0 / 0.45), 0 ${z(6)}px ${z(14)}px -${z(6)}px rgb(0 0 0 / 0.25)`,
       }}
     >
+      {/* Borda preta uniforme, concêntrica com o aro e com a tela — era o degradê
+          cinza aparecendo aqui que fazia os cantos parecerem tortos. */}
+      <div
+        aria-hidden
+        className="absolute bg-[#050506]"
+        style={{ inset: z(ARO), borderRadius: z(Math.max(0, raioCorpo - ARO)) }}
+      />
       {corpo.botoesLaterais && (
         <>
           {botao("esq", 150, 30)}
@@ -77,9 +88,21 @@ export function MolduraAparelho({
         </>
       )}
 
+      {/* clip-path em vez de só overflow+radius: o iframe escalado vira camada
+          própria no Chromium e escapava da curva nos cantos. Fundo preto porque
+          o arredondamento de subpixel deixava um fio branco na borda. */}
       <div
-        className="absolute overflow-hidden bg-white"
-        style={{ left: z(bx), top: z(by), width: z(largura), height: z(altura), borderRadius: z(corpo.raioTela) }}
+        className="absolute overflow-hidden bg-black"
+        style={{
+          left: z(bx),
+          top: z(by),
+          width: z(largura),
+          height: z(altura),
+          borderRadius: z(corpo.raioTela),
+          clipPath: `inset(0 round ${z(corpo.raioTela)}px)`,
+          isolation: "isolate",
+          transform: "translateZ(0)",
+        }}
       >
         {children}
 

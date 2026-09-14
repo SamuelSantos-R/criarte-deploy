@@ -116,6 +116,7 @@ export type Servidor = { siteId: string; url: string; lan: string | null };
 
 export const previewStart = (id: string) => call(api.previewStart(id)) as Promise<Servidor>;
 export const previewStop = () => call(api.previewStop());
+export const previewPreaquecer = (id: string) => call(api.previewPreaquecer(id));
 export const previewState = () => call(api.previewState()) as Promise<Servidor | null>;
 export const previewScroll = (ancora: string) => call(api.previewScroll(ancora)) as Promise<boolean>;
 export const previewRepintar = (doc?: unknown) =>
@@ -153,6 +154,7 @@ export const envelopeModelo = () => call(api.envelopeModelo()) as Promise<Modelo
 export const envelopeLista = () => call(api.envelopeLista()) as Promise<Lista | null>;
 export const envelopePasta = () => call(api.envelopePasta()) as Promise<string | null>;
 export const envelopeGerar = (p: PedidoEnvelope) => call(api.envelopeGerar(p)) as Promise<Saida>;
+export const envelopeLinkUnico = (e: { url: string; nome: string }) => call(api.envelopeLinkUnico(e)) as Promise<Lista>;
 export const envelopeAbrirSaida = () => call(api.envelopeAbrirSaida());
 
 export type FonteMonograma = { chave: string; nome: string };

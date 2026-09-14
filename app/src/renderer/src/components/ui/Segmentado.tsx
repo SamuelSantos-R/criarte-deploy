@@ -1,4 +1,5 @@
-import { type ReactElement, type ReactNode } from "react";
+import { useId, type ReactElement, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,6 +19,7 @@ export function Segmentado<T extends string>({
   rotulo: string;
   className?: string;
 }): ReactElement {
+  const pilula = useId();
   return (
     <div role="radiogroup" aria-label={rotulo} className={cn("no-drag inline-flex rounded-lg bg-surface-2 p-0.5", className)}>
       {opcoes.map((o) => (
@@ -29,11 +31,19 @@ export function Segmentado<T extends string>({
           disabled={o.disabled}
           onClick={() => onChange(o.valor)}
           className={cn(
-            "flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-[12px] font-semibold transition-[background-color,color,box-shadow] duration-150 disabled:opacity-40",
-            valor === o.valor ? "bg-surface text-text shadow-sm" : "text-muted hover:text-text",
+            "relative flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-[12px] font-semibold transition-colors duration-150 disabled:opacity-40",
+            valor === o.valor ? "text-text" : "text-muted hover:text-text",
           )}
         >
-          {o.rotulo}
+          {/* A opção ativa é um botão claro que desliza até à escolhida. */}
+          {valor === o.valor && (
+            <motion.span
+              layoutId={pilula}
+              className="absolute inset-0 rounded-md bg-surface shadow-sm"
+              transition={{ type: "spring", stiffness: 520, damping: 38 }}
+            />
+          )}
+          <span className="relative flex items-center gap-1.5">{o.rotulo}</span>
         </button>
       ))}
     </div>

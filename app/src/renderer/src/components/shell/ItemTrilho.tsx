@@ -1,5 +1,6 @@
 import { type ReactElement } from "react";
 import type { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,11 +31,19 @@ export function ItemTrilho({
     >
       <span
         className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-xl transition-[background-color,color,transform] duration-200 ease-out group-active:scale-95",
-          ativo ? "bg-cyan text-on-cyan shadow-sm" : "text-muted group-hover:bg-surface-2 group-hover:text-text",
+          "relative flex h-10 w-10 items-center justify-center rounded-xl transition-[color,transform] duration-200 ease-out group-active:scale-95",
+          ativo ? "text-on-cyan" : "text-muted group-hover:bg-surface-2 group-hover:text-text",
         )}
       >
-        <Icone size={19} strokeWidth={ativo ? 2.2 : 1.9} />
+        {/* Um ladrilho só, que desliza de ferramenta em ferramenta em vez de piscar. */}
+        {ativo && (
+          <motion.span
+            layoutId="trilho-ativo"
+            className="absolute inset-0 rounded-xl bg-cyan shadow-sm"
+            transition={{ type: "spring", stiffness: 520, damping: 38 }}
+          />
+        )}
+        <Icone size={19} strokeWidth={ativo ? 2.2 : 1.9} className="relative" />
       </span>
       <span
         className={cn(

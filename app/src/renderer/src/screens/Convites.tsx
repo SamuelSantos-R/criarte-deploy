@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useSiteValido } from "@/lib/useSiteValido";
-import { Copy, FolderOpen, Lock, PenLine, Redo2, RotateCcw, Save, Ticket, Trash2, Undo2, Users } from "lucide-react";
+import { Lock, Redo2, RotateCcw, Save, Undo2 } from "lucide-react";
 import {
   onConviteMudou,
   plantarSecao,
@@ -14,6 +14,7 @@ import {
   vigiarConvite,
   writeConvite,
   type Site,
+  previewPreaquecer,
 } from "@/lib/api";
 import {
   alternarSecao,
@@ -45,6 +46,7 @@ import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
 import { BotaoTrilha, ChaveSecao, Regua } from "@/components/ReguaSecoes";
 import { Topo } from "@/components/Topo";
+import { BotaoCoop, MenuConvite } from "@/components/AcoesConvite";
 
 // Tempo entre a última tecla e o disco. Curto o bastante pra parecer ao vivo,
 // longo o bastante pra não gravar letra por letra enquanto se digita um nome.
@@ -122,6 +124,11 @@ export function Convites({
   // O documento em cena é o do anfitrião, mas o `id` daqui é o site local. Deixar
   // gravar escreveria o convite do outro por cima de um ficheiro que não é dele.
   const convidado = coop.estado.papel === "convidado";
+  // Neste Mac compilar um convite custa ~15s. Começa por trás assim que ele é
+  // escolhido, para o "Ligar" encontrar a página já feita.
+  useEffect(() => {
+    if (id && !convidado) void previewPreaquecer(id).catch(() => {});
+  }, [id, convidado]);
   // Com sessão aberta quem grava é o anfitrião, a cada patch. O mtime que este
   // painel guarda envelhece a cada gravação dessas, então um ⌘S daqui bateria na
   // guarda e acusaria conflito com o próprio trabalho.
@@ -506,7 +513,7 @@ export function Convites({
         />
         {/* Par segmentado, encostado e com régua no meio: desfazer e refazer são
             a mesma ação em dois sentidos, não dois botões que por acaso vizinham. */}
-        <div className="no-drag flex shrink-0 items-center border border-rule rounded-lg">
+        <div className="no-drag flex shrink-0 items-center rounded-full border border-rule bg-surface px-0.5">
           <BotaoTrilha
             rotuloAcao="Desfazer"
             atalho="⌘Z"
@@ -531,67 +538,36 @@ export function Convites({
         )}
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {sujo && !emSessao && (
-            <Button variant="ghost" onClick={descartar}>
+            <Button variant="ghost" className="h-9 rounded-full" onClick={descartar}>
               <RotateCcw size={13} /> Descartar
             </Button>
           )}
-          {/* Aberta, a sessão veste a sua tinta: o botão vira bloco magenta com
-              a contagem, e diz que há outra mão sem ter de abrir o painel. */}
-          <button
-            type="button"
-            aria-pressed={mostrarCoop}
+          <BotaoCoop
+            ligado={coop.ligado}
+            // O convidado não recebe a lista de pares: do lado dele há sempre o anfitrião.
+            outros={convidado ? Math.max(1, coop.estado.pares.length) : coop.estado.pares.length}
+            aberto={mostrarCoop}
             onClick={() => setMostrarCoop((v) => !v)}
-            title={coop.ligado ? "Coop aberta — abrir painel" : "Abrir sessão coop"}
-            className={cn(
-              "no-drag flex h-[28px] shrink-0 items-center gap-2 px-2.5 text-[12px] font-medium transition-colors duration-0",
-              coop.ligado
-                ? "bg-magenta text-on-magenta"
-                : mostrarCoop
-                  ? "bg-surface-2 text-text"
-                  : "text-muted hover:bg-surface-2 hover:text-text",
-            )}
-          >
-            <Users size={13} strokeWidth={1.8} aria-hidden />
-            <span>Coop</span>
-            {coop.ligado && (
-              <span className="gauge font-narrow text-gauge font-semibold">
-                {String(coop.estado.pares.length + 1).padStart(2, "0")}
-              </span>
-            )}
-          </button>
-          {/* No convidado é o único jeito de ficar com o convite: a pasta do
-              site está na máquina do anfitrião, não na dele. */}
-          {(id || convidado) && dados && (
-            <Button variant="ghost" onClick={() => setDuplicando(true)}>
-              <Copy size={13} /> {convidado ? "Salvar aqui" : "Salvar como novo"}
-            </Button>
-          )}
-          {id && !convidado && (
-            <Button variant="ghost" onClick={() => setRenomeando(true)}>
-              <PenLine size={13} /> Renomear
-            </Button>
-          )}
-          {id && !convidado && (
-            <Button variant="ghost" onClick={() => setTokenizando(true)}>
-              <Ticket size={13} /> Tokenizar
-            </Button>
-          )}
-          {id && !convidado && (
-            <Button variant="ghost" onClick={() => void reveal(id)}>
-              <FolderOpen size={13} /> Abrir pasta
-            </Button>
-          )}
-          {id && !convidado && (
-            <Button variant="ghost" onClick={() => setApagando(true)}>
-              <Trash2 size={13} /> Apagar
-            </Button>
-          )}
+          />
+          <MenuConvite
+            convidado={convidado}
+            // No convidado é o único jeito de ficar com o convite: a pasta do
+            // site está na máquina do anfitrião, não na dele.
+            podeSalvarComoNovo={Boolean((id || convidado) && dados)}
+            temSite={Boolean(id)}
+            onSalvarComoNovo={() => setDuplicando(true)}
+            onRenomear={() => setRenomeando(true)}
+            onTokenizar={() => setTokenizando(true)}
+            onAbrirPasta={() => id && void reveal(id)}
+            onApagar={() => setApagando(true)}
+          />
           {/* Amarelo é a tinta do "por gravar": o botão só a veste enquanto há
               alguma coisa por gravar, e volta a contorno assim que o disco iguala. */}
           {!emSessao && (
             <Button
               variant={sujo ? "save" : "outline"}
               size="sm"
+              className="h-9 rounded-full px-4"
               disabled={!sujo || salvando}
               onClick={() => void salvar()}
             >

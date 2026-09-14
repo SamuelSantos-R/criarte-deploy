@@ -101,6 +101,7 @@ const api = {
 
   previewStart: (id: string) => invoke<Servidor>("preview:start", id),
   previewStop: () => invoke<void>("preview:stop"),
+  previewPreaquecer: (id: string) => invoke<void>("preview:preaquecer", id),
   previewState: () => invoke<Servidor | null>("preview:state"),
   previewScroll: (ancora: string) => invoke<boolean>("preview:scroll", ancora),
   previewRepintar: (doc: unknown) => invoke<boolean>("preview:repintar", doc),
@@ -116,6 +117,7 @@ const api = {
   envelopeLista: () => invoke<unknown>("envelope:lista"),
   envelopePasta: () => invoke<string | null>("envelope:pasta"),
   envelopeGerar: (opcoes: unknown) => invoke<unknown>("envelope:gerar", opcoes),
+  envelopeLinkUnico: (entrada: unknown) => invoke<unknown>("envelope:linkUnico", entrada),
   envelopeAbrirSaida: () => invoke<void>("envelope:abrirSaida"),
 
   monogramaRecursos: () => invoke<unknown>("monograma:recursos"),

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
-import { FileText, Image, Rocket, Settings, Signature, Smartphone, Stamp } from "lucide-react";
+import { motion } from "framer-motion";
+import { FileText, Image, KanbanSquare, Rocket, Settings, Signature, Smartphone, Stamp } from "lucide-react";
 import { getSettings, listSites, type Site } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProvaProvider, useProva } from "@/lib/prova";
@@ -14,8 +15,9 @@ import { Preview } from "@/screens/Preview";
 import { Config } from "@/screens/Config";
 import { Envelope } from "@/screens/Envelope";
 import { Monograma } from "@/screens/Monograma";
+import { Quadro } from "@/screens/Quadro";
 
-type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "monograma" | "config";
+type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "monograma" | "quadro" | "config";
 type Item = { id: Tela; label: string; Icone: typeof FileText };
 
 const TRABALHO: Item[] = [
@@ -29,6 +31,7 @@ const TRABALHO: Item[] = [
 const AVULSO: Item[] = [
   { id: "envelope", label: "Envelopes", Icone: Stamp },
   { id: "monograma", label: "Monogramas", Icone: Signature },
+  { id: "quadro", label: "Quadro", Icone: KanbanSquare },
 ];
 
 /**
@@ -38,13 +41,37 @@ const AVULSO: Item[] = [
  */
 function Aba({ ativa, children }: { ativa: boolean; children: ReactNode }): ReactElement {
   return (
-    <div
+    <motion.div
       aria-hidden={!ativa}
-      // `hidden` some do layout mas mantém o nó — o iframe do preview continua vivo.
-      className={cn("min-h-0 min-w-0 flex-1 flex-col", ativa ? "flex" : "hidden")}
+      // Continua a esconder por `display` e nunca desmonta — o iframe do preview
+      // segue vivo. Só opacidade e deslocamento: filtro ou transform que ficasse
+      // aplicado prenderia os modais `fixed` dentro do painel.
+      initial={false}
+      animate={
+        ativa
+          ? { opacity: 1, y: 0, display: "flex" }
+          : { opacity: 0, y: 6, transitionEnd: { display: "none" } }
+      }
+      transition={{ duration: ativa ? 0.28 : 0, ease: [0.22, 1, 0.36, 1] }}
+      className={cn("min-h-0 min-w-0 flex-1 flex-col")}
+      style={{ display: ativa ? "flex" : "none" }}
     >
       {children}
-    </div>
+    </motion.div>
+  );
+}
+
+/** Tela que monta e desmonta: a mesma entrada das abas, sem ficar escondida. */
+function Entrada({ children }: { children: ReactNode }): ReactElement {
+  return (
+    <motion.div
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -149,8 +176,10 @@ function Estudio(): ReactElement {
         <main className="flex min-h-0 min-w-0 flex-1 pb-3 pr-3">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-painel">
             {!pronto && <p className="px-6 pt-16 text-[13px] text-muted">Abrindo…</p>}
-            {pronto && ((semRaiz && tela !== "envelope" && tela !== "monograma") || tela === "config") && (
-              <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
+            {pronto && ((semRaiz && tela !== "envelope" && tela !== "monograma" && tela !== "quadro") || tela === "config") && (
+              <Entrada key="config">
+                <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
+              </Entrada>
             )}
             {pronto && !semRaiz && visitadas.includes("convites") && (
               <Aba ativa={tela === "convites"}>
@@ -172,7 +201,16 @@ function Estudio(): ReactElement {
                 <Fotos sites={sites} id={site} setId={setSite} />
               </Aba>
             )}
-            {pronto && tela === "envelope" && <Envelope />}
+            {pronto && tela === "envelope" && (
+              <Entrada key="envelope">
+                <Envelope />
+              </Entrada>
+            )}
+            {pronto && visitadas.includes("quadro") && (
+              <Aba ativa={tela === "quadro"}>
+                <Quadro sites={sites} />
+              </Aba>
+            )}
             {/* Montada escondida como as abas do fluxo: trocar de tela não pode apagar o monograma em curso. */}
             {pronto && visitadas.includes("monograma") && (
               <Aba ativa={tela === "monograma"}>

@@ -1,4 +1,4 @@
-import { nativeImage } from "electron";
+import { app, nativeImage } from "electron";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { PDFDocument, PDFName, PDFString, type PDFRef } from "pdf-lib";
@@ -70,7 +70,10 @@ function semRepetidos(lista: Convidado[]): Convidado[] {
   });
 }
 
-const estado: { pdf: Uint8Array | null; lista: string | null; pasta: string | null } = {
+/** A lista vem de um .txt em massa ou de um link só, escrito na hora. */
+type Origem = { tipo: "arquivo"; caminho: string } | { tipo: "unico"; convidado: Convidado };
+
+const estado: { pdf: Uint8Array | null; lista: Origem | null; pasta: string | null } = {
   pdf: null,
   lista: null,
   pasta: null,
@@ -126,7 +129,7 @@ export async function carregarLista(caminho: string): Promise<Lista> {
   const lista = lerLista(texto);
   if (lista.length === 0) throw new Error("nenhuma linha com link nesse arquivo");
   const repetidas = repetidos(lista);
-  estado.lista = caminho;
+  estado.lista = { tipo: "arquivo", caminho };
   return {
     caminho,
     nome: basename(caminho),
@@ -135,6 +138,21 @@ export async function carregarLista(caminho: string): Promise<Lista> {
     repetidos: repetidas,
     amostra: lista.slice(0, 6),
   };
+}
+
+/** Um convite avulso: sem .txt, o link e o nome entram direto. */
+export function definirLinkUnico(entrada: unknown): Lista {
+  const e = (entrada ?? {}) as Record<string, unknown>;
+  const url = typeof e.url === "string" ? e.url.trim() : "";
+  if (!/^https?:\/\/\S+$/i.test(url)) throw new Error("o link tem de começar por http:// ou https://");
+  const nome = typeof e.nome === "string" ? e.nome.trim().slice(0, 120) : "";
+  const convidado = { url, nome };
+  estado.lista = { tipo: "unico", convidado };
+  return { caminho: "", nome: nome || "Link único", total: 1, unicos: 1, repetidos: [], amostra: [convidado] };
+}
+
+async function convidados(origem: Origem): Promise<Convidado[]> {
+  return origem.tipo === "unico" ? [origem.convidado] : lerLista(await readFile(origem.caminho, "utf8"));
 }
 
 export function definirPasta(caminho: string): string {
@@ -177,7 +195,7 @@ async function carimbar(bytes: Uint8Array, rect: number[], url: string): Promise
 export async function gerar(opcoes: unknown): Promise<Saida> {
   const o = (opcoes ?? {}) as Record<string, unknown>;
   if (!estado.pdf) throw new Error("escolha a imagem do convite primeiro");
-  if (!estado.lista) throw new Error("escolha o .txt dos convidados");
+  if (!estado.lista) throw new Error("escolha o .txt dos convidados ou escreva um link");
 
   const r = o.rect;
   if (!Array.isArray(r) || r.length !== 4 || r.some((n) => !Number.isFinite(Number(n)))) {
@@ -187,12 +205,17 @@ export async function gerar(opcoes: unknown): Promise<Saida> {
   const rect = [Math.min(x1, x2), Math.min(y1, y2), Math.max(x1, x2), Math.max(y1, y2)];
   if (rect[2] - rect[0] < 2 || rect[3] - rect[1] < 2) throw new Error("a área marcada é pequena demais");
 
-  const pasta = estado.pasta ?? join(dirname(estado.lista), "saida");
+  // Link único não tem pasta de onde veio: sem escolha, vai para as Transferências.
+  const pasta =
+    estado.pasta ??
+    (estado.lista.tipo === "arquivo"
+      ? join(dirname(estado.lista.caminho), "saida")
+      : join(app.getPath("downloads"), "Criarte Envelopes"));
   await mkdir(pasta, { recursive: true });
   estado.pasta = pasta;
 
   const molde = typeof o.padrao === "string" && o.padrao.trim() ? o.padrao.trim() : "{nome}";
-  let lista = lerLista(await readFile(estado.lista, "utf8"));
+  let lista = await convidados(estado.lista);
   if (o.semRepetidos === true) lista = semRepetidos(lista);
 
   const usados = new Map<string, number>();

@@ -106,10 +106,20 @@ async function portaLivre(): Promise<number> {
   });
 }
 
-export async function iniciarServidor(siteId: string): Promise<Servidor> {
-  if (servidor?.siteId === siteId) return { siteId, url: servidor.url, lan: servidor.lan };
-  pararServidor();
+type Vivo = Servidor & { child: ChildProcess };
 
+/**
+ * Um `next dev` pronto e compilado que não está no ecrã. Neste Mac o primeiro
+ * carregamento de um convite custa ~15s de CPU (medido: 14–28s frio, 15s mesmo
+ * com o cache do webpack gravado), e o Turbopack do Next 14.2 não arranca com o
+ * `node_modules` partilhado na raiz de sites. Então em vez de compilar mais
+ * depressa, compila-se antes: o convite escolhido aquece por trás, e o que se
+ * deixa de ver fica de reserva uns minutos — voltar a ele é instantâneo.
+ */
+let reserva: { siteId: string; vivo: Promise<Vivo>; timer: NodeJS.Timeout } | null = null;
+const RESERVA_MS = 15 * 60_000;
+
+async function subir(siteId: string): Promise<Vivo> {
   const cwd = await siteDir(siteId);
   // Antes do `next dev` subir, pra ele já compilar o convite consertado.
   await repararConvite(cwd).catch(() => []);
@@ -155,27 +165,84 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
 
   try {
     await pronto;
+    // "Ready" é só o servidor de pé; a página compila no primeiro pedido. Pedi-la
+    // aqui é o que faz o aquecimento valer: quem chega depois já a encontra feita.
+    await assinaturaServida(url, AbortSignal.timeout(90_000));
   } catch (e) {
-    pararServidor();
+    child.kill("SIGTERM");
     throw e;
   }
+  return { siteId, url, lan: lanIp ? `http://${lanIp}:${porta}` : null, child };
+}
 
-  servidor = { siteId, url, lan: lanIp ? `http://${lanIp}:${porta}` : null, child };
+function descartarReserva(): void {
+  if (!reserva) return;
+  const r = reserva;
+  reserva = null;
+  clearTimeout(r.timer);
+  void r.vivo.then((v) => v.child.kill("SIGTERM")).catch(() => {});
+}
+
+function guardarReserva(siteId: string, vivo: Promise<Vivo>): void {
+  descartarReserva();
+  const timer = setTimeout(descartarReserva, RESERVA_MS);
+  timer.unref?.();
+  const r = { siteId, vivo, timer };
+  reserva = r;
+  vivo.catch(() => {
+    if (reserva === r) {
+      clearTimeout(r.timer);
+      reserva = null;
+    }
+  });
+}
+
+/** Começa a compilar o convite por trás, sem o pôr no ecrã. */
+export function preaquecer(siteId: string): void {
+  if (servidor?.siteId === siteId || reserva?.siteId === siteId) return;
+  guardarReserva(siteId, subir(siteId));
+}
+
+export async function iniciarServidor(siteId: string): Promise<Servidor> {
+  if (servidor?.siteId === siteId) return { siteId, url: servidor.url, lan: servidor.lan };
+
+  let vivo: Promise<Vivo>;
+  if (reserva?.siteId === siteId) {
+    vivo = reserva.vivo;
+    clearTimeout(reserva.timer);
+    reserva = null;
+  } else {
+    vivo = subir(siteId);
+  }
+  // O que estava no ecrã não morre: passa a reserva, para a volta ser imediata.
+  pararServidor();
+
+  servidor = await vivo;
   // Ponto de partida do repinte: sem esta leitura a primeira gravação achava
   // que a página tinha mudado e recarregava com o conteúdo ainda velho.
-  assinatura = await assinaturaServida(url, AbortSignal.timeout(20_000));
+  assinatura = await assinaturaServida(servidor.url, AbortSignal.timeout(20_000));
   for (const ouvinte of ouvintes) ouvinte();
   return { siteId, url: servidor.url, lan: servidor.lan };
 }
 
+/** Tira o preview do ecrã. O servidor fica aquecido de reserva, não morre. */
 export function pararServidor(): void {
-  servidor?.child.kill("SIGTERM");
-  servidor = null;
+  if (servidor) {
+    const s = servidor;
+    servidor = null;
+    guardarReserva(s.siteId, Promise.resolve(s));
+  }
   espera?.abort();
   espera = null;
   assinatura = null;
   ultimoDoc = null;
   for (const ouvinte of ouvintes) ouvinte();
+}
+
+/** Ao fechar o app: nada fica a correr. */
+export function encerrarPreviews(): void {
+  pararServidor();
+  descartarReserva();
 }
 
 const ouvintes: (() => void)[] = [];

@@ -1,5 +1,5 @@
 import { type ReactElement } from "react";
-import { CircleCheck, Lock, PenLine, Server, Users } from "lucide-react";
+import { CircleCheck, Lock, PenLine, Server } from "lucide-react";
 import { useProva } from "@/lib/prova";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +47,7 @@ function Estado({
 /** Os quatro estados do trabalho, na ordem em que acontecem: servidor, coop, gravar, publicar. */
 export function BarraDeCor(): ReactElement {
   const { prova } = useProva();
-  const { servidor, coopLigado, coopPares, coopTranca, porGravar, publicacao } = prova;
+  const { servidor, coopLigado, coopTranca, porGravar, publicacao } = prova;
 
   return (
     <div aria-label="Estado do convite" className="no-drag flex items-center gap-1">
@@ -58,19 +58,17 @@ export function BarraDeCor(): ReactElement {
         rotulo={servidor ? servidor.replace(/^https?:\/\//, "") : "Servidor"}
         titulo={servidor ? `Servidor a correr em ${servidor}` : "Servidor parado"}
       />
-      <Estado
-        ligado={coopLigado}
-        tinta="magenta"
-        Icone={coopTranca ? Lock : Users}
-        rotulo={coopTranca ? `${coopTranca} a editar` : `Coop · ${coopPares}`}
-        titulo={
-          coopTranca
-            ? `${coopTranca} está a segurar um campo`
-            : coopLigado
-              ? `Coop aberta — ${coopPares} na mesa`
-              : "Coop fechada — está sozinho no convite"
-        }
-      />
+      {/* O coop mora no botão do bonequinho, com a contagem. Aqui só aparece
+          quando alguém segura um campo — é o que o botão não diz. */}
+      {coopLigado && coopTranca && (
+        <Estado
+          ligado
+          tinta="magenta"
+          Icone={Lock}
+          rotulo={`${coopTranca} a editar`}
+          titulo={`${coopTranca} está a segurar um campo`}
+        />
+      )}
       <Estado
         ligado={porGravar}
         tinta="yellow"

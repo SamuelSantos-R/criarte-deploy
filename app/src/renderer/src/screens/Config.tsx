@@ -195,6 +195,14 @@ export function Config({
         </div>
       </div>
 
+      <p className="border-t border-rule px-8 py-2 text-[11px] text-muted">
+        Algumas animações vêm de componentes free do{" "}
+        <button type="button" className="underline hover:text-text" onClick={() => void openExternal("https://skiper-ui.com")}>
+          Skiper UI
+        </button>
+        .
+      </p>
+
       <Console linhas={job.linhas} estado={job.estado} erro={job.erro} vazio="Saída do doctor e da instalação de dependências aparece aqui." />
     </div>
   );

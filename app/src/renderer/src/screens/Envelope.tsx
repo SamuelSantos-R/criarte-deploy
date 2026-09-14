@@ -3,6 +3,7 @@ import { FolderOpen, Image as Icone, ListChecks, Stamp } from "lucide-react";
 import {
   envelopeAbrirSaida,
   envelopeGerar,
+  envelopeLinkUnico,
   envelopeLista,
   envelopeModelo,
   envelopePasta,
@@ -11,11 +12,24 @@ import {
   type Saida,
 } from "@/lib/api";
 import { Button, Input } from "@/components/ui/primitives";
+import { Segmentado } from "@/components/ui/Segmentado";
 import { Topo } from "@/components/Topo";
 
 type Marca = { x: number; y: number; l: number; a: number };
 
 const MINIMO = 0.004;
+
+/** As oito alças do Canva: cantos redondos, lados em barrinha. */
+const ALCAS: { lado: string; cursor: string; barra?: boolean; estilo: Record<string, string> }[] = [
+  { lado: "nw", cursor: "nwse-resize", estilo: { left: "-6px", top: "-6px" } },
+  { lado: "ne", cursor: "nesw-resize", estilo: { right: "-6px", top: "-6px" } },
+  { lado: "sw", cursor: "nesw-resize", estilo: { left: "-6px", bottom: "-6px" } },
+  { lado: "se", cursor: "nwse-resize", estilo: { right: "-6px", bottom: "-6px" } },
+  { lado: "n", cursor: "ns-resize", barra: true, estilo: { left: "calc(50% - 10px)", top: "-4px", width: "20px", height: "7px" } },
+  { lado: "s", cursor: "ns-resize", barra: true, estilo: { left: "calc(50% - 10px)", bottom: "-4px", width: "20px", height: "7px" } },
+  { lado: "w", cursor: "ew-resize", barra: true, estilo: { top: "calc(50% - 10px)", left: "-4px", width: "7px", height: "20px" } },
+  { lado: "e", cursor: "ew-resize", barra: true, estilo: { top: "calc(50% - 10px)", right: "-4px", width: "7px", height: "20px" } },
+];
 
 export function Envelope(): ReactElement {
   const [modelo, setModelo] = useState<Modelo | null>(null);
@@ -27,9 +41,17 @@ export function Envelope(): ReactElement {
   const [erro, setErro] = useState<string | null>(null);
   const [saida, setSaida] = useState<Saida | null>(null);
   const [gerando, setGerando] = useState(false);
+  const [modo, setModo] = useState<"lista" | "unico">("lista");
+  const [link, setLink] = useState("");
+  const [nomeUnico, setNomeUnico] = useState("");
 
   const folha = useRef<HTMLImageElement>(null);
-  const inicio = useRef<{ x: number; y: number } | null>(null);
+  const gesto = useRef<
+    | { tipo: "novo"; a: { x: number; y: number } }
+    | { tipo: "mover"; p0: { x: number; y: number }; m0: Marca }
+    | { tipo: "alca"; lado: string; m0: Marca }
+    | null
+  >(null);
 
   const pegar = <T,>(fn: () => Promise<T | null>, guardar: (v: T) => void) => (): void => {
     setErro(null);
@@ -48,21 +70,35 @@ export function Envelope(): ReactElement {
     };
   };
 
+  // Como no Canva: arrastar no vazio desenha, por dentro move, e cada uma das
+  // oito alças puxa só o seu lado (ou os dois do canto).
   const arrastar = (e: ReactPointerEvent): void => {
-    if (!inicio.current) return;
+    const g = gesto.current;
+    if (!g) return;
     const p = ponto(e);
     if (!p) return;
-    const a = inicio.current;
-    setMarca({
-      x: Math.min(a.x, p.x),
-      y: Math.min(a.y, p.y),
-      l: Math.abs(p.x - a.x),
-      a: Math.abs(p.y - a.y),
-    });
+    const lim = (v: number): number => Math.min(Math.max(v, 0), 1);
+    if (g.tipo === "novo") {
+      setMarca({ x: Math.min(g.a.x, p.x), y: Math.min(g.a.y, p.y), l: Math.abs(p.x - g.a.x), a: Math.abs(p.y - g.a.y) });
+      return;
+    }
+    const m = g.m0;
+    if (g.tipo === "mover") {
+      const x = Math.min(Math.max(m.x + p.x - g.p0.x, 0), 1 - m.l);
+      const y = Math.min(Math.max(m.y + p.y - g.p0.y, 0), 1 - m.a);
+      setMarca({ ...m, x, y });
+      return;
+    }
+    let [x1, y1, x2, y2] = [m.x, m.y, m.x + m.l, m.y + m.a];
+    if (g.lado.includes("w")) x1 = lim(p.x);
+    if (g.lado.includes("e")) x2 = lim(p.x);
+    if (g.lado.includes("n")) y1 = lim(p.y);
+    if (g.lado.includes("s")) y2 = lim(p.y);
+    setMarca({ x: Math.min(x1, x2), y: Math.min(y1, y2), l: Math.abs(x2 - x1), a: Math.abs(y2 - y1) });
   };
 
   const soltar = (e: ReactPointerEvent): void => {
-    inicio.current = null;
+    gesto.current = null;
     e.currentTarget.releasePointerCapture?.(e.pointerId);
     setMarca((m) => (m && (m.l < MINIMO || m.a < MINIMO) ? null : m));
   };
@@ -101,9 +137,11 @@ export function Envelope(): ReactElement {
         <Button variant="ghost" onClick={pegar(envelopeModelo, setModelo)}>
           <Icone size={13} /> {modelo ? "Trocar convite" : "Convite"}
         </Button>
-        <Button variant="ghost" onClick={pegar(envelopeLista, setLista)}>
-          <ListChecks size={13} /> {lista ? "Trocar lista" : "Lista .txt"}
-        </Button>
+        {modo === "lista" && (
+          <Button variant="ghost" onClick={pegar(envelopeLista, setLista)}>
+            <ListChecks size={13} /> {lista ? "Trocar lista" : "Lista .txt"}
+          </Button>
+        )}
         <Button variant="ghost" onClick={pegar(envelopePasta, setPasta)}>
           <FolderOpen size={13} /> Pasta
         </Button>
@@ -124,13 +162,19 @@ export function Envelope(): ReactElement {
         <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-surface-2/40 p-8">
           {modelo ? (
             <div
-              className="relative max-h-full max-w-full cursor-crosshair select-none"
+              className="relative max-h-full max-w-full cursor-crosshair select-none touch-none"
               onPointerDown={(e) => {
                 const p = ponto(e);
                 if (!p) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
-                inicio.current = p;
-                setMarca({ x: p.x, y: p.y, l: 0, a: 0 });
+                const alvo = e.target as HTMLElement;
+                const lado = alvo.closest<HTMLElement>("[data-alca]")?.dataset.alca;
+                if (marca && lado) gesto.current = { tipo: "alca", lado, m0: marca };
+                else if (marca && alvo.closest("[data-marca]")) gesto.current = { tipo: "mover", p0: p, m0: marca };
+                else {
+                  gesto.current = { tipo: "novo", a: p };
+                  setMarca({ x: p.x, y: p.y, l: 0, a: 0 });
+                }
               }}
               onPointerMove={arrastar}
               onPointerUp={soltar}
@@ -144,7 +188,8 @@ export function Envelope(): ReactElement {
               />
               {marca && (
                 <div
-                  className="pointer-events-none absolute border border-focus bg-focus/25"
+                  data-marca
+                  className="absolute cursor-move rounded-[3px] border-2 border-focus bg-focus/20 shadow-[0_0_0_1px_rgb(255_255_255/0.6)]"
                   style={{
                     left: `${marca.x * 100}%`,
                     top: `${marca.y * 100}%`,
@@ -152,8 +197,20 @@ export function Envelope(): ReactElement {
                     height: `${marca.a * 100}%`,
                   }}
                 >
-                  <span className="absolute -top-5 left-0 whitespace-nowrap font-narrow font-semibold text-gauge text-focus">
-                    {emPontos(marca, modelo).join(" ")}
+                  {ALCAS.map(({ lado, estilo, cursor, barra }) => (
+                    <span
+                      key={lado}
+                      data-alca={lado}
+                      className={
+                        barra
+                          ? "absolute rounded-full border border-focus bg-white shadow-sm"
+                          : "absolute h-3 w-3 rounded-full border-2 border-focus bg-white shadow-sm"
+                      }
+                      style={{ ...estilo, cursor }}
+                    />
+                  ))}
+                  <span className="pointer-events-none absolute -top-6 left-0 whitespace-nowrap rounded bg-focus px-1.5 py-0.5 font-narrow text-[10px] font-semibold text-white">
+                    {Math.round(marca.l * modelo.largura)} × {Math.round(marca.a * modelo.altura)}
                   </span>
                 </div>
               )}
@@ -172,12 +229,45 @@ export function Envelope(): ReactElement {
           <span className="font-narrow font-semibold text-label text-muted">Área do botão</span>
           <p className="mt-2 text-[12px] leading-normal text-muted">
             {marca
-              ? "Arraste de novo pra remarcar."
+              ? "Puxe as alças pra ajustar cada lado, arraste por dentro pra mover, ou desenhe outra fora."
               : "Arraste por cima do convite onde o convidado vai tocar."}
           </p>
 
           <span className="mt-8 block font-narrow font-semibold text-label text-muted">Convidados</span>
-          {lista ? (
+          <Segmentado
+            rotulo="De onde vêm os links"
+            valor={modo}
+            className="mt-2 w-full"
+            onChange={(m) => {
+              setModo(m);
+              setLista(null);
+              setErro(null);
+            }}
+            opcoes={[
+              { valor: "lista", rotulo: "Lista .txt" },
+              { valor: "unico", rotulo: "Link único" },
+            ]}
+          />
+          {modo === "unico" ? (
+            <form
+              className="mt-3 space-y-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                pegar(() => envelopeLinkUnico({ url: link, nome: nomeUnico }), setLista)();
+              }}
+            >
+              <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" aria-label="Link do convidado" spellCheck={false} />
+              <Input value={nomeUnico} onChange={(e) => setNomeUnico(e.target.value)} placeholder="Nome (opcional)" aria-label="Nome do convidado" />
+              <Button type="submit" variant="outline" className="w-full" disabled={!link.trim()}>
+                {lista ? "Atualizar link" : "Usar este link"}
+              </Button>
+              {lista && (
+                <p className="text-[12px] text-muted">
+                  1 PDF para <span className="text-text">{lista.nome}</span>
+                </p>
+              )}
+            </form>
+          ) : lista ? (
             <>
               <p className="mt-2 break-all font-mono text-[11px] text-text">{lista.nome}</p>
               <p className="mt-1 text-[12px] text-muted">
@@ -215,7 +305,7 @@ export function Envelope(): ReactElement {
 
           <span className="mt-8 block font-narrow font-semibold text-label text-muted">Salvar em</span>
           <p className="mt-2 break-all font-mono text-[11px] text-text">
-            {pasta ?? "saida/ ao lado do .txt"}
+            {pasta ?? (modo === "unico" ? "Transferências/Criarte Envelopes" : "saida/ ao lado do .txt")}
           </p>
 
           {saida && (

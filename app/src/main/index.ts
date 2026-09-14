@@ -3,7 +3,7 @@ import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { join } from "node:path";
 import { registerIpc } from "./ipc";
 import { killAll } from "./cli";
-import { origensDoPreview, pararServidor } from "./preview";
+import { encerrarPreviews, origensDoPreview } from "./preview";
 import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 import { limparAtualizacao } from "./atualizar";
@@ -117,13 +117,13 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   killAll();
-  pararServidor();
+  encerrarPreviews();
   pararVigia();
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
   killAll();
-  pararServidor();
+  encerrarPreviews();
   pararVigia();
 });

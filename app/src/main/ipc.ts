@@ -18,7 +18,7 @@ import {
 } from "./duplicar";
 import { FILTROS, importAssets, previaDeAsset, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
-import { carregarLista, carregarModelo, definirPasta, gerar, pastaDaSaida } from "./envelope";
+import { carregarLista, carregarModelo, definirLinkUnico, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import {
   exportar,
   fontesRecentes,
@@ -31,7 +31,7 @@ import {
   ultimaPasta,
 } from "./monograma";
 import { abrirDaBiblioteca, apagarDaBiblioteca, lerSvg, listarBiblioteca, salvarNaBiblioteca, svgParaTemp } from "./biblioteca";
-import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, repintarPreview, rolarPreview } from "./preview";
+import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, preaquecer, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
 import { atualizarSecao, estadoPlantio, plantarSecao } from "./plantar";
 import { resolverFormulario } from "./formulario";
@@ -268,6 +268,7 @@ export function registerIpc(): void {
 
   handle("preview:start", (_e, id: unknown) => iniciarServidor(asString(id, "id")));
   handle("preview:stop", () => pararServidor());
+  handle("preview:preaquecer", (_e, id: unknown) => preaquecer(asString(id, "id")));
   handle("preview:state", () => estadoPreview());
   handle("preview:scroll", (event, ancora: unknown) =>
     rolarPreview(event.sender, asString(ancora, "âncora")),
@@ -310,6 +311,7 @@ export function registerIpc(): void {
   });
 
   handle("envelope:gerar", (_e, opcoes: unknown) => gerar(opcoes));
+  handle("envelope:linkUnico", (_e, entrada: unknown) => definirLinkUnico(entrada));
 
   // Sem caminho vindo do renderer: abre só a pasta que o próprio main escolheu.
   handle("envelope:abrirSaida", async () => {

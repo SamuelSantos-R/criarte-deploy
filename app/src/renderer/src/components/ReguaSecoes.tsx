@@ -133,7 +133,7 @@ export function BotaoTrilha({
       aria-label={`${rotuloAcao} — ${atalho}`}
       aria-keyshortcuts={atalho === "⌘Z" ? "Meta+Z" : "Shift+Meta+Z"}
       className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+        "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
         "text-muted hover:bg-surface-2 hover:text-text",
         "disabled:pointer-events-none disabled:opacity-40",
       )}

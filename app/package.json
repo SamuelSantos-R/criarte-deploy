@@ -1,6 +1,6 @@
 {
   "name": "criarte-studio",
-  "version": "5.64.3",
+  "version": "5.65.0",
   "description": "Fábrica de convites da Criarte Design AO",
   "main": "./out/main/index.js",
   "author": "Criarte Design AO",
@@ -44,6 +44,7 @@
     "electron": "^44.0.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "framer-motion": "^12.43.0",
     "lucide-react": "^0.469.0",
     "opentype.js": "^1.3.4",
     "postcss": "^8.4.49",

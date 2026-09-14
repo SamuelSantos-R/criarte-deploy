@@ -44,6 +44,18 @@ function tirarExcecao(codigo: string, icone: string): string {
   return novo !== codigo && !/<Image\b/.test(novo) ? novo.replace(/import Image from "next\/image";\r?\n/, "") : novo;
 }
 
+/**
+ * Nossa História: título em `whitespace-nowrap` numa coluna `1fr` alargava a
+ * coluna quando não cabia (iPhone 13/14, "Duas famílias, uma só história") e
+ * atirava o coração e o texto para cima da linha. `minmax(0,1fr)` segura as
+ * metades iguais e o título passa a quebrar em linhas equilibradas.
+ */
+function consertarHistoria(codigo: string): string {
+  return codigo
+    .replaceAll("grid grid-cols-[1fr_22px_1fr]", "grid grid-cols-[minmax(0,1fr)_22px_minmax(0,1fr)]")
+    .replaceAll("leading-[1.3] mb-1 whitespace-nowrap", "leading-[1.3] mb-1 [text-wrap:balance]");
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [];
   for (const nome of ICONES) {
@@ -61,6 +73,15 @@ export async function repararConvite(dir: string): Promise<string[]> {
     if (novo === codigo) continue;
     await writeFile(alvo, novo, "utf8");
     feitos.push(arquivo);
+  }
+  const historia = join(dir, "src", "components", "Historia.tsx");
+  if (existsSync(historia)) {
+    const codigo = await readFile(historia, "utf8");
+    const novo = consertarHistoria(codigo);
+    if (novo !== codigo) {
+      await writeFile(historia, novo, "utf8");
+      feitos.push("Historia.tsx");
+    }
   }
   return feitos;
 }

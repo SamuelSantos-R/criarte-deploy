@@ -39,7 +39,7 @@ function FotoCard({
   const { dataUrl, carregando } = usePreviaDeAsset(siteId, caminho);
 
   return (
-    <div className="relative rounded-xl border border-rule bg-surface p-3">
+    <div className="relative min-w-0 rounded-xl border border-rule bg-surface p-3">
       <div className="mb-2 flex items-center gap-2">
         {arrastavel}
         <span className="font-narrow text-gauge font-semibold text-muted">{String(indice + 1).padStart(2, "0")}</span>
@@ -133,7 +133,10 @@ export function PainelGaleria({
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* Colunas pelo espaço do painel, não pela janela: com "3 fixas", o preview
+          aberto espremia o formulário e a terceira coluna ficava fora de vista —
+          duas fotos pareciam não ter cartão. */}
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(230px,1fr))]">
         {fotos.map((foto, i) => (
           <div
             key={i}

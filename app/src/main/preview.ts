@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { siteDir } from "./sites";
 import { urlDoEspelho } from "./espelho";
+import { repararConvite } from "./reparos";
 
 export type Servidor = { siteId: string; url: string; lan: string | null };
 
@@ -110,6 +111,8 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
   pararServidor();
 
   const cwd = await siteDir(siteId);
+  // Antes do `next dev` subir, pra ele já compilar o convite consertado.
+  await repararConvite(cwd).catch(() => []);
   const bin = acharNext(cwd);
   if (!bin) {
     throw new Error("faltam as dependências dos convites — vá em Configurações e clique em Instalar");

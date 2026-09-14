@@ -1,0 +1,66 @@
+import { existsSync } from "node:fs";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { app } from "electron";
+
+// ============================================================================
+// REPAROS — correções que os convites já criados precisam receber. Cada site
+// tem a sua cópia dos componentes, então um fix feito nos sites do repo não
+// chega ao convite que só existe na máquina de outra pessoa. O Studio aplica
+// ao abrir o preview; tudo é idempotente e só mexe no que reconhece.
+// ============================================================================
+
+function molde(nome: string): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, "icones", nome)
+    : resolve(app.getAppPath(), "resources", "icones", nome);
+}
+
+/**
+ * Ícone de duas cores (tinta + miolo claro pintado) não segue o tema: a máscara
+ * do IconeTinta pinta o miolo junto. O molde é o mesmo desenho com o miolo como
+ * buraco de verdade, num path só.
+ */
+const ICONES = ["danca-dos-noivos.svg", "registe-esse-momento.svg"];
+
+function duasCores(svg: string): boolean {
+  const cores = new Set((svg.match(/fill:\s*#[0-9a-f]{3,6}/gi) ?? []).map((c) => c.toLowerCase()));
+  return cores.size >= 2;
+}
+
+/** A exceção que mandava estes dois ícones pro <Image> cru, com as cores da arte. */
+const EXCECOES: { arquivo: string; icone: string }[] = [
+  { arquivo: "NossoDia.tsx", icone: "danca-dos-noivos" },
+  { arquivo: "Manual.tsx", icone: "registe-esse-momento" },
+];
+
+function tirarExcecao(codigo: string, icone: string): string {
+  const padrao = new RegExp(
+    `\\{item\\.icone\\.includes\\("${icone}"\\)\\s*\\?\\s*\\(\\s*<Image\\b[^>]*/>\\s*\\)\\s*:\\s*\\(\\s*(<IconeTinta\\b[^>]*/>)\\s*\\)\\s*\\}`,
+    "g",
+  );
+  const novo = codigo.replace(padrao, "$1");
+  // Sem outro <Image> no ficheiro, o import ficava a sobrar.
+  return novo !== codigo && !/<Image\b/.test(novo) ? novo.replace(/import Image from "next\/image";\r?\n/, "") : novo;
+}
+
+export async function repararConvite(dir: string): Promise<string[]> {
+  const feitos: string[] = [];
+  for (const nome of ICONES) {
+    const alvo = join(dir, "public", "assets", nome);
+    if (!existsSync(alvo) || !existsSync(molde(nome))) continue;
+    if (!duasCores(await readFile(alvo, "utf8"))) continue;
+    await copyFile(molde(nome), alvo);
+    feitos.push(nome);
+  }
+  for (const { arquivo, icone } of EXCECOES) {
+    const alvo = join(dir, "src", "components", arquivo);
+    if (!existsSync(alvo)) continue;
+    const codigo = await readFile(alvo, "utf8");
+    const novo = tirarExcecao(codigo, icone);
+    if (novo === codigo) continue;
+    await writeFile(alvo, novo, "utf8");
+    feitos.push(arquivo);
+  }
+  return feitos;
+}

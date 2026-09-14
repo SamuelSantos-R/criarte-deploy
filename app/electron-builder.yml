@@ -38,6 +38,9 @@ extraResources:
   # dentro do app, nunca sobe pro R2 nem vai parar num convite.
   - from: resources/monograma
     to: monograma
+  # Ícones consertados que o Studio aplica em convites já criados (ver reparos.ts).
+  - from: resources/icones
+    to: icones
   - from: ../node_modules
     to: cli/node_modules
     filter:

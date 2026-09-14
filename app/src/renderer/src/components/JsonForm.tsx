@@ -259,9 +259,13 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
 /** Renderiza as chaves de um objeto. Objeto aninhado vira bloco com régua. */
 function Nos({ valor, caminho, onChange }: Props): ReactElement {
   const obj = (valor ?? {}) as Record<string, unknown>;
+  const entradas = Object.entries(obj);
+  // Cartão de evento sem texto de botão (convites antigos): o campo aparece na
+  // mesma, vazio — vazio no site é "Acessar Localização". Só grava se escrever.
+  if (caminho[0] === "eventos" && "mapa" in obj && !("botao" in obj)) entradas.push(["botao", ""]);
   return (
     <>
-      {Object.entries(obj).map(([chave, v]) => {
+      {entradas.map(([chave, v]) => {
         const filho: Caminho = [...caminho, chave];
         const label = rotulo(chave);
         if (typeof v === "string") {

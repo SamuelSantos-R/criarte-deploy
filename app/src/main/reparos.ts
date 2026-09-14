@@ -56,6 +56,14 @@ function consertarHistoria(codigo: string): string {
     .replaceAll("leading-[1.3] mb-1 whitespace-nowrap", "leading-[1.3] mb-1 [text-wrap:balance]");
 }
 
+/** Eventos: o texto do botão do mapa vem do convite.json (vazio = o de sempre). */
+function botaoDoEvento(codigo: string): string {
+  return codigo.replace(
+    /(<\/svg>\s*\n\s*)Acessar Localização(\s*\n)/,
+    '$1{(event as { botao?: string }).botao?.trim() || "Acessar Localização"}$2',
+  );
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [];
   for (const nome of ICONES) {
@@ -74,14 +82,17 @@ export async function repararConvite(dir: string): Promise<string[]> {
     await writeFile(alvo, novo, "utf8");
     feitos.push(arquivo);
   }
-  const historia = join(dir, "src", "components", "Historia.tsx");
-  if (existsSync(historia)) {
-    const codigo = await readFile(historia, "utf8");
-    const novo = consertarHistoria(codigo);
-    if (novo !== codigo) {
-      await writeFile(historia, novo, "utf8");
-      feitos.push("Historia.tsx");
-    }
+  for (const [arquivo, consertar] of [
+    ["Historia.tsx", consertarHistoria],
+    ["Evento.tsx", botaoDoEvento],
+  ] as const) {
+    const alvo = join(dir, "src", "components", arquivo);
+    if (!existsSync(alvo)) continue;
+    const codigo = await readFile(alvo, "utf8");
+    const novo = consertar(codigo);
+    if (novo === codigo) continue;
+    await writeFile(alvo, novo, "utf8");
+    feitos.push(arquivo);
   }
   return feitos;
 }

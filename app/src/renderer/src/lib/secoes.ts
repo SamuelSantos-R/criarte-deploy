@@ -45,6 +45,7 @@ const APELIDOS: Record<string, string> = {
   encerrado: "Frase depois de fechar",
   pretoEBranco: "Foto em preto e branco",
   centrarNomes: "Centrar nomes com a divisória",
+  botao: "Texto do botão",
 };
 
 export function rotulo(chave: string): string {

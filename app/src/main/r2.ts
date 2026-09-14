@@ -88,7 +88,7 @@ async function pedir(
   const assinatura = createHmac("sha256", chaveAssinatura).update(aAssinar).digest("hex");
 
   const { host: _host, ...enviados } = cabecalhos;
-  return fetch(`${cfg.endpoint}${caminho}${query ? `?${query}` : ""}`, {
+  return comRetentativas(() => fetch(`${cfg.endpoint}${caminho}${query ? `?${query}` : ""}`, {
     method: metodo,
     headers: {
       ...enviados,
@@ -97,7 +97,28 @@ async function pedir(
     },
     body: metodo === "PUT" ? new Uint8Array(corpo) : undefined,
     signal: AbortSignal.timeout(opcoes.tempoMs ?? TEMPO_MAX_MS),
-  });
+  }));
+}
+
+/**
+ * "fetch failed" é o undici a dizer que nem houve conversa: DNS, ligação que caiu
+ * ou os 10s de ligação que a rede lenta não cumpre. Tenta mais duas vezes, e se
+ * falhar mesmo, diz o motivo de verdade (vem escondido em `cause`).
+ */
+async function comRetentativas(pedido: () => Promise<Response>): Promise<Response> {
+  let ultimo: unknown;
+  for (const espera of [0, 1500, 4000]) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    try {
+      return await pedido();
+    } catch (e) {
+      ultimo = e;
+      if ((e as Error)?.name === "TimeoutError" || (e as Error)?.name === "AbortError") break;
+    }
+  }
+  const causa = (ultimo as { cause?: { code?: string; message?: string } })?.cause;
+  const motivo = causa?.code ?? causa?.message ?? (ultimo instanceof Error ? ultimo.message : String(ultimo));
+  throw new Error(`sem ligação ao R2 — ${motivo}. Confere a internet e tenta de novo`);
 }
 
 async function falhou(r: Response, oQue: string): Promise<never> {

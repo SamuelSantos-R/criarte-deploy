@@ -2,7 +2,7 @@ import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { baixarFonte } from "./coop";
+import { baixarFonte, estadoCoop } from "./coop";
 import { copiavel, desempacotar } from "./pacote";
 import { containedPath, requireSitesRoot } from "./paths";
 import { readConvite, siteDir } from "./sites";
@@ -199,7 +199,12 @@ export async function salvarSessaoComoNovo(
   }
   const destino = await destinoLivre(categoria, slug);
   const pacote = await baixarFonte();
-  const siteId = podeRegistrar() ? await registrar(slug, tituloDoSlug(slug)) : null;
+  // Com o mesmo nome do convite da sessão, é o mesmo convite a ir para outra
+  // máquina, não um casal novo: fica com o registo (e o mural) que já existe.
+  // Antes registava sempre, e o 409 barrava quem só queria editar no seu PC.
+  const mesmoConvite = estadoCoop().siteId?.split("/")[1] === slug;
+  const existente = mesmoConvite && podeRegistrar() ? await uuidDoSlug(slug) : null;
+  const siteId = existente ?? (podeRegistrar() ? await registrar(slug, tituloDoSlug(slug)) : null);
 
   try {
     await mkdir(destino, { recursive: true });
@@ -211,7 +216,8 @@ export async function salvarSessaoComoNovo(
     // nome preso — mas desfaz-se na mesma, para os dois caminhos de criação se
     // comportarem igual. Sem registo (`siteId` nulo) não há nada a soltar.
     await rm(destino, { recursive: true, force: true }).catch(() => {});
-    if (siteId) await libertarSlug(slug).catch(() => {});
+    // O registo reaproveitado não é nosso para soltar: é o do convite no ar.
+    if (siteId && !existente) await libertarSlug(slug).catch(() => {});
     throw erro;
   }
 }

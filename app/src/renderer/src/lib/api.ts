@@ -116,6 +116,7 @@ export type Servidor = { siteId: string; url: string; lan: string | null };
 
 export const previewStart = (id: string) => call(api.previewStart(id)) as Promise<Servidor>;
 export const previewStop = () => call(api.previewStop());
+export const onPreviewMudou = api.onPreviewMudou;
 export const previewPreaquecer = (id: string) => call(api.previewPreaquecer(id));
 export const previewState = () => call(api.previewState()) as Promise<Servidor | null>;
 export const previewScroll = (ancora: string) => call(api.previewScroll(ancora)) as Promise<boolean>;

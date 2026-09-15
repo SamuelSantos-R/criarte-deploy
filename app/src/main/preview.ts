@@ -172,8 +172,33 @@ async function subir(siteId: string): Promise<Vivo> {
     child.kill("SIGTERM");
     throw e;
   }
-  return { siteId, url, lan: lanIp ? `http://${lanIp}:${porta}` : null, child };
+  const vivo: Vivo = { siteId, url, lan: lanIp ? `http://${lanIp}:${porta}` : null, child };
+  // Servidor que morre depois de pronto (processo derrubado, falta de memória)
+  // não pode ficar na tela nem na reserva: o painel mostrava a porta e um
+  // quadro branco, e o Ligar reaproveitava o mesmo morto.
+  child.once("exit", () => {
+    if (servidor?.child === child) {
+      servidor = null;
+      espera?.abort();
+      espera = null;
+      assinatura = null;
+      ultimoDoc = null;
+      for (const ouvinte of ouvintes) ouvinte();
+    }
+    if (reserva) {
+      const r = reserva;
+      void r.vivo.then((v) => {
+        if (v.child === child && reserva === r) {
+          clearTimeout(r.timer);
+          reserva = null;
+        }
+      }, () => {});
+    }
+  });
+  return vivo;
 }
+
+const morto = (v: Vivo): boolean => v.child.exitCode !== null || v.child.signalCode !== null;
 
 function descartarReserva(): void {
   if (!reserva) return;
@@ -204,11 +229,13 @@ export function preaquecer(siteId: string): void {
 }
 
 export async function iniciarServidor(siteId: string): Promise<Servidor> {
+  if (servidor && morto(servidor)) pararServidor();
   if (servidor?.siteId === siteId) return { siteId, url: servidor.url, lan: servidor.lan };
 
   let vivo: Promise<Vivo>;
   if (reserva?.siteId === siteId) {
-    vivo = reserva.vivo;
+    const r = reserva;
+    vivo = r.vivo.then((v) => (morto(v) ? subir(siteId) : v));
     clearTimeout(reserva.timer);
     reserva = null;
   } else {
@@ -227,6 +254,7 @@ export async function iniciarServidor(siteId: string): Promise<Servidor> {
 
 /** Tira o preview do ecrã. O servidor fica aquecido de reserva, não morre. */
 export function pararServidor(): void {
+  if (servidor && morto(servidor)) servidor = null;
   if (servidor) {
     const s = servidor;
     servidor = null;

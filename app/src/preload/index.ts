@@ -103,6 +103,7 @@ const api = {
   previewStop: () => invoke<void>("preview:stop"),
   previewPreaquecer: (id: string) => invoke<void>("preview:preaquecer", id),
   previewState: () => invoke<Servidor | null>("preview:state"),
+  onPreviewMudou: ouvir<Servidor | null>("preview:mudou"),
   previewScroll: (ancora: string) => invoke<boolean>("preview:scroll", ancora),
   previewRepintar: (doc: unknown) => invoke<boolean>("preview:repintar", doc),
   previewRecarregar: () => invoke<boolean>("preview:recarregar"),

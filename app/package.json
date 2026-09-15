@@ -1,6 +1,6 @@
 {
   "name": "criarte-studio",
-  "version": "5.66.0",
+  "version": "5.66.1",
   "description": "Fábrica de convites da Criarte Design AO",
   "main": "./out/main/index.js",
   "author": "Criarte Design AO",

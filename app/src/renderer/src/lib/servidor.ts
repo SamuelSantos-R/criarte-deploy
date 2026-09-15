@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { previewStart, previewStop, type Servidor } from "./api";
+import { onPreviewMudou, previewStart, previewStop, type Servidor } from "./api";
 
 /**
  * Só existe um `next dev` de cada vez no main. Com as telas todas montadas ao
@@ -12,6 +12,13 @@ const ouvintes = new Set<() => void>();
 function avisar(): void {
   for (const f of ouvintes) f();
 }
+
+// O main avisa quando o servidor cai sozinho: sem isto o iframe ficava a
+// apontar para uma porta morta, em branco.
+onPreviewMudou((s) => {
+  atual = s;
+  avisar();
+});
 
 export function usarServidor(): Servidor | null {
   return useSyncExternalStore(

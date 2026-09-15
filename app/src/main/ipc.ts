@@ -31,7 +31,7 @@ import {
   ultimaPasta,
 } from "./monograma";
 import { abrirDaBiblioteca, apagarDaBiblioteca, lerSvg, listarBiblioteca, salvarNaBiblioteca, svgParaTemp } from "./biblioteca";
-import { estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, preaquecer, repintarPreview, rolarPreview } from "./preview";
+import { aoMudarPreview, estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, preaquecer, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
 import { atualizarSecao, estadoPlantio, plantarSecao } from "./plantar";
 import { resolverFormulario } from "./formulario";
@@ -270,6 +270,11 @@ export function registerIpc(): void {
   handle("preview:stop", () => pararServidor());
   handle("preview:preaquecer", (_e, id: unknown) => preaquecer(asString(id, "id")));
   handle("preview:state", () => estadoPreview());
+  aoMudarPreview(() => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.webContents.isDestroyed()) w.webContents.send("preview:mudou", estadoPreview());
+    }
+  });
   handle("preview:scroll", (event, ancora: unknown) =>
     rolarPreview(event.sender, asString(ancora, "âncora")),
   );

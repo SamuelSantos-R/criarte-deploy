@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type ReactElement, type PointerEvent as ReactPointerEvent } from "react";
 import { FolderOpen, Image as Icone, ListChecks, Stamp } from "lucide-react";
 import {
   envelopeAbrirSaida,
@@ -46,6 +46,10 @@ export function Envelope(): ReactElement {
   const [nomeUnico, setNomeUnico] = useState("");
 
   const folha = useRef<HTMLImageElement>(null);
+  // Onde a imagem está dentro da moldura, em px. A marca era desenhada em % da
+  // moldura mas medida na imagem: quando as duas não coincidiam, o retângulo
+  // aparecia num sítio e o clique ficava gravado noutro.
+  const [caixa, setCaixa] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const gesto = useRef<
     | { tipo: "novo"; a: { x: number; y: number } }
     | { tipo: "mover"; p0: { x: number; y: number }; m0: Marca }
@@ -59,6 +63,21 @@ export function Envelope(): ReactElement {
       .then((v) => v !== null && guardar(v))
       .catch((e: Error) => setErro(e.message));
   };
+
+  useEffect(() => {
+    const el = folha.current;
+    if (!el) return;
+    const medir = (): void =>
+      setCaixa({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight });
+    medir();
+    const obs = new ResizeObserver(medir);
+    obs.observe(el);
+    window.addEventListener("resize", medir);
+    return () => {
+      obs.disconnect();
+      window.removeEventListener("resize", medir);
+    };
+  }, [modelo]);
 
   const ponto = (e: ReactPointerEvent): { x: number; y: number } | null => {
     const el = folha.current;
@@ -162,7 +181,7 @@ export function Envelope(): ReactElement {
         <div className="flex min-w-0 flex-1 items-center justify-center overflow-hidden bg-surface-2/40 p-8">
           {modelo ? (
             <div
-              className="relative max-h-full max-w-full cursor-crosshair select-none touch-none"
+              className="relative cursor-crosshair select-none touch-none"
               onPointerDown={(e) => {
                 const p = ponto(e);
                 if (!p) return;
@@ -191,10 +210,10 @@ export function Envelope(): ReactElement {
                   data-marca
                   className="absolute cursor-move rounded-[3px] border-2 border-focus bg-focus/20 shadow-[0_0_0_1px_rgb(255_255_255/0.6)]"
                   style={{
-                    left: `${marca.x * 100}%`,
-                    top: `${marca.y * 100}%`,
-                    width: `${marca.l * 100}%`,
-                    height: `${marca.a * 100}%`,
+                    left: caixa.left + marca.x * caixa.width,
+                    top: caixa.top + marca.y * caixa.height,
+                    width: marca.l * caixa.width,
+                    height: marca.a * caixa.height,
                   }}
                 >
                   {ALCAS.map(({ lado, estilo, cursor, barra }) => (

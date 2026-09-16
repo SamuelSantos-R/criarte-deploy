@@ -24,6 +24,7 @@ const FORA: EstadoCoop = {
   pares: [],
   trancas: [],
   aoVivo: null,
+  aoVivoLan: null,
   erro: null,
 };
 

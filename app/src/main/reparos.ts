@@ -64,6 +64,38 @@ function botaoDoEvento(codigo: string): string {
   );
 }
 
+/** O contorno do título da galeria era a cor principal: agora é a do próprio texto. */
+function contornoDaGaleria(codigo: string): string {
+  return codigo.replaceAll('WebkitTextStroke: "0.2px rgb(var(--c-principal))"', 'WebkitTextStroke: "0.2px currentColor"');
+}
+
+/**
+ * O traço na Noah herdava o peso do texto (500) e o browser engrossava a fonte,
+ * que só tem regular. Fixar 400 é o que a faz sair como ela é.
+ */
+function tracoRegular(codigo: string): string {
+  return codigo.replace(
+    /(fontFamily: ["']var\(--font-noah\), Georgia, serif["'], fontStyle: "normal")(?!, fontWeight)/g,
+    "$1, fontWeight: 400",
+  );
+}
+
+/** Nossa História: hífen e números tratados como no resto do convite. */
+function tracoDaHistoria(codigo: string): string {
+  if (!codigo.includes("comNumeros(")) return codigo;
+  return codigo
+    .replaceAll('import { comNumeros } from "@/lib/numeros";', 'import { comNumerosETraco } from "@/lib/numeros";')
+    .replaceAll("comNumeros(", "comNumerosETraco(");
+}
+
+/** A folga acima do monograma passa a aceitar valor negativo, pra ele subir. */
+function folgaNegativa(codigo: string): string {
+  return codigo.replaceAll(
+    '"--t-monograma-topo": px(medidas.monogramaTopo, 0, 120, 0),',
+    '"--t-monograma-topo": px(medidas.monogramaTopo, -80, 120, 0),',
+  );
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [];
   for (const nome of ICONES) {
@@ -83,16 +115,21 @@ export async function repararConvite(dir: string): Promise<string[]> {
     feitos.push(arquivo);
   }
   for (const [arquivo, consertar] of [
-    ["Historia.tsx", consertarHistoria],
-    ["Evento.tsx", botaoDoEvento],
+    ["components/Historia.tsx", (c: string) => tracoRegular(tracoDaHistoria(consertarHistoria(c)))],
+    ["components/Evento.tsx", (c: string) => tracoRegular(botaoDoEvento(c))],
+    ["components/Carrousel.tsx", contornoDaGaleria],
+    ["lib/vars.ts", folgaNegativa],
+    ["components/NossoDia.tsx", tracoRegular],
+    ["components/Manual.tsx", tracoRegular],
+    ["lib/numeros.tsx", tracoRegular],
   ] as const) {
-    const alvo = join(dir, "src", "components", arquivo);
+    const alvo = join(dir, "src", arquivo);
     if (!existsSync(alvo)) continue;
     const codigo = await readFile(alvo, "utf8");
     const novo = consertar(codigo);
     if (novo === codigo) continue;
     await writeFile(alvo, novo, "utf8");
-    feitos.push(arquivo);
+    feitos.push(arquivo.split("/").pop() ?? arquivo);
   }
   return feitos;
 }

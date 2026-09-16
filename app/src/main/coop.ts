@@ -39,6 +39,8 @@ export type EstadoCoop = {
   trancas: Tranca[];
   /** Preview do outro lado, pronto pro iframe. Só o convidado tem — o anfitrião vê o seu. */
   aoVivo: string | null;
+  /** O mesmo preview, mas no endereço de rede do anfitrião — é o que vai no QR. */
+  aoVivoLan: string | null;
   erro: string | null;
 };
 
@@ -173,6 +175,7 @@ export function estadoCoop(): EstadoCoop {
       pares: [...anfitriao.pares.values()].map((p) => p.nome),
       trancas: [...anfitriao.trancas.entries()].map(([secao, t]) => ({ secao, nome: t.nome })),
       aoVivo: null,
+      aoVivoLan: null,
       erro: null,
     };
   }
@@ -185,6 +188,12 @@ export function estadoCoop(): EstadoCoop {
       pares: [],
       trancas: [],
       aoVivo: urlDoEspelho(),
+      // O espelho é 127.0.0.1: serve ao iframe, não ao telemóvel. Pro QR vai o
+      // endereço do preview do anfitrião na rede — o telefone dela alcança o
+      // Mac dele, e ela deixa de ter de ler o QR do ecrã do outro.
+      aoVivoLan: convidado.portaAoVivo
+        ? `http://${convidado.endereco.split(":")[0]}:${convidado.portaAoVivo}`
+        : null,
       erro: null,
     };
   }
@@ -196,6 +205,7 @@ export function estadoCoop(): EstadoCoop {
     pares: [],
     trancas: [],
     aoVivo: null,
+    aoVivoLan: null,
     erro: null,
   };
 }

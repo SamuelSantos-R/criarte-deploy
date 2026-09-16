@@ -684,7 +684,7 @@ export function Convites({
             do anfitrião servido pela LAN, e o QR aponta pro Mac dele. */}
         <PainelAoVivo
           url={convidado ? coop.estado.aoVivo : (servidor?.url ?? null)}
-          lan={convidado ? coop.estado.aoVivo : (servidor?.lan ?? null)}
+          lan={convidado ? coop.estado.aoVivoLan : (servidor?.lan ?? null)}
           largura={largura}
           ligando={ligando}
           podeLigar={!!id}

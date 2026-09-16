@@ -34,8 +34,8 @@ const MEDIDAS: Medida[] = [
   {
     chave: "monogramaTopo",
     rotulo: "folga acima do monograma",
-    dica: "Empurra só o monograma para baixo. A régua da secção move o bloco todo; isto move só ele.",
-    min: 0,
+    dica: "Empurra o monograma para baixo — ou para cima, com valor negativo, quando ele precisa de subir mais do que o zero deixa.",
+    min: -80,
     max: 120,
     passo: 2,
     padrao: 0,

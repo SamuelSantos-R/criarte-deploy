@@ -38,6 +38,7 @@ type EstadoCoop = {
   pares: string[];
   trancas: Tranca[];
   aoVivo: string | null;
+  aoVivoLan: string | null;
   erro: string | null;
 };
 

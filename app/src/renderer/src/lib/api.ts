@@ -229,6 +229,7 @@ export type EstadoCoop = {
   trancas: Tranca[];
   /** Preview do anfitrião, servido pela LAN. Só o convidado recebe. */
   aoVivo: string | null;
+  aoVivoLan: string | null;
   erro: string | null;
 };
 

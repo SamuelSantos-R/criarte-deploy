@@ -117,6 +117,11 @@ export const PAPEIS: Grupo[] = [
         rotulo: "RSVP — cartão de confirmação",
         onde: "Só o fundo do cartão que abre ao confirmar. Vazio deixa o branco de sempre.",
       },
+      {
+        chave: "rsvp-opcao-texto",
+        rotulo: "RSVP — letra das opções",
+        onde: "«Sim, estarei lá!», «Não poderei ir», «Somente eu» e «+1 acompanhante». Vazio deixa a cor de texto de sempre.",
+      },
     ],
   },
 ];

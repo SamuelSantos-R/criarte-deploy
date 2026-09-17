@@ -79,6 +79,13 @@ const PAPEIS = {
   "--rsvp-selecao": CANAL_SELECAO,
 } as CSSProperties;
 
+/**
+ * A letra das opções — "Sim, estarei lá!", "Não poderei ir", "Somente eu" e
+ * "+1 acompanhante". Sem a variável a declaração fica inválida e a cor herda o
+ * `text-text` do rótulo, como sempre foi.
+ */
+const COR_OPCAO_TEXTO = { color: "rgb(var(--c-rsvp-opcao-texto))" };
+
 /** A borda de todos os campos do cartão, a mesma escolhida ou não. */
 const BORDA = "border-[rgb(var(--c-card-borda,214_187_141))]";
 
@@ -320,7 +327,7 @@ export default function RSVP() {
                           className="appearance-none w-[18px] h-[18px] border-2 border-[rgb(var(--rsvp-opcao)/0.5)] rounded-full relative checked:border-[rgb(var(--rsvp-opcao))] checked:after:content-[''] checked:after:absolute checked:after:top-1/2 checked:after:left-1/2 checked:after:-translate-x-1/2 checked:after:-translate-y-1/2 checked:after:w-2 checked:after:h-2 checked:after:bg-[rgb(var(--rsvp-opcao))] checked:after:rounded-full"
                           onChange={() => handleComparecerChange(val)}
                         />
-                        {val === "sim" ? "Sim, estarei lá!" : "Não poderei ir"}
+                        <span style={COR_OPCAO_TEXTO}>{val === "sim" ? "Sim, estarei lá!" : "Não poderei ir"}</span>
                       </label>
                     ))}
                   </div>
@@ -342,7 +349,7 @@ export default function RSVP() {
                             onClick={() => setAcompOpen((v) => !v)}
                             className={`w-full flex items-center justify-between p-[11px_14px] bg-white border rounded-[10px] text-base text-text outline-none transition-all ${BORDA} ${acompOpen ? "ring-3 ring-[rgb(var(--rsvp-opcao)/0.15)]" : ""}`}
                           >
-                            <span>
+                            <span style={COR_OPCAO_TEXTO}>
                               {ACOMPANHANTES_OPTIONS.find((o) => o.value === formData.acompanhantes)?.label}
                             </span>
                             <ChevronDown size={18} className={`text-gold-dark transition-transform ${acompOpen ? "rotate-180" : ""}`} />
@@ -359,7 +366,7 @@ export default function RSVP() {
                                     }}
                                     className={`w-full text-left p-[11px_14px] text-base text-text transition-colors hover:bg-[rgb(var(--rsvp-selecao))] ${formData.acompanhantes === opt.value ? "bg-[rgb(var(--rsvp-selecao))]" : ""}`}
                                   >
-                                    {opt.label}
+                                    <span style={COR_OPCAO_TEXTO}>{opt.label}</span>
                                   </button>
                                 </li>
                               ))}

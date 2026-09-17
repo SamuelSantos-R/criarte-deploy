@@ -96,6 +96,27 @@ function folgaNegativa(codigo: string): string {
   );
 }
 
+/** RSVP: a letra das opções ("Sim, estarei lá!", "Somente eu"…) ganha cor própria no tema. */
+function letraDasOpcoes(codigo: string): string {
+  if (codigo.includes("COR_OPCAO_TEXTO")) return codigo;
+  const novo = codigo
+    .replace(
+      /\{val === "sim" \? "Sim, estarei lá!" : "Não poderei ir"\}/,
+      '<span style={COR_OPCAO_TEXTO}>{val === "sim" ? "Sim, estarei lá!" : "Não poderei ir"}</span>',
+    )
+    .replace(
+      /<span>(\s*\{ACOMPANHANTES_OPTIONS\.find)/,
+      "<span style={COR_OPCAO_TEXTO}>$1",
+    )
+    .replace(/(\n\s*)\{opt\.label\}(\s*\n\s*<\/button>)/, "$1<span style={COR_OPCAO_TEXTO}>{opt.label}</span>$2");
+  if (novo === codigo || !/\nfunction fireWeddingConfetti/.test(novo)) return codigo;
+  // Sem a variável a cor herda o text-text de sempre.
+  return novo.replace(
+    /\nfunction fireWeddingConfetti/,
+    '\nconst COR_OPCAO_TEXTO = { color: "rgb(var(--c-rsvp-opcao-texto))" };\n\nfunction fireWeddingConfetti',
+  );
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [];
   for (const nome of ICONES) {
@@ -122,6 +143,7 @@ export async function repararConvite(dir: string): Promise<string[]> {
     ["components/NossoDia.tsx", tracoRegular],
     ["components/Manual.tsx", tracoRegular],
     ["lib/numeros.tsx", tracoRegular],
+    ["components/RSVP.tsx", letraDasOpcoes],
   ] as const) {
     const alvo = join(dir, "src", arquivo);
     if (!existsSync(alvo)) continue;

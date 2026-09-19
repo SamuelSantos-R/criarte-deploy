@@ -423,6 +423,7 @@ const PINTADAS = [
   "noivaEspacamento",
   "noivoEspacamento",
   "eEspacamento",
+  "eDeslocamento",
   "noivosAltura",
   "countdownDataTamanho",
   "rodapeTamanho",

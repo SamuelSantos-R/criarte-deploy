@@ -170,6 +170,16 @@ const ESPACAMENTOS: Medida[] = [
     unidade: "em",
   },
   {
+    chave: "eDeslocamento",
+    rotulo: "o & do meio — altura",
+    dica: "Sobe ou desce só o &, sem mexer nos nomes. Negativo sobe, positivo desce.",
+    min: -1,
+    max: 1,
+    passo: 0.01,
+    padrao: 0,
+    unidade: "em",
+  },
+  {
     chave: "noivoEspacamento",
     rotulo: "nome do noivo",
     dica: "Afasta as letras umas das outras. Zero é a fonte como veio.",

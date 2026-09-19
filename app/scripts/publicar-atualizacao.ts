@@ -10,7 +10,13 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Agent, setGlobalDispatcher } from "undici";
 import { configR2, prefixoAtualizacoes, r2Get, r2Put } from "../src/main/r2.ts";
+
+// O fetch desiste se a resposta não vier em 5 min, e esse relógio corre durante o
+// envio: numa rede de ~200 KB/s o .dmg leva ~11 min e morria sempre a meio. Quem
+// manda no tempo aqui é o UPLOAD_MAX_MS.
+setGlobalDispatcher(new Agent({ headersTimeout: 0, bodyTimeout: 0 }));
 
 // `fileURLToPath`, não `.pathname`: o disco chama-se "Sem nome - dados" e o espaço viria como %20.
 const RAIZ = fileURLToPath(new URL("..", import.meta.url));

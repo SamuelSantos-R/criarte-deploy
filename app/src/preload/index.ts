@@ -88,6 +88,9 @@ const api = {
     invoke<AssetImportado | null>("assets:semente", id, secao),
   previaDeAsset: (id: string, caminho: string) =>
     invoke<string | null>("assets:previa", id, caminho),
+  lerSvgDoSite: (id: string, caminho: string) => invoke<string | null>("assets:lerSvg", id, caminho),
+  gravarSvgDoSite: (id: string, caminho: string, svg: string) =>
+    invoke<boolean>("assets:gravarSvg", id, caminho, svg),
   plantarSecao: (id: string, secao: string) => invoke<Plantio>("secao:plantar", id, secao),
   estadoPlantio: (id: string, secao: string) => invoke<Plantio>("secao:estado", id, secao),
   atualizarSecao: (id: string, secao: string) => invoke<Plantio>("secao:atualizar", id, secao),

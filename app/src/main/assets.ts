@@ -158,6 +158,43 @@ export async function previaDeAsset(siteId: string, caminhoBruto: unknown): Prom
   return `data:${mime};base64,${bytes.toString("base64")}`;
 }
 
+/**
+ * O SVG de um campo do convite, como texto. Só SVG e só dentro do `public` do
+ * site: é o par de leitura do recorte que o Studio faz no ícone escolhido.
+ */
+export async function lerSvgDoSite(siteId: string, caminhoBruto: unknown): Promise<string | null> {
+  const arquivo = await svgDoSite(siteId, caminhoBruto);
+  if (!arquivo || !existsSync(arquivo)) return null;
+  const info = await stat(arquivo);
+  if (info.size > SVG_MAX) return null;
+  return readFile(arquivo, "utf8");
+}
+
+/** Grava por cima do mesmo SVG. Devolve `false` se o caminho não servir. */
+export async function gravarSvgDoSite(siteId: string, caminhoBruto: unknown, svg: unknown): Promise<boolean> {
+  if (typeof svg !== "string" || svg.length === 0 || svg.length > SVG_MAX) return false;
+  if (!/^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!DOCTYPE[^>]*>\s*)?<svg\b/i.test(svg)) return false;
+  const arquivo = await svgDoSite(siteId, caminhoBruto);
+  if (!arquivo || !existsSync(arquivo)) return false;
+  await writeFile(arquivo, svg, "utf8");
+  return true;
+}
+
+const SVG_MAX = 4 * 1024 * 1024;
+
+async function svgDoSite(siteId: string, caminhoBruto: unknown): Promise<string | null> {
+  if (typeof caminhoBruto !== "string" || !caminhoBruto) return null;
+  if (/^https?:\/\//i.test(caminhoBruto)) return null;
+  const semQuery = caminhoBruto.split("?")[0].replace(/^\/+/, "");
+  if (extname(semQuery).toLowerCase() !== ".svg") return null;
+  const dir = await siteDir(siteId);
+  const direto = await containedPath(dir, "public", semQuery);
+  if (existsSync(direto) || semQuery.includes("/")) return direto;
+  // Campo que guarda só o nome do ficheiro (o feitio dos pesados que sobem pro
+  // R2): o ficheiro continua a viver em public/assets.
+  return containedPath(dir, "public", "assets", semQuery);
+}
+
 export const FILTROS = [
   { name: "Tudo que serve de asset", extensions: [...EXTENSOES].map((e) => e.slice(1)) },
   { name: "Imagens", extensions: ["jpg", "jpeg", "png", "webp", "avif", "gif", "svg"] },

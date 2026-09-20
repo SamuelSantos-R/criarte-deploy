@@ -161,6 +161,12 @@ function numerosDoEvento(codigo: string): string {
   if (codigo.includes("comNumerosETraco(event.local)")) return codigo;
   let novo = codigo.replace(/comNumeros\(event\.local\)/g, "comNumerosETraco(event.local)");
   if (novo === codigo) {
+    // O convite que passou pelo conversor trata o título com o `renderText` local,
+    // que só sabe do hífen. O `comNumerosETraco` faz o hífen e mais os algarismos,
+    // então entra no lugar dele em vez de embrulhar um no outro.
+    novo = codigo.replace(/\{renderText\(event\.local\)\}/g, "{comNumerosETraco(event.local)}");
+  }
+  if (novo === codigo) {
     novo = codigo.replace(/(<h3\b[^>]*>[\s\S]*?)\{event\.local\}([\s\S]*?<\/h3>)/, "$1{comNumerosETraco(event.local)}$2");
   }
   if (novo === codigo) return codigo;

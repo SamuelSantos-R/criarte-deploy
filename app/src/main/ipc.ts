@@ -16,7 +16,7 @@ import {
   salvarSessaoComoNovo,
   sincronizarTitulo,
 } from "./duplicar";
-import { FILTROS, importAssets, previaDeAsset, semearAsset } from "./assets";
+import { FILTROS, gravarSvgDoSite, importAssets, lerSvgDoSite, previaDeAsset, semearAsset } from "./assets";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirLinkUnico, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import {
@@ -220,6 +220,16 @@ export function registerIpc(): void {
   // sem isto o "posicao"/"zoom" da galeria e do hero eram números às cegas.
   handle("assets:previa", (_e, id: unknown, caminho: unknown) =>
     previaDeAsset(asString(id, "id"), caminho),
+  );
+
+  // O ícone escolhido vem com a prancheta inteira à volta do desenho; quem mede
+  // a sobra é o renderer, que tem canvas. Aqui só se lê e se grava o mesmo ficheiro.
+  handle("assets:lerSvg", (_e, id: unknown, caminho: unknown) =>
+    lerSvgDoSite(asString(id, "id"), caminho),
+  );
+
+  handle("assets:gravarSvg", (_e, id: unknown, caminho: unknown, svg: unknown) =>
+    gravarSvgDoSite(asString(id, "id"), caminho, svg),
   );
 
   handle("secao:plantar", (_e, id: unknown, secao: unknown) =>

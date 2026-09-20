@@ -76,6 +76,11 @@ export const pickAssets = (id: string, pasta: boolean) =>
 export const semearAsset = (id: string, secao: string) =>
   call(api.semearAsset(id, secao)) as Promise<AssetImportado | null>;
 /** A imagem de um campo em `data:`, pra recorte visual. Vazio ou sem foto ainda dá `null`. */
+export const lerSvgDoSite = (id: string, caminho: string) =>
+  call(api.lerSvgDoSite(id, caminho)) as Promise<string | null>;
+export const gravarSvgDoSite = (id: string, caminho: string, svg: string) =>
+  call(api.gravarSvgDoSite(id, caminho, svg)) as Promise<boolean>;
+
 export const previaDeAsset = (id: string, caminho: string) =>
   call(api.previaDeAsset(id, caminho)) as Promise<string | null>;
 

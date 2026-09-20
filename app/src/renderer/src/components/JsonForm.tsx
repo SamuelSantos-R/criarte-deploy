@@ -277,6 +277,7 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
                   label={label}
                   onChange={(novo) => onChange(filho, novo)}
                   biblioteca={/^monograma/i.test(chave)}
+                  recortar={/icone/i.test(chave)}
                 />
               </div>
             );

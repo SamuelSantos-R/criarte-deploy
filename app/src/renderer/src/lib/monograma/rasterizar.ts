@@ -29,7 +29,11 @@ const num = (n: number): string => String(Math.round(n * 100) / 100);
  * arrastada, com transparência própria — o path das letras não sabe dela.
  */
 export async function recortarAoDesenho(svg: string, folgaPx = 4): Promise<string> {
-  const raiz = svg.match(/^<svg\b[^>]*>/)?.[0];
+  // O `<svg>` nem sempre é o primeiro caractere: o que sai do Illustrator começa
+  // com `<?xml …?>`, e prender a busca ao início fazia o recorte desistir em
+  // silêncio — o ícone entrava no convite com a prancheta inteira à volta.
+  const achada = /<svg\b[^>]*>/.exec(svg);
+  const raiz = achada?.[0];
   const vb = raiz?.match(/\sviewBox="([^"]+)"/)?.[1]?.trim().split(/[\s,]+/).map(Number);
   if (!raiz || !vb || vb.length !== 4 || vb.some((n) => !Number.isFinite(n)) || vb[2] <= 0 || vb[3] <= 0) return svg;
   const [vx, vy, vw, vh] = vb;
@@ -74,7 +78,8 @@ export async function recortarAoDesenho(svg: string, folgaPx = 4): Promise<strin
   const nova = raiz
     .replace(/\s(?:width|height|viewBox)="[^"]*"/g, "")
     .replace(/^<svg\b/, `<svg width="${num(w)}" height="${num(h)}" viewBox="${num(nx1)} ${num(ny1)} ${num(w)} ${num(h)}"`);
-  return nova + svg.slice(raiz.length);
+  const inicio = achada.index;
+  return svg.slice(0, inicio) + nova + svg.slice(inicio + raiz.length);
 }
 
 /** Tamanho natural de uma imagem em data URL. SVG sem width/height cai em 1000×1000. */

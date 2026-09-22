@@ -6,6 +6,12 @@ directories:
   output: dist
   buildResources: resources
 
+# Sem asar: dentro dele o nosso código e as dependências viram um único ficheiro
+# de 29 MB, que muda por inteiro a cada versão — e a atualização por partes ficava
+# a mandar 29 MB para entregar 2. Solto em ficheiros, só viaja o que mexeu. O app
+# não é assinado, então não há assinatura para quebrar ao trocar ficheiro.
+asar: false
+
 files:
   - out/**
   - package.json

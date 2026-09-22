@@ -7,6 +7,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { promisify } from "node:util";
 import { app } from "electron";
+import { diferencaPara, manifestoDe, montarVersaoNova, ponteiro } from "./atualizar-leve";
 import { configR2, prefixoAtualizacoes, r2Get, r2Stream } from "./r2";
 
 // ============================================================================
@@ -103,6 +104,27 @@ async function lerManifesto(): Promise<{ manifesto: Manifesto | null; prefixo: s
 
 export async function verificarAtualizacao(): Promise<EstadoAtualizacao> {
   const atual = app.getVersion();
+  // A via por partes manda quando existe: são megabytes em vez de 136 MB. Se o
+  // servidor não responder, ou a versão de lá não for mais nova, o .dmg de
+  // sempre continua logo abaixo — nunca se fica sem caminho.
+  const leve = await ponteiro().catch(() => null);
+  if (leve && maisNova(leve.ponteiro.versao, atual)) {
+    const manifesto = await manifestoDe(leve.base, leve.ponteiro.manifesto).catch(() => null);
+    const bundle = bundleMac();
+    if (manifesto && bundle && manifesto.versao === leve.ponteiro.versao) {
+      const diferenca = await diferencaPara(bundle, manifesto).catch(() => null);
+      if (diferenca && !diferenca.impedimento) {
+        return {
+          atual,
+          nova: manifesto.versao,
+          notas: manifesto.notas.slice(0, 2000),
+          bytes: diferenca.bytes,
+          impedimento: await impedimento(),
+        };
+      }
+    }
+  }
+
   const { manifesto, prefixo } = await lerManifesto();
   const pacote = manifesto && PLATAFORMA ? manifesto[PLATAFORMA] : undefined;
   if (!pacote || !pacoteValido(pacote, prefixo) || !maisNova(pacote.versao, atual)) {
@@ -184,6 +206,28 @@ export function limparAtualizacao(): void {
   if (!emCurso) void rm(pastaTemp(), { recursive: true, force: true }).catch(() => undefined);
 }
 
+/**
+ * A versão nova montada a partir da que está instalada, ou `null` se esta
+ * publicação não se faz por partes (Electron trocado, servidor fora, primeira
+ * vez sem manifesto). Nunca lança: quem chama tem o .dmg logo abaixo.
+ */
+async function porPartes(pasta: string, avisar: (p: Progresso) => void): Promise<string | null> {
+  const bundle = bundleMac();
+  if (!bundle) return null;
+  const leve = await ponteiro();
+  if (!leve || !maisNova(leve.ponteiro.versao, app.getVersion())) return null;
+  const manifesto = await manifestoDe(leve.base, leve.ponteiro.manifesto);
+  if (!manifesto || manifesto.versao !== leve.ponteiro.versao) return null;
+  const diferenca = await diferencaPara(bundle, manifesto);
+  if (diferenca.impedimento) return null;
+  avisar({ fase: "baixar", feito: 0, total: diferenca.bytes });
+  const novo = await montarVersaoNova(bundle, pasta, leve.base, diferenca, (feito, total) =>
+    avisar({ fase: "baixar", feito, total }),
+  );
+  avisar({ fase: "verificar", feito: diferenca.bytes, total: diferenca.bytes });
+  return novo;
+}
+
 export async function instalarAtualizacao(avisar: (p: Progresso) => void): Promise<void> {
   if (emCurso) throw new Error("a atualização já está a correr");
   const bloqueio = await impedimento();
@@ -199,6 +243,25 @@ export async function instalarAtualizacao(avisar: (p: Progresso) => void): Promi
     const pasta = pastaTemp();
     await rm(pasta, { recursive: true, force: true });
     await mkdir(pasta, { recursive: true });
+
+    // Via por partes: baixa só os ficheiros que mudaram, monta a versão nova
+    // numa cópia do app e entrega ao mesmo script de troca. Qualquer tropeço
+    // aqui cai no .dmg logo a seguir, que é o caminho que já se conhece.
+    if (PLATAFORMA === "mac") {
+      const pronto = await porPartes(pasta, avisar).catch(() => null);
+      if (pronto) {
+        const destino = bundleMac();
+        if (destino) {
+          const script = join(pasta, "trocar.sh");
+          await writeFile(script, TROCA_MAC, { mode: 0o755 });
+          avisar({ fase: "reiniciar", feito: 1, total: 1 });
+          spawn("/bin/sh", [script, String(process.pid), pronto, destino], { detached: true, stdio: "ignore" }).unref();
+          setTimeout(() => app.quit(), 400);
+          return;
+        }
+      }
+    }
+
     const instalador = join(pasta, PLATAFORMA === "mac" ? "Criarte-Studio.dmg" : "Criarte-Studio-Setup.exe");
     await baixar(pacote, instalador, avisar);
 

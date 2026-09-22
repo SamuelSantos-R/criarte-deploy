@@ -1,6 +1,6 @@
 {
   "name": "criarte-studio",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Fábrica de convites da Criarte Design AO",
   "main": "./out/main/index.js",
   "author": "Criarte Design AO",
@@ -9,10 +9,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && electron-vite build",
-    "test": "node --experimental-strip-types tests/prancheta-canto.test.mjs",
+    "test": "node --experimental-strip-types tests/prancheta-canto.test.mjs && node --experimental-strip-types --import ./tests/registrar-resolver.mjs tests/atualizacao-arvore.test.mjs",
     "dmg": "npm run build && electron-builder --mac --x64",
     "exe": "npm run build && electron-builder --win --x64",
-    "publicar": "node scripts/publicar-atualizacao.ts"
+    "publicar": "node scripts/publicar-atualizacao.ts",
+    "publicar-arvore": "node scripts/publicar-arvore.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

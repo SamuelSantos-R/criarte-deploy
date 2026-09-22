@@ -17,6 +17,7 @@ import {
   sincronizarTitulo,
 } from "./duplicar";
 import { FILTROS, gravarSvgDoSite, importAssets, lerSvgDoSite, previaDeAsset, semearAsset } from "./assets";
+import { criarPainel } from "./painel";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirLinkUnico, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import {
@@ -231,6 +232,8 @@ export function registerIpc(): void {
   handle("assets:gravarSvg", (_e, id: unknown, caminho: unknown, svg: unknown) =>
     gravarSvgDoSite(asString(id, "id"), caminho, svg),
   );
+
+  handle("painel:criar", (_e, slug: unknown) => criarPainel(asString(slug, "nome")));
 
   handle("secao:plantar", (_e, id: unknown, secao: unknown) =>
     plantarSecao(asString(id, "id"), asString(secao, "secao")),

@@ -34,6 +34,10 @@ extraResources:
   # no convite.json e a página não tinha nada para desenhar.
   - from: resources/secoes
     to: secoes
+  # O molde do painel RSVP. Viaja inteiro (página, fontes, música e molduras)
+  # porque um painel novo tem de nascer em máquina que ainda não tenha nenhum.
+  - from: resources/painel-rsvp
+    to: painel-rsvp
   # Fontes e moldura do monograma. A Milton One é licença da Criarte: viaja só
   # dentro do app, nunca sobe pro R2 nem vai parar num convite.
   - from: resources/monograma

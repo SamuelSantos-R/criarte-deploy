@@ -1,0 +1,188 @@
+{
+  "tipo": "painel-rsvp",
+  "evento": {
+    "noivos": "Leodalena & Mauro",
+    "data": "31 de Outubro de 2026",
+    "dataISO": "2026-10-31"
+  },
+  "tema": {
+    "fundo": "#F7F1E6",
+    "card": "#FFFFFF",
+    "destaque": "#A2824E",
+    "texto": "#000000",
+    "confete": [
+      "#A2824E",
+      "#C6A46A",
+      "#D9BE8B",
+      "#8A6C3C",
+      "#EBD9B8"
+    ],
+    "sucesso": "#5C8E2C",
+    "cardBorda": "#EFE6D5"
+  },
+  "molduras": [
+    {
+      "arquivo": "/assets/moldura-std-lm.svg",
+      "canto": "superior-esquerdo",
+      "folgaX": 0,
+      "folgaY": 0,
+      "largura": 37,
+      "espelhoX": false,
+      "espelhoY": true
+    },
+    {
+      "arquivo": "/assets/moldura-std-lm.svg",
+      "canto": "inferior-direito",
+      "folgaX": 0,
+      "folgaY": 0,
+      "largura": 37,
+      "espelhoX": true,
+      "espelhoY": false
+    }
+  ],
+  "neve": true,
+  "musica": "/assets/fundo-musical-rsvp-web.mp3",
+  "header": {
+    "eyebrow": {
+      "text": "NOSSO CASAMENTO",
+      "size": 16,
+      "color": "#000000"
+    },
+    "eyebrow2": {
+      "text": "",
+      "size": 14,
+      "color": "#000000"
+    },
+    "coupleName": {
+      "text": "Leodalena & Mauro",
+      "size": 64,
+      "color": "#A2824E"
+    },
+    "date": {
+      "text": "31 DE OUTUBRO DE 2026",
+      "size": 16,
+      "color": "#000000"
+    },
+    "deadline": {
+      "text": "",
+      "size": 13,
+      "color": "#000000"
+    }
+  },
+  "card": {
+    "labelNome": {
+      "text": "NOME COMPLETO",
+      "size": 10,
+      "color": "#000000"
+    },
+    "placeholderNome": "Seu nome",
+    "inputNome": {
+      "size": 14,
+      "color": "#000000"
+    },
+    "labelComparecer": {
+      "text": "VOCÊ IRÁ COMPARECER?",
+      "size": 10,
+      "color": "#000000"
+    },
+    "opcaoSim": {
+      "text": "Sim, estarei lá!",
+      "size": 14,
+      "color": "#000000"
+    },
+    "opcaoNao": {
+      "text": "Infelizmente não",
+      "size": 14,
+      "color": "#000000"
+    },
+    "labelAcompanhantes": {
+      "text": "ACOMPANHANTES",
+      "size": 10,
+      "color": "#000000"
+    },
+    "opcoesAcompanhantes": [
+      {
+        "value": "0",
+        "label": "Somente eu"
+      },
+      {
+        "value": "1",
+        "label": "+1 acompanhante"
+      }
+    ],
+    "dropdownAcomp": {
+      "size": 14,
+      "color": "#000000"
+    },
+    "labelAcompanhanteUnico": "NOME COMPLETO DO ACOMPANHANTE",
+    "labelAcompanhanteNumerado": "NOME COMPLETO DO ACOMPANHANTE {n}",
+    "labelAcompanhanteStyle": {
+      "size": 10,
+      "color": "#000000"
+    },
+    "placeholderAcompanhante": "Nome completo do acompanhante",
+    "inputAcompanhante": {
+      "size": 14,
+      "color": "#000000"
+    },
+    "botaoEnviar": {
+      "text": "CONFIRMAR PRESENÇA",
+      "size": 15,
+      "color": "#FFFFFF"
+    },
+    "sucessoSim": {
+      "titulo": {
+        "text": "Sua presença está confirmada!",
+        "size": 20,
+        "color": "#000000"
+      },
+      "subtitulo": {
+        "text": "Você já enviou suas informações para este evento.",
+        "size": 14,
+        "color": "#000000"
+      }
+    },
+    "sucessoNao": {
+      "titulo": {
+        "text": "Informação enviada!",
+        "size": 20,
+        "color": "#000000"
+      },
+      "subtitulo": {
+        "text": "Recebemos sua resposta. Obrigado por nos avisar!",
+        "size": 14,
+        "color": "#000000"
+      }
+    }
+  },
+  "footer": {
+    "prefix": "Feito com amor por",
+    "creditName": "Criarte Design",
+    "creditUrl": "https://www.instagram.com/criartedesign.ao/",
+    "size": 10,
+    "color": "#000000"
+  },
+  "spacing": {
+    "pageTopPadding": 140,
+    "betweenEyebrowLines": 4,
+    "betweenEyebrowAndName": 16,
+    "betweenNameAndDate": 8,
+    "betweenDateAndDivider": 14,
+    "betweenDividerAndCard": 34,
+    "cardPadding": 22,
+    "betweenFields": 12,
+    "labelToInput": 6,
+    "betweenFormAndButton": 12,
+    "betweenCardAndFooter": 48,
+    "pageBottomPadding": 44
+  },
+  "googleForm": {
+    "url": "",
+    "entryNome": "",
+    "entryComparecer": "",
+    "entryAcompanhantes": "",
+    "entryNomeAcompanhante": "",
+    "valorAcomp0": "Somente eu",
+    "valorAcomp1": "+1 acompanhante"
+  }
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useSiteValido } from "@/lib/useSiteValido";
-import { Lock, Redo2, RotateCcw, Save, Undo2 } from "lucide-react";
+import { Lock, Plus, Redo2, RotateCcw, Save, Undo2 } from "lucide-react";
 import {
   onConviteMudou,
   plantarSecao,
@@ -41,6 +41,7 @@ import { Divisor, useLarguraPainel } from "@/components/Divisor";
 import { ApagarSite } from "@/components/ApagarSite";
 import { RenomearSite } from "@/components/RenomearSite";
 import { Tokenizar } from "@/components/Tokenizar";
+import { NovoPainelRSVP } from "@/components/NovoPainelRSVP";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
@@ -103,6 +104,7 @@ export function Convites({
   } = useHistorico<Record<string, unknown>>();
 
   const [mostrarCoop, setMostrarCoop] = useState(false);
+  const [criandoPainel, setCriandoPainel] = useState(false);
   // Patch que chegou da rede entra pelo mesmo caminho de uma edição local, mas
   // sem voltar pra rede — senão os dois Studios ficavam a devolver-se o mesmo.
   // O hook guarda estes ganchos num ref e refaz a cada render, então `dados`
@@ -466,6 +468,21 @@ export function Convites({
    * o antigo volta ao que estava salvo. Sem isso a edição ficaria nos dois, que
    * é justamente o que suja a base de onde sai o deploy.
    */
+  /** Painel RSVP acabado de criar: entra na lista e passa a ser o que está na tela. */
+  const aoCriarPainel = async (novoId: string): Promise<void> => {
+    setCriandoPainel(false);
+    setErro(null);
+    setAviso(`${novoId} criado. Preenche o Google Forms antes de publicar.`);
+    try {
+      await desligarAoVivo();
+      await derrubarServidor();
+      await recarregar();
+      setId(novoId);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const aoDuplicar = async (copia: { id: string; faltam: string[] }): Promise<void> => {
     setDuplicando(false);
     setErro(null);
@@ -511,6 +528,13 @@ export function Convites({
           somenteConvite
           className="w-[220px]"
         />
+        <button
+          onClick={() => setCriandoPainel(true)}
+          title="Criar um painel RSVP novo"
+          className="no-drag inline-flex shrink-0 items-center gap-1.5 rounded-full border border-rule bg-surface px-2.5 py-1 font-mono text-[11px] text-muted transition-colors hover:text-text"
+        >
+          <Plus size={12} /> painel RSVP
+        </button>
         {/* Par segmentado, encostado e com régua no meio: desfazer e refazer são
             a mesma ação em dois sentidos, não dois botões que por acaso vizinham. */}
         <div className="no-drag flex shrink-0 items-center rounded-full border border-rule bg-surface px-0.5">
@@ -747,6 +771,12 @@ export function Convites({
             />
           );
         })()}
+      {criandoPainel && (
+        <NovoPainelRSVP
+          onFechar={() => setCriandoPainel(false)}
+          onPronto={(novoId) => void aoCriarPainel(novoId)}
+        />
+      )}
     </div>
     </ProvedorSite>
   );

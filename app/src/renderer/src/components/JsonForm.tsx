@@ -5,6 +5,7 @@ import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
 import { AvisoRSVP } from "@/components/AvisoRSVP";
 import { PainelTema } from "@/components/PainelTema";
 import { PainelMedidas } from "@/components/PainelMedidas";
+import { PainelPrancheta } from "@/components/PainelPrancheta";
 import { PainelOrnamentos } from "@/components/PainelOrnamentos";
 import { PainelHero } from "@/components/PainelHero";
 import { PainelGaleria } from "@/components/PainelGaleria";
@@ -408,6 +409,19 @@ export function JsonForm({
         galeria={valor as Record<string, unknown>}
         siteId={siteId}
         onChange={(caminho, novo) => alterar([secao, ...caminho], novo)}
+      />
+    );
+  }
+  // As molduras do painel RSVP não se editam em lista: elas têm lugar no quadro,
+  // e é no quadro que ela as põe.
+  if (secao === "molduras" && Array.isArray(valor)) {
+    const tema = dados.tema as Record<string, unknown> | undefined;
+    return (
+      <PainelPrancheta
+        molduras={valor}
+        fundo={typeof tema?.fundo === "string" ? tema.fundo : undefined}
+        siteId={siteId}
+        onChange={(novas) => alterar([secao], novas)}
       />
     );
   }

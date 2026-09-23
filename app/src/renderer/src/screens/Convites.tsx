@@ -41,6 +41,7 @@ import { Divisor, useLarguraPainel } from "@/components/Divisor";
 import { ApagarSite } from "@/components/ApagarSite";
 import { RenomearSite } from "@/components/RenomearSite";
 import { Tokenizar } from "@/components/Tokenizar";
+import { CorreioDoAmor } from "@/components/CorreioDoAmor";
 import { NovoPainelRSVP } from "@/components/NovoPainelRSVP";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
@@ -105,6 +106,7 @@ export function Convites({
 
   const [mostrarCoop, setMostrarCoop] = useState(false);
   const [criandoPainel, setCriandoPainel] = useState(false);
+  const [vendoCorreio, setVendoCorreio] = useState(false);
   // Patch que chegou da rede entra pelo mesmo caminho de uma edição local, mas
   // sem voltar pra rede — senão os dois Studios ficavam a devolver-se o mesmo.
   // O hook guarda estes ganchos num ref e refaz a cada render, então `dados`
@@ -580,6 +582,7 @@ export function Convites({
             podeSalvarComoNovo={Boolean((id || convidado) && dados)}
             temSite={Boolean(id)}
             onSalvarComoNovo={() => setDuplicando(true)}
+            onCorreio={() => setVendoCorreio(true)}
             onRenomear={() => setRenomeando(true)}
             onTokenizar={() => setTokenizando(true)}
             onAbrirPasta={() => id && void reveal(id)}
@@ -771,6 +774,8 @@ export function Convites({
             />
           );
         })()}
+      {vendoCorreio && id && <CorreioDoAmor siteId={id} onFechar={() => setVendoCorreio(false)} />}
+
       {criandoPainel && (
         <NovoPainelRSVP
           onFechar={() => setCriandoPainel(false)}

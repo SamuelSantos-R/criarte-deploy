@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { FileText, Image, KanbanSquare, Rocket, Settings, Signature, Smartphone, Stamp } from "lucide-react";
+import { Clapperboard, FileText, Image, KanbanSquare, Rocket, Settings, Signature, Smartphone, Stamp } from "lucide-react";
 import { getSettings, listSites, type Site } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProvaProvider, useProva } from "@/lib/prova";
@@ -14,10 +14,11 @@ import { Fotos } from "@/screens/Fotos";
 import { Preview } from "@/screens/Preview";
 import { Config } from "@/screens/Config";
 import { Envelope } from "@/screens/Envelope";
+import { EnvelopeAnimado } from "@/screens/EnvelopeAnimado";
 import { Monograma } from "@/screens/Monograma";
 import { Quadro } from "@/screens/Quadro";
 
-type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "monograma" | "quadro" | "config";
+type Tela = "convites" | "preview" | "deploy" | "fotos" | "envelope" | "envelope-animado" | "monograma" | "quadro" | "config";
 type Item = { id: Tela; label: string; Icone: typeof FileText };
 
 const TRABALHO: Item[] = [
@@ -30,6 +31,7 @@ const TRABALHO: Item[] = [
 // Fora do fluxo do site: envelopador e monograma não precisam de raiz nem de convite.
 const AVULSO: Item[] = [
   { id: "envelope", label: "Envelopes", Icone: Stamp },
+  { id: "envelope-animado", label: "Animar envelope", Icone: Clapperboard },
   { id: "monograma", label: "Monogramas", Icone: Signature },
   { id: "quadro", label: "Quadro", Icone: KanbanSquare },
 ];
@@ -176,7 +178,7 @@ function Estudio(): ReactElement {
         <main className="flex min-h-0 min-w-0 flex-1 pb-3 pr-3">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-painel">
             {!pronto && <p className="px-6 pt-16 text-[13px] text-muted">Abrindo…</p>}
-            {pronto && ((semRaiz && tela !== "envelope" && tela !== "monograma" && tela !== "quadro") || tela === "config") && (
+            {pronto && ((semRaiz && tela !== "envelope" && tela !== "envelope-animado" && tela !== "monograma" && tela !== "quadro") || tela === "config") && (
               <Entrada key="config">
                 <Config sitesRoot={sitesRoot} onRoot={trocarRaiz} />
               </Entrada>
@@ -204,6 +206,12 @@ function Estudio(): ReactElement {
             {pronto && tela === "envelope" && (
               <Entrada key="envelope">
                 <Envelope />
+              </Entrada>
+            )}
+
+            {pronto && tela === "envelope-animado" && (
+              <Entrada key="envelope-animado">
+                <EnvelopeAnimado />
               </Entrada>
             )}
             {pronto && visitadas.includes("quadro") && (

@@ -40,6 +40,10 @@ extraResources:
   # no convite.json e a página não tinha nada para desenhar.
   - from: resources/secoes
     to: secoes
+  # O motor que anima o envelope (o FlapMotion, feito para a Criarte). Fica de
+  # fora do bundle porque é CommonJS e chama sharp e ffmpeg, que são binários.
+  - from: resources/envelope-animado
+    to: envelope-animado
   # O molde do painel RSVP. Viaja inteiro (página, fontes, música e molduras)
   # porque um painel novo tem de nascer em máquina que ainda não tenha nenhum.
   - from: resources/painel-rsvp

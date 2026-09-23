@@ -1,0 +1,6 @@
+{
+  "name": "envelope-animado",
+  "private": true,
+  "type": "commonjs",
+  "main": "engine-curva.js"
+}

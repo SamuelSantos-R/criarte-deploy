@@ -78,6 +78,19 @@ export const semearAsset = (id: string, secao: string) =>
 /** A imagem de um campo em `data:`, pra recorte visual. Vazio ou sem foto ainda dá `null`. */
 export type AvisoRevisao = { tipo: "ficheiro-em-falta" | "arte-por-cima" | "arte-sem-uso"; grave: boolean; texto: string };
 export type Revisao = { url: string; avisos: AvisoRevisao[]; largurasVistas: number[] };
+export type PassoAnimacao = { fase: string; fracao: number; quadro?: number; total?: number; segundos: number };
+export const escolherConvite = () => call(api.escolherConvite()) as Promise<string | null>;
+export const animarEnvelope = (ficheiro: string, segundos: number) =>
+  call(api.animarEnvelope(ficheiro, segundos)) as Promise<{ ficheiro: string; nome: string }>;
+export const cancelarEnvelope = () => call(api.cancelarEnvelope()) as Promise<boolean>;
+export const mostrarVideo = (ficheiro: string) => call(api.mostrarVideo(ficheiro)) as Promise<void>;
+export const aoAnimar = (cb: (p: PassoAnimacao) => void) => api.aoAnimar(cb);
+
+export type Recado = { id: string; nome: string; texto: string; quando: string };
+export const lerRecados = (id: string) => call(api.lerRecados(id)) as Promise<Recado[]>;
+export const apagarRecado = (id: string, recado: string) =>
+  call(api.apagarRecado(id, recado)) as Promise<{ apagados: number }>;
+
 export const abrirRevisao = (id: string) => call(api.abrirRevisao(id)) as Promise<Revisao>;
 export const fecharRevisao = () => call(api.fecharRevisao()) as Promise<void>;
 export const aoRevisar = (cb: (linha: string) => void) => api.aoRevisar(cb);

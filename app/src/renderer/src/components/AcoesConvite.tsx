@@ -1,6 +1,6 @@
 import { type ReactElement } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Copy, FolderOpen, MoreHorizontal, PenLine, Ticket, Trash2, Users } from "lucide-react";
+import { Copy, FolderOpen, Mail, MoreHorizontal, PenLine, Ticket, Trash2, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,6 +94,7 @@ type Acoes = {
   onSalvarComoNovo: () => void;
   onRenomear: () => void;
   onTokenizar: () => void;
+  onCorreio: () => void;
   onAbrirPasta: () => void;
   onApagar: () => void;
 };
@@ -132,6 +133,9 @@ export function MenuConvite(a: Acoes): ReactElement | null {
             </DropdownMenuItem>
             <DropdownMenuItem className={item} onSelect={a.onTokenizar}>
               <Ticket size={15} className="text-muted" /> Tokenizar
+            </DropdownMenuItem>
+            <DropdownMenuItem className={item} onSelect={a.onCorreio}>
+              <Mail size={15} className="text-muted" /> Correio do amor
             </DropdownMenuItem>
             <DropdownMenuItem className={item} onSelect={a.onAbrirPasta}>
               <FolderOpen size={15} className="text-muted" /> Abrir pasta

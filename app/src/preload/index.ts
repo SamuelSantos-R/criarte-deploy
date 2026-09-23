@@ -100,6 +100,16 @@ const api = {
       largurasVistas: number[];
     }>("revisao:abrir", id),
   fecharRevisao: () => invoke<void>("revisao:fechar"),
+  lerRecados: (id: string) =>
+    invoke<{ id: string; nome: string; texto: string; quando: string }[]>("mural:ler", id),
+  apagarRecado: (id: string, recado: string) =>
+    invoke<{ apagados: number }>("mural:apagar", id, recado),
+  escolherConvite: () => invoke<string | null>("envelope:escolher"),
+  animarEnvelope: (ficheiro: string, segundos: number) =>
+    invoke<{ ficheiro: string; nome: string }>("envelope:animar", ficheiro, segundos),
+  cancelarEnvelope: () => invoke<boolean>("envelope:cancelar"),
+  mostrarVideo: (ficheiro: string) => invoke<void>("envelope:mostrar", ficheiro),
+  aoAnimar: ouvir<{ fase: string; fracao: number; quadro?: number; total?: number; segundos: number }>("envelope:passo"),
   aoRevisar: ouvir<string>("revisao:linha"),
   plantarSecao: (id: string, secao: string) => invoke<Plantio>("secao:plantar", id, secao),
   estadoPlantio: (id: string, secao: string) => invoke<Plantio>("secao:estado", id, secao),

@@ -24,7 +24,6 @@ import { configR2, prefixoAtualizacoes } from "./r2";
 // chave que a máquina já tem, não de um segredo novo.
 // ============================================================================
 
-const BASE_PUBLICA = "https://criartedesing.ao/sites";
 const TEMPO_MAX_MS = 60_000;
 // O ponteiro muda a cada versão e o blob nunca muda, mas quem está no meio do
 // caminho (Cloudflare) não sabe disso: pedir sem cache evita ficar a ver a
@@ -33,9 +32,15 @@ const SEM_CACHE = { "cache-control": "no-cache" };
 
 export type Fonte = { base: string };
 
+/**
+ * As peças moram no mesmo sítio do .dmg: o R2, no caminho secreto que a chave
+ * desta máquina gera. A VPS chegou a receber a árvore, mas o nginx de lá
+ * reescreve `/sites/...` e o endereço não bate — mexer nessa regra é obra no
+ * servidor de produção, e o ganho (2 MB em vez de 136) não depende dela.
+ */
 async function fonte(): Promise<Fonte> {
   const cfg = await configR2();
-  return { base: `${BASE_PUBLICA}/${prefixoAtualizacoes(cfg).replace(/\/$/, "")}` };
+  return { base: `${cfg.publicUrl}/${prefixoAtualizacoes(cfg).replace(/\/$/, "")}` };
 }
 
 async function baixarTexto(url: string): Promise<string | null> {

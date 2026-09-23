@@ -22,11 +22,11 @@ const CONFIG_CLI = (): string => join(homedir(), ".criarte-deploy", "config.json
  * sem o config do CLI. Não ter a chave não pode impedi-lo de ficar com a pasta:
  * publicar é outro passo, e quem publica é quem tem a chave.
  */
-function podeRegistrar(): boolean {
+export function podeRegistrar(): boolean {
   return existsSync(CONFIG_CLI());
 }
 
-function credenciais(): Credenciais {
+export function credenciais(): Credenciais {
   const arquivo = CONFIG_CLI();
   if (!existsSync(arquivo)) throw new Error("~/.criarte-deploy/config.json não existe");
   const bruto = JSON.parse(readFileSync(arquivo, "utf8")) as {
@@ -259,12 +259,12 @@ async function gravarSlugLocal(destino: string, slug: string): Promise<void> {
 }
 
 /** Cabeçalhos do PostgREST com a chave de serviço. */
-function auth(serviceKey: string): Record<string, string> {
+export function auth(serviceKey: string): Record<string, string> {
   return { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` };
 }
 
 /** O uuid que o banco deu a este slug, ou null se o nome não está registado. */
-async function uuidDoSlug(slug: string): Promise<string | null> {
+export async function uuidDoSlug(slug: string): Promise<string | null> {
   const { url, serviceKey } = credenciais();
   const r = await fetch(
     `${url}/rest/v1/cr_sites?slug=eq.${encodeURIComponent(slug)}&select=id`,

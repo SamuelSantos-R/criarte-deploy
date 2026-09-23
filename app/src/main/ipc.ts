@@ -19,6 +19,8 @@ import {
 import { FILTROS, gravarSvgDoSite, importAssets, lerSvgDoSite, previaDeAsset, semearAsset } from "./assets";
 import { criarPainel } from "./painel";
 import { abrirRevisao, fecharRevisao } from "./revisao";
+import { apagarRecado, lerRecados } from "./mural";
+import { animarEnvelope, cancelarEnvelope, escolherConvite, mostrarVideo } from "./envelope-animado";
 import { instalarFonte, listarFontes } from "./fontes";
 import { carregarLista, carregarModelo, definirLinkUnico, definirPasta, gerar, pastaDaSaida } from "./envelope";
 import {
@@ -243,6 +245,16 @@ export function registerIpc(): void {
   );
 
   handle("revisao:fechar", () => fecharRevisao());
+
+  handle("mural:ler", (_e, id: unknown) => lerRecados(asString(id, "id")));
+  handle("mural:apagar", (_e, id: unknown, recado: unknown) => apagarRecado(asString(id, "id"), recado));
+
+  handle("envelope:escolher", () => escolherConvite());
+  handle("envelope:animar", (e, ficheiro: unknown, segundos: unknown) =>
+    animarEnvelope(e.sender, ficheiro, segundos),
+  );
+  handle("envelope:cancelar", () => cancelarEnvelope());
+  handle("envelope:mostrar", (_e, ficheiro: unknown) => mostrarVideo(ficheiro));
 
   handle("secao:plantar", (_e, id: unknown, secao: unknown) =>
     plantarSecao(asString(id, "id"), asString(secao, "secao")),

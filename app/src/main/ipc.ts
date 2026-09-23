@@ -250,8 +250,8 @@ export function registerIpc(): void {
   handle("mural:apagar", (_e, id: unknown, recado: unknown) => apagarRecado(asString(id, "id"), recado));
 
   handle("envelope:escolher", () => escolherConvite());
-  handle("envelope:animar", (e, ficheiro: unknown, segundos: unknown) =>
-    animarEnvelope(e.sender, ficheiro, segundos),
+  handle("envelope:animar", (e, ficheiro: unknown, segundos: unknown, suavizar: unknown) =>
+    animarEnvelope(e.sender, ficheiro, segundos, suavizar),
   );
   handle("envelope:cancelar", () => cancelarEnvelope());
   handle("envelope:mostrar", (_e, ficheiro: unknown) => mostrarVideo(ficheiro));

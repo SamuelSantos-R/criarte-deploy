@@ -28,6 +28,7 @@ function tempo(s: number): string {
 export function EnvelopeAnimado(): ReactElement {
   const [convite, setConvite] = useState<string | null>(null);
   const [segundos, setSegundos] = useState(6);
+  const [suavizar, setSuavizar] = useState(true);
   const [passo, setPasso] = useState<PassoAnimacao | null>(null);
   const [feito, setFeito] = useState<{ ficheiro: string; nome: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export function EnvelopeAnimado(): ReactElement {
     setFeito(null);
     setPasso({ fase: "prepare", fracao: 0, segundos: 0 });
     try {
-      setFeito(await animarEnvelope(convite, segundos));
+      setFeito(await animarEnvelope(convite, segundos, suavizar));
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -112,6 +113,23 @@ export function EnvelopeAnimado(): ReactElement {
               ))}
             </div>
           </div>
+
+          <label className="no-drag flex cursor-pointer items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={suavizar}
+              disabled={trabalhando}
+              onChange={(e) => setSuavizar(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-cyan"
+            />
+            <span>
+              <span className="block font-narrow text-label font-semibold text-text">suavizar movimento</span>
+              <span className="mt-0.5 block text-[11px] leading-snug text-muted">
+                Tira o engasgo do começo e deixa um rasto leve quando a aba vira depressa. Desligado, é o
+                motor original, pose a pose.
+              </span>
+            </span>
+          </label>
 
           {trabalhando && (
             <div className="rounded-xl border border-rule p-3">

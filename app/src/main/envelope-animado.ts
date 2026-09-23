@@ -32,6 +32,7 @@ type Motor = {
       outDir: string;
       fileName: string;
       durationSeconds: number;
+      suavizar?: boolean;
       signal: AbortSignal;
       onProgress: (d: { phase: string; fraction: number; elapsedSec: number; frame?: number; total?: number }) => void;
     },
@@ -66,6 +67,7 @@ export async function animarEnvelope(
   sender: WebContents,
   entrada: unknown,
   segundos: unknown,
+  suavizar: unknown = true,
 ): Promise<VideoFeito> {
   if (typeof entrada !== "string" || !existsSync(entrada)) throw new Error("não achei esse ficheiro");
   if (!/\.(png|jpe?g|webp)$/i.test(entrada)) throw new Error("tem de ser uma imagem do convite");
@@ -83,6 +85,9 @@ export async function animarEnvelope(
       outDir: pasta,
       fileName: nome,
       durationSeconds: duracao,
+      // Mistura as poses vizinhas com um obturador de cinema: tira o soluço do
+      // começo e deixa um rasto leve onde a aba vira depressa.
+      suavizar: suavizar !== false,
       signal: emCurso.signal,
       onProgress: (d) => {
         if (sender.isDestroyed()) return;

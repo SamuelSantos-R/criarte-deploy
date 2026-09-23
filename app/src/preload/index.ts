@@ -105,8 +105,8 @@ const api = {
   apagarRecado: (id: string, recado: string) =>
     invoke<{ apagados: number }>("mural:apagar", id, recado),
   escolherConvite: () => invoke<string | null>("envelope:escolher"),
-  animarEnvelope: (ficheiro: string, segundos: number) =>
-    invoke<{ ficheiro: string; nome: string }>("envelope:animar", ficheiro, segundos),
+  animarEnvelope: (ficheiro: string, segundos: number, suavizar: boolean) =>
+    invoke<{ ficheiro: string; nome: string }>("envelope:animar", ficheiro, segundos, suavizar),
   cancelarEnvelope: () => invoke<boolean>("envelope:cancelar"),
   mostrarVideo: (ficheiro: string) => invoke<void>("envelope:mostrar", ficheiro),
   aoAnimar: ouvir<{ fase: string; fracao: number; quadro?: number; total?: number; segundos: number }>("envelope:passo"),

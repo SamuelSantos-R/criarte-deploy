@@ -80,8 +80,8 @@ export type AvisoRevisao = { tipo: "ficheiro-em-falta" | "arte-por-cima" | "arte
 export type Revisao = { url: string; avisos: AvisoRevisao[]; largurasVistas: number[] };
 export type PassoAnimacao = { fase: string; fracao: number; quadro?: number; total?: number; segundos: number };
 export const escolherConvite = () => call(api.escolherConvite()) as Promise<string | null>;
-export const animarEnvelope = (ficheiro: string, segundos: number) =>
-  call(api.animarEnvelope(ficheiro, segundos)) as Promise<{ ficheiro: string; nome: string }>;
+export const animarEnvelope = (ficheiro: string, segundos: number, suavizar: boolean) =>
+  call(api.animarEnvelope(ficheiro, segundos, suavizar)) as Promise<{ ficheiro: string; nome: string }>;
 export const cancelarEnvelope = () => call(api.cancelarEnvelope()) as Promise<boolean>;
 export const mostrarVideo = (ficheiro: string) => call(api.mostrarVideo(ficheiro)) as Promise<void>;
 export const aoAnimar = (cb: (p: PassoAnimacao) => void) => api.aoAnimar(cb);

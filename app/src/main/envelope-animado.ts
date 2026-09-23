@@ -16,10 +16,12 @@ export type VideoFeito = { ficheiro: string; nome: string };
 
 let emCurso: AbortController | null = null;
 
+// O mesmo sítio nos dois formatos: a pasta do projeto em desenvolvimento, e
+// `Resources/app` depois de empacotado (o asar está desligado desde a 6.1.0).
+// Tem de ser dentro do app: o motor faz `require("sharp")` e o Node procura
+// subindo a partir do ficheiro — de `Resources/` nunca chegava ao node_modules.
 function pastaDoMotor(): string {
-  return app.isPackaged
-    ? join(process.resourcesPath, "envelope-animado")
-    : resolve(app.getAppPath(), "resources", "envelope-animado");
+  return resolve(app.getAppPath(), "resources", "envelope-animado");
 }
 
 type Motor = {

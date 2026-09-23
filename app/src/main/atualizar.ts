@@ -234,19 +234,15 @@ export async function instalarAtualizacao(avisar: (p: Progresso) => void): Promi
   if (bloqueio) throw new Error(bloqueio);
   emCurso = true;
   try {
-    const { manifesto, prefixo } = await lerManifesto();
-    const pacote = manifesto && PLATAFORMA ? manifesto[PLATAFORMA] : undefined;
-    if (!pacote || !pacoteValido(pacote, prefixo) || !maisNova(pacote.versao, app.getVersion())) {
-      throw new Error("não há versão nova para esta máquina");
-    }
-
     const pasta = pastaTemp();
     await rm(pasta, { recursive: true, force: true });
     await mkdir(pasta, { recursive: true });
 
-    // Via por partes: baixa só os ficheiros que mudaram, monta a versão nova
-    // numa cópia do app e entrega ao mesmo script de troca. Qualquer tropeço
-    // aqui cai no .dmg logo a seguir, que é o caminho que já se conhece.
+    // A via por partes vem PRIMEIRO, e não depois de aprovar o .dmg: as duas
+    // publicações são independentes, e as peças chegam antes do instalador
+    // (sobem em minutos, ele em onze). Quem checava o .dmg primeiro recusava a
+    // versão que o botão estava mesmo a oferecer — "não há versão nova para
+    // esta máquina" com a atualização à vista, que foi o que aconteceu na 6.3.1.
     if (PLATAFORMA === "mac") {
       const pronto = await porPartes(pasta, avisar).catch(() => null);
       if (pronto) {
@@ -260,6 +256,13 @@ export async function instalarAtualizacao(avisar: (p: Progresso) => void): Promi
           return;
         }
       }
+    }
+
+    // Sem peças (ou peças que não servem a esta versão), vale o instalador.
+    const { manifesto, prefixo } = await lerManifesto();
+    const pacote = manifesto && PLATAFORMA ? manifesto[PLATAFORMA] : undefined;
+    if (!pacote || !pacoteValido(pacote, prefixo) || !maisNova(pacote.versao, app.getVersion())) {
+      throw new Error("não há versão nova para esta máquina");
     }
 
     const instalador = join(pasta, PLATAFORMA === "mac" ? "Criarte-Studio.dmg" : "Criarte-Studio-Setup.exe");

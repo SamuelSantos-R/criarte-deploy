@@ -15,6 +15,10 @@ asar: false
 files:
   - out/**
   - package.json
+  # O motor do envelope viaja aqui dentro, e não em extraResources, porque ele
+  # é CommonJS e faz `require("sharp")`: o Node sobe a partir da pasta do
+  # ficheiro, e só daqui é que chega ao `node_modules` do app. Fora, não achava.
+  - resources/envelope-animado/**
 
 # O CLI viaja junto: o app roda cli.mjs com o próprio binário do Electron
 # (ELECTRON_RUN_AS_NODE), então a máquina não precisa ter Node instalado.
@@ -40,10 +44,6 @@ extraResources:
   # no convite.json e a página não tinha nada para desenhar.
   - from: resources/secoes
     to: secoes
-  # O motor que anima o envelope (o FlapMotion, feito para a Criarte). Fica de
-  # fora do bundle porque é CommonJS e chama sharp e ffmpeg, que são binários.
-  - from: resources/envelope-animado
-    to: envelope-animado
   # O molde do painel RSVP. Viaja inteiro (página, fontes, música e molduras)
   # porque um painel novo tem de nascer em máquina que ainda não tenha nenhum.
   - from: resources/painel-rsvp

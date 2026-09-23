@@ -6,8 +6,9 @@
 import { execSync, execFileSync, spawn } from "node:child_process";
 import {
   existsSync, mkdtempSync, readFileSync, writeFileSync, mkdirSync,
-  rmSync, cpSync, readdirSync, statSync,
+  rmSync, cpSync, readdirSync, statSync, renameSync, createReadStream,
 } from "node:fs";
+import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir, networkInterfaces, userInfo } from "node:os";
 import { join, basename, relative, extname, dirname, sep, resolve } from "node:path";
@@ -2260,6 +2261,203 @@ function rewriteSourceForR2(siteCopyPath, r2Config, remoteMap, category, slug) {
 }
 
 // ============================================================================
+// REVISÃO LOCAL — o convite do Marcos & Chelsea foi ao ar com a flor por cima
+// do contador, e no `next dev` estava certo: a página publicada é outra coisa,
+// construída e com basePath. Aqui constrói-se igual à VPS, serve-se na máquina
+// e ela vê ANTES. Duas perguntas que o olho não faz vão de brinde: falta algum
+// ficheiro que a página pede? sobrou arte que nenhuma página usa?
+// ============================================================================
+
+/** Guarda o next.config da pessoa e põe o da VPS no lugar. Devolve como desfazer. */
+function trocarConfigPorDaVps(cwd, basePath) {
+  const nomes = ["next.config.js", "next.config.mjs", "next.config.ts"];
+  const guardados = [];
+  for (const nome of nomes) {
+    const p = join(cwd, nome);
+    if (!existsSync(p)) continue;
+    const backup = join(cwd, `${nome}.antes-da-revisao`);
+    renameSync(p, backup);
+    guardados.push({ p, backup });
+  }
+  const nosso = join(cwd, "next.config.mjs");
+  writeFileSync(
+    nosso,
+    `// Escrito pela revisão do crd — é o mesmo que a VPS injeta. Apagado no fim.\n` +
+      `export default { output: "export", images: { unoptimized: true }, basePath: ${JSON.stringify(basePath)}, trailingSlash: true };\n`,
+  );
+  return () => {
+    try { rmSync(nosso, { force: true }); } catch {}
+    for (const g of guardados) {
+      try { renameSync(g.backup, g.p); } catch {}
+    }
+  };
+}
+
+/** Sobra de uma revisão que morreu a meio: devolve o config da pessoa ao lugar. */
+function restaurarConfigSeSobrou(cwd) {
+  for (const nome of ["next.config.js", "next.config.mjs", "next.config.ts"]) {
+    const backup = join(cwd, `${nome}.antes-da-revisao`);
+    if (!existsSync(backup)) continue;
+    try {
+      rmSync(join(cwd, nome), { force: true });
+      renameSync(backup, join(cwd, nome));
+      warn(`Devolvi o ${nome} que uma revisão interrompida tinha guardado.`);
+    } catch {}
+  }
+}
+
+const TIPOS_REVISAO = {
+  ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".webp": "image/webp", ".avif": "image/avif", ".gif": "image/gif", ".ico": "image/x-icon",
+  ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf",
+  ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".mp4": "video/mp4", ".webm": "video/webm",
+  ".txt": "text/plain; charset=utf-8", ".xml": "application/xml",
+};
+
+/** Serve o `out/` no mesmo endereço do ar e anota tudo o que pedirem e não existir. */
+function servirBuild(out, basePath, faltas) {
+  const servidor = createServer((req, res) => {
+    const caminho = decodeURIComponent((req.url || "/").split("?")[0]);
+    if (!caminho.startsWith(basePath)) {
+      // No ar, caminho sem o prefixo do site não existe. Servir aqui esconderia o engano.
+      faltas.add(caminho);
+      res.statusCode = 404;
+      return res.end("fora do endereço do site");
+    }
+    const semBase = caminho.slice(basePath.length) || "/";
+    let ficheiro = join(out, semBase);
+    if (!ficheiro.startsWith(out)) { res.statusCode = 403; return res.end(); }
+    if (semBase.endsWith("/")) ficheiro = join(ficheiro, "index.html");
+    else if (!extname(ficheiro) && existsSync(`${ficheiro}.html`)) ficheiro = `${ficheiro}.html`;
+    if (!existsSync(ficheiro)) {
+      faltas.add(caminho);
+      res.statusCode = 404;
+      return res.end("não existe neste build");
+    }
+    res.setHeader("content-type", TIPOS_REVISAO[extname(ficheiro).toLowerCase()] || "application/octet-stream");
+    res.setHeader("cache-control", "no-store");
+    createReadStream(ficheiro).pipe(res);
+  });
+  return new Promise((resolvido) => {
+    servidor.listen(0, "127.0.0.1", () => resolvido({ servidor, porta: servidor.address().port }));
+  });
+}
+
+/** Arte na pasta que nenhuma página construída usa — o sinal do campo trocado. */
+function arteSemUso(cwd) {
+  const assets = join(cwd, "public", "assets");
+  const out = join(cwd, "out");
+  if (!existsSync(assets) || !existsSync(out)) return [];
+  let texto = "";
+  const juntar = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) juntar(p);
+      else if (/\.(html|js|css|json|txt)$/i.test(e.name)) texto += readFileSync(p, "utf8");
+    }
+  };
+  juntar(out);
+  const sobrando = [];
+  for (const e of readdirSync(assets, { withFileTypes: true })) {
+    if (!e.isFile() || e.name.startsWith(".")) continue;
+    const semExt = e.name.replace(/\.[^.]+$/, "");
+    if (texto.includes(e.name) || texto.includes(semExt)) continue;
+    if (statSync(join(assets, e.name)).size < 2048) continue;
+    sobrando.push(e.name);
+  }
+  return sobrando.slice(0, 10);
+}
+
+/**
+ * Constrói, serve, abre no navegador e espera o OK dela. Devolve `false` se
+ * mandar parar — aí o deploy não acontece.
+ */
+async function revisarLocalmente(cwd, category, slug) {
+  const basePath = `/${category}/${slug}`;
+  restaurarConfigSeSobrou(cwd);
+  screen.phase("👀 Revisão", `${category}/${slug}`);
+  console.log(`  ${c.dim}Construindo igual à VPS — é o mesmo trabalho, mas aqui dá pra desistir.${c.reset}\n`);
+
+  const desfazer = trocarConfigPorDaVps(cwd, basePath);
+  try {
+    rmSync(join(cwd, "out"), { recursive: true, force: true });
+    execSync("npx --no-install next build", { cwd, stdio: "inherit", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" } });
+  } catch {
+    err("O site não construiu. O erro está aí em cima — no ar daria o mesmo.");
+    desfazer();
+    return false;
+  }
+  desfazer();
+
+  const out = join(cwd, "out");
+  if (!existsSync(join(out, "index.html"))) {
+    err("O build não deixou página nenhuma em out/.");
+    return false;
+  }
+
+  const sobrando = arteSemUso(cwd);
+  const faltas = new Set();
+  const { servidor, porta } = await servirBuild(out, basePath, faltas);
+  const url = `http://127.0.0.1:${porta}${basePath}/`;
+
+  console.log();
+  ok(`Site construído e a servir em ${c.cyan}${url}${c.reset}`);
+  if (sobrando.length > 0) {
+    console.log();
+    warn(`${sobrando.length} arte(s) na pasta que nenhuma página usa:`);
+    for (const nome of sobrando) console.log(`    ${c.dim}${nome}${c.reset}`);
+    info("Se era pra estar no convite, o campo ficou com outro ficheiro.");
+  }
+  try { execSync(`open ${JSON.stringify(url)}`, { stdio: "ignore" }); } catch {}
+  console.log();
+  console.log(`  ${c.dim}Role o convite inteiro, e no telemóvel também (o QR está no Studio).${c.reset}`);
+  console.log(`  ${c.dim}Veja sobretudo as molduras: é aí que a arte sobe por cima do texto.${c.reset}`);
+  console.log();
+
+  const resposta = await ask(`Está como você quer? ${c.dim}(s/N)${c.reset} → `);
+  const passou = resposta.toLowerCase() === "s" || resposta.toLowerCase() === "sim";
+
+  if (faltas.size > 0) {
+    console.log();
+    warn(`${faltas.size} ficheiro(s) que a página pediu e não existem no build:`);
+    for (const f of [...faltas].slice(0, 8)) console.log(`    ${c.dim}${f}${c.reset}`);
+    info("No ar isto dá 404 — é o que faz a imagem não aparecer.");
+  }
+
+  await new Promise((r) => servidor.close(() => r()));
+  if (!passou) warn("Revisão recusada — nada foi publicado.");
+  return passou;
+}
+
+/**
+ * `crd revisar` — o mesmo olhar do deploy, sem publicar nada. Para quando ela
+ * só quer ver como o convite fica construído, com o endereço do ar.
+ */
+async function cmdRevisar(argv) {
+  const cwd = process.cwd();
+  if (!existsSync(join(cwd, "package.json"))) {
+    err("Isto não parece a pasta de um site (não há package.json).");
+    return;
+  }
+  // Categoria e nome saem do site.json, como no deploy; os argumentos mandam
+  // quando forem dados, para rever um endereço diferente do de ontem.
+  let meta = {};
+  try { meta = JSON.parse(readFileSync(join(cwd, "site.json"), "utf8")); } catch {}
+  const limpar = (s) =>
+    String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const category = limpar(argv[0] || meta.category || basename(dirname(cwd)) || "casamento");
+  const slug = limpar(argv[1] || meta.slug || basename(cwd));
+  if (!category || !slug) {
+    err("Não descobri a categoria e o nome. Use: crd revisar <categoria> <nome>");
+    return;
+  }
+  await revisarLocalmente(cwd, category, slug);
+}
+
+// ============================================================================
 // DIRECT DEPLOY (upload direto pra VPS via API — sem git, sem rebuild)
 // ============================================================================
 // Janela da setinha: acima disso o clack rola em vez de despejar tudo na tela.
@@ -3020,6 +3218,15 @@ async function cmdDirectDeploy(argv) {
   }
   console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${fmtDateBR(expires_at)}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
   console.log();
+
+  // A revisão vem antes da confirmação: ela vê o site CONSTRUÍDO, com basePath,
+  // como o convidado vai ver — não o `next dev`. Foi a falta desta porta que pôs
+  // um convite no ar com a arte por cima do texto. O `--yes` do Studio pula,
+  // porque lá a revisão já aconteceu na tela.
+  if (!assumeYes && !dryRun && !validateOnly && !argv.includes("--sem-revisao")) {
+    const aprovado = await revisarLocalmente(cwd, category, slug);
+    if (!aprovado) process.exit(0);
+  }
 
   if (assumeYes) {
     info("--yes: confirmação automática.");
@@ -4287,6 +4494,7 @@ const FLAGS_DEPLOY = new Set([
       case "remove":
       case "delete":     await cmdRemove(rest); break;
       case "check":      await cmdCheck();     break;
+      case "revisar":    await cmdRevisar(rest); break;
       case "locks":      await cmdLocks(rest);  break;
       case "fotos":
       case "webp":       await cmdFotos(rest);  break;

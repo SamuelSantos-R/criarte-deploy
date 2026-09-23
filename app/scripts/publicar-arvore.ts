@@ -33,7 +33,7 @@ import { configR2, prefixoAtualizacoes, r2Listar, r2Put } from "../src/main/r2.t
 setGlobalDispatcher(new Agent({ headersTimeout: 0, bodyTimeout: 0 }));
 
 /** Prazo de uma peça: o que ela leva a 15 KB/s, nunca menos de 5 minutos. */
-const prazoPara = (bytes: number): number => Math.max(5 * 60_000, (bytes / 15_000) * 1000);
+const prazoPara = (bytes: number): number => Math.round(Math.max(5 * 60_000, (bytes / 15_000) * 1000));
 
 const RAIZ = fileURLToPath(new URL("..", import.meta.url));
 const { version: versao } = JSON.parse(await readFile(join(RAIZ, "package.json"), "utf8")) as { version: string };

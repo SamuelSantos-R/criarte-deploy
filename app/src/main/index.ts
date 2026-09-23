@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { registerIpc } from "./ipc";
 import { killAll } from "./cli";
 import { encerrarPreviews, origensDoPreview } from "./preview";
+import { origensDaRevisao } from "./revisao";
 import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 import { limparAtualizacao } from "./atualizar";
@@ -46,7 +47,7 @@ function hardenSession(): void {
     // O site em preview passa pela mesma sessão. Carimbar a CSP do app nele
     // mataria o `next dev`, que precisa de eval e de websocket pro HMR.
     const espelho = urlDoEspelho();
-    const livres = espelho ? [...origensDoPreview(), espelho] : origensDoPreview();
+    const livres = [...origensDoPreview(), ...origensDaRevisao(), ...(espelho ? [espelho] : [])];
     if (livres.some((o) => details.url.startsWith(o))) return cb({});
     cb({ responseHeaders: { ...details.responseHeaders, "Content-Security-Policy": [csp()] } });
   });

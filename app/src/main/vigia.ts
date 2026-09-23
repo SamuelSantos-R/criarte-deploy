@@ -1,5 +1,5 @@
 import { watch, type FSWatcher } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { BrowserWindow } from "electron";
 import { conviteFile, gravadaPeloStudio } from "./sites";
 
@@ -29,9 +29,11 @@ export async function vigiarConvite(id: string | null): Promise<void> {
     if (atual?.id !== id) return;
     if (atual.timer) clearTimeout(atual.timer);
     atual.timer = setTimeout(() => {
-      void stat(file)
-        .then((s) => {
-          if (!gravadaPeloStudio(id, s.mtimeMs)) avisar(id, s.mtimeMs);
+      // Conteúdo igual a algo que o Studio escreveu não é "mudou lá fora",
+      // mesmo que o mtime não bata (precisão do APFS, gravações cruzadas).
+      void Promise.all([stat(file), readFile(file, "utf8")])
+        .then(([s, texto]) => {
+          if (!gravadaPeloStudio(id, s.mtimeMs, texto)) avisar(id, s.mtimeMs);
         })
         .catch(() => {});
     }, REPIQUE);

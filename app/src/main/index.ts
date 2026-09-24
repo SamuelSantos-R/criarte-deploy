@@ -3,8 +3,7 @@ import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { join } from "node:path";
 import { registerIpc } from "./ipc";
 import { killAll } from "./cli";
-import { encerrarPreviews, origensDoPreview } from "./preview";
-import { origensDaRevisao } from "./revisao";
+import { encerrarPreviews, origensDoPreview, protegerQuadro } from "./preview";
 import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 import { limparAtualizacao } from "./atualizar";
@@ -47,7 +46,7 @@ function hardenSession(): void {
     // O site em preview passa pela mesma sessão. Carimbar a CSP do app nele
     // mataria o `next dev`, que precisa de eval e de websocket pro HMR.
     const espelho = urlDoEspelho();
-    const livres = [...origensDoPreview(), ...origensDaRevisao(), ...(espelho ? [espelho] : [])];
+    const livres = [...origensDoPreview(), ...(espelho ? [espelho] : [])];
     if (livres.some((o) => details.url.startsWith(o))) return cb({});
     cb({ responseHeaders: { ...details.responseHeaders, "Content-Security-Policy": [csp()] } });
   });
@@ -96,6 +95,11 @@ function createWindow(): void {
   });
 
   win.webContents.on("will-attach-webview", (event) => event.preventDefault());
+
+  // Cada carga do quadro do preview ganha o guarda de chunk/hidratação.
+  win.webContents.on("did-frame-finish-load", (_e, isMain, processId, routingId) => {
+    if (!isMain) protegerQuadro(win.webContents, processId, routingId);
+  });
 
   if (DEV_URL) void win.loadURL(DEV_URL);
   else void win.loadFile(join(RAIZ, "out", "renderer", "index.html"));

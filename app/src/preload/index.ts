@@ -93,13 +93,6 @@ const api = {
   gravarSvgDoSite: (id: string, caminho: string, svg: string) =>
     invoke<boolean>("assets:gravarSvg", id, caminho, svg),
   criarPainel: (slug: string) => invoke<{ id: string }>("painel:criar", slug),
-  abrirRevisao: (id: string) =>
-    invoke<{
-      url: string;
-      avisos: { tipo: string; grave: boolean; texto: string }[];
-      largurasVistas: number[];
-    }>("revisao:abrir", id),
-  fecharRevisao: () => invoke<void>("revisao:fechar"),
   lerRecados: (id: string) =>
     invoke<{ id: string; nome: string; texto: string; quando: string }[]>("mural:ler", id),
   apagarRecado: (id: string, recado: string) =>
@@ -110,7 +103,6 @@ const api = {
   cancelarEnvelope: () => invoke<boolean>("envelope:cancelar"),
   mostrarVideo: (ficheiro: string) => invoke<void>("envelope:mostrar", ficheiro),
   aoAnimar: ouvir<{ fase: string; fracao: number; quadro?: number; total?: number; segundos: number }>("envelope:passo"),
-  aoRevisar: ouvir<string>("revisao:linha"),
   plantarSecao: (id: string, secao: string) => invoke<Plantio>("secao:plantar", id, secao),
   estadoPlantio: (id: string, secao: string) => invoke<Plantio>("secao:estado", id, secao),
   atualizarSecao: (id: string, secao: string) => invoke<Plantio>("secao:atualizar", id, secao),

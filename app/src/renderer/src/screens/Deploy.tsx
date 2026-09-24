@@ -6,7 +6,6 @@ import { useProva } from "@/lib/prova";
 import { useSiteValido } from "@/lib/useSiteValido";
 import { Button } from "@/components/ui/primitives";
 import { ConfirmarPublicacao } from "@/components/ConfirmarPublicacao";
-import { RevisaoPublicacao } from "@/components/RevisaoPublicacao";
 import {
   OpcoesDeploy,
   OPCOES_PADRAO,
@@ -30,7 +29,6 @@ export function Deploy({
   const [ensaio, setEnsaio] = useState(true);
   const [opcoes, setOpcoes] = useState<Opcoes>(OPCOES_PADRAO);
   const [confirmando, setConfirmando] = useState(false);
-  const [revisando, setRevisando] = useState(false);
   const job = useJob();
   const { marcar } = useProva();
 
@@ -119,11 +117,8 @@ export function Deploy({
               title={pronto ? undefined : "Preencha a data de validade"}
               onClick={() => {
                 // O ensaio não toca no que está no ar; a publicação passa pelo modal.
-                // O ensaio não toca no ar e não precisa de revisão. Publicar a
-                // sério passa pela revisão: ela vê o site construído e é o botão
-                // de lá que dispara o deploy.
                 if (ensaio) disparar(true);
-                else setRevisando(true);
+                else setConfirmando(true);
               }}
             >
               <Rocket size={13} /> {ensaio ? "Ensaiar" : "Publicar"}
@@ -140,19 +135,6 @@ export function Deploy({
         erro={job.erro}
         vazio="Escolha um site e rode o ensaio primeiro."
       />
-
-      {revisando && id && (
-        <RevisaoPublicacao
-          siteId={id}
-          validade={validadeEmPalavras(opcoes)}
-          convidados={opcoes.convidados}
-          onFechar={() => setRevisando(false)}
-          onPublicar={() => {
-            setRevisando(false);
-            disparar(false);
-          }}
-        />
-      )}
 
       {confirmando && id && (
         <ConfirmarPublicacao

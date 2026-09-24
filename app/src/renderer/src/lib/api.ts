@@ -76,8 +76,6 @@ export const pickAssets = (id: string, pasta: boolean) =>
 export const semearAsset = (id: string, secao: string) =>
   call(api.semearAsset(id, secao)) as Promise<AssetImportado | null>;
 /** A imagem de um campo em `data:`, pra recorte visual. Vazio ou sem foto ainda dá `null`. */
-export type AvisoRevisao = { tipo: "ficheiro-em-falta" | "arte-por-cima" | "arte-sem-uso"; grave: boolean; texto: string };
-export type Revisao = { url: string; avisos: AvisoRevisao[]; largurasVistas: number[] };
 export type PassoAnimacao = { fase: string; fracao: number; quadro?: number; total?: number; segundos: number };
 export const escolherConvite = () => call(api.escolherConvite()) as Promise<string | null>;
 export const animarEnvelope = (ficheiro: string, segundos: number, suavizar: boolean) =>
@@ -91,9 +89,6 @@ export const lerRecados = (id: string) => call(api.lerRecados(id)) as Promise<Re
 export const apagarRecado = (id: string, recado: string) =>
   call(api.apagarRecado(id, recado)) as Promise<{ apagados: number }>;
 
-export const abrirRevisao = (id: string) => call(api.abrirRevisao(id)) as Promise<Revisao>;
-export const fecharRevisao = () => call(api.fecharRevisao()) as Promise<void>;
-export const aoRevisar = (cb: (linha: string) => void) => api.aoRevisar(cb);
 
 export const criarPainel = (slug: string) => call(api.criarPainel(slug)) as Promise<{ id: string }>;
 

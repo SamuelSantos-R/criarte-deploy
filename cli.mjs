@@ -3219,15 +3219,6 @@ async function cmdDirectDeploy(argv) {
   console.log(`  ${c.dim}Expira:${c.reset}   ${expires_at ? `${c.bold}${fmtDateBR(expires_at)}${c.reset}` : `${c.dim}sem expiração${c.reset}`}`);
   console.log();
 
-  // A revisão vem antes da confirmação: ela vê o site CONSTRUÍDO, com basePath,
-  // como o convidado vai ver — não o `next dev`. Foi a falta desta porta que pôs
-  // um convite no ar com a arte por cima do texto. O `--yes` do Studio pula,
-  // porque lá a revisão já aconteceu na tela.
-  if (!assumeYes && !dryRun && !validateOnly && !argv.includes("--sem-revisao")) {
-    const aprovado = await revisarLocalmente(cwd, category, slug);
-    if (!aprovado) process.exit(0);
-  }
-
   if (assumeYes) {
     info("--yes: confirmação automática.");
   } else {

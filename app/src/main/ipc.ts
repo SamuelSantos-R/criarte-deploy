@@ -18,7 +18,6 @@ import {
 } from "./duplicar";
 import { FILTROS, gravarSvgDoSite, importAssets, lerSvgDoSite, previaDeAsset, semearAsset } from "./assets";
 import { criarPainel } from "./painel";
-import { abrirRevisao, fecharRevisao } from "./revisao";
 import { apagarRecado, lerRecados } from "./mural";
 import { animarEnvelope, cancelarEnvelope, escolherConvite, mostrarVideo } from "./envelope-animado";
 import { instalarFonte, listarFontes } from "./fontes";
@@ -238,13 +237,6 @@ export function registerIpc(): void {
 
   handle("painel:criar", (_e, slug: unknown) => criarPainel(asString(slug, "nome")));
 
-  // A revisão fala enquanto trabalha: construir um site leva minutos e consola
-  // parada é indistinguível de consola travada.
-  handle("revisao:abrir", (e, id: unknown) =>
-    abrirRevisao(asString(id, "id"), (linha) => e.sender.send("revisao:linha", linha)),
-  );
-
-  handle("revisao:fechar", () => fecharRevisao());
 
   handle("mural:ler", (_e, id: unknown) => lerRecados(asString(id, "id")));
   handle("mural:apagar", (_e, id: unknown, recado: unknown) => apagarRecado(asString(id, "id"), recado));

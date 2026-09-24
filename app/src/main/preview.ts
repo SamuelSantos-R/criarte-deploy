@@ -527,3 +527,46 @@ export async function rolarPreview(wc: WebContents, ancora: string): Promise<boo
   );
   return achou === true;
 }
+
+/**
+ * Guarda dentro do quadro do preview. Chunk que falha a carregar (o `next dev`
+ * reescreveu-o a meio do pedido) e erro de hidratação logo depois de uma
+ * recompilação são transitórios: um reload uns instantes depois resolve, e era
+ * o que se fazia à mão. Aqui faz-se sozinho, no máximo 3 vezes em 30s — um erro
+ * que persiste é do próprio convite e fica visível no overlay do Next, sem laço
+ * de recarregar infinito.
+ */
+const GUARDA = `(() => {
+  if (window.__crGuarda) return;
+  window.__crGuarda = true;
+  const PADRAO = /ChunkLoadError|Loading (CSS )?chunk|hydrat|did not match|server-rendered|Text content does not match/i;
+  const CHAVE = "__crRecargas";
+  let marcado = false;
+  const tentar = (msg) => {
+    if (marcado || !PADRAO.test(String(msg || ""))) return;
+    let hist = [];
+    try { hist = JSON.parse(sessionStorage.getItem(CHAVE) || "[]"); } catch {}
+    const agora = Date.now();
+    hist = hist.filter((t) => agora - t < 30000);
+    if (hist.length >= 3) return;
+    hist.push(agora);
+    try { sessionStorage.setItem(CHAVE, JSON.stringify(hist)); } catch {}
+    marcado = true;
+    setTimeout(() => location.reload(), 900);
+  };
+  addEventListener("error", (e) => tentar((e.error && (e.error.name + " " + e.error.message)) || e.message), true);
+  addEventListener("unhandledrejection", (e) => tentar(e.reason && (e.reason.name + " " + e.reason.message)));
+  const orig = console.error;
+  console.error = function (...a) { try { tentar(a.map(String).join(" ")); } catch {} return orig.apply(this, a); };
+})()`;
+
+export function protegerQuadro(wc: WebContents, processId: number, routingId: number): void {
+  const espelho = urlDoEspelho();
+  const origens = [...origensDoPreview(), ...(espelho ? [espelho] : [])];
+  if (origens.length === 0) return;
+  const frame = wc.mainFrame.framesInSubtree.find(
+    (f) => f.processId === processId && f.routingId === routingId,
+  );
+  if (!frame || !origens.some((o) => frame.url.startsWith(o))) return;
+  void frame.executeJavaScript(GUARDA).catch(() => undefined);
+}

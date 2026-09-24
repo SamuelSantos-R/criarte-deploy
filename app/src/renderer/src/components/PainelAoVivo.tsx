@@ -138,22 +138,21 @@ export function FaixaConflito({
     >
       <span aria-hidden className="h-[30px] w-[2px] shrink-0 bg-pencil" />
       <div className="min-w-0">
-        <p className="font-narrow font-semibold text-label text-pencil">conflito</p>
+        <p className="font-narrow font-semibold text-label text-pencil">versões diferentes</p>
         <p className="mt-0.5 text-[12px] leading-normal text-muted">
-          O <span className="font-mono">convite.json</span> mudou fora do Studio e você tem alteração
-          na tela. Um dos dois vai embora.
+          Este convite foi alterado noutro lugar enquanto você editava. Escolha qual versão manter.
         </p>
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-4">
         <Button variant="primary" size="sm" onClick={onFicarComArquivo}>
-          Ficar com o arquivo
+          Usar a versão salva
         </Button>
         <button
           type="button"
           onClick={onGravarPorCima}
           className="no-drag text-[11px] leading-none text-muted underline decoration-dotted underline-offset-4 transition-colors hover:text-pencil focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus"
         >
-          descartar o arquivo
+          manter a minha edição
         </button>
       </div>
     </div>

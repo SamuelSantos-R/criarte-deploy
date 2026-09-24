@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { copyFile, readFile, writeFile } from "node:fs/promises";
+import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { app } from "electron";
 
@@ -196,8 +197,39 @@ function alturaDoENaCapa(codigo: string): string {
   );
 }
 
-export async function repararConvite(dir: string): Promise<string[]> {
+/**
+ * Desfaz o recorte automático de ícones da 6.3 (tirado na 6.4.2). Ele apertava o
+ * viewBox até ao desenho: o ícone passava a encher a caixa de 50px e ficava
+ * visivelmente maior que nos outros convites. A tag original de cada ícone da
+ * Criarte está na tabela, indexada pelo DESENHO (o que vem depois da tag, que o
+ * recorte nunca mexeu) — assim a cor trocada ou a arte nova ficam como estão.
+ * Só toca em ficheiro com o carimbo do recorte e desenho conhecido.
+ */
+const CARIMBO_RECORTE = /^<svg width="[\d.]+" height="[\d.]+" viewBox="-?[\d.]+ /;
+
+async function desfazerRecorteDeIcones(dir: string): Promise<string[]> {
+  const pasta = join(dir, "public", "assets");
+  const tabelaArq = molde("tags-originais.json");
+  if (!existsSync(pasta) || !existsSync(tabelaArq)) return [];
+  const tabela = JSON.parse(await readFile(tabelaArq, "utf8")) as Record<string, string>;
   const feitos: string[] = [];
+  for (const nome of await readdir(pasta)) {
+    if (!nome.endsWith(".svg") || nome.startsWith("monograma")) continue;
+    const alvo = join(pasta, nome);
+    const texto = await readFile(alvo, "utf8");
+    const m = /<svg\b[^>]*>/.exec(texto);
+    if (!m || !CARIMBO_RECORTE.test(m[0])) continue;
+    const resto = texto.slice(m.index + m[0].length);
+    const original = tabela[createHash("sha1").update(resto).digest("hex")];
+    if (!original) continue;
+    await writeFile(alvo, texto.slice(0, m.index) + original + resto, "utf8");
+    feitos.push(nome);
+  }
+  return feitos;
+}
+
+export async function repararConvite(dir: string): Promise<string[]> {
+  const feitos: string[] = [...(await desfazerRecorteDeIcones(dir))];
   for (const nome of ICONES) {
     const alvo = join(dir, "public", "assets", nome);
     if (!existsSync(alvo) || !existsSync(molde(nome))) continue;

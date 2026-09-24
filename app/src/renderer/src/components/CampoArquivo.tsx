@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type DragEvent, type ReactElement } from "react";
+import { createContext, useContext, useState, type DragEvent, type ReactElement } from "react";
 import { BookOpen, File as FileIcon, FolderOpen, Upload, X } from "lucide-react";
 import {
   bibliotecaLerSvg,
@@ -8,9 +8,7 @@ import {
   coopPickAsset,
   importAssets,
   pickAssets,
-  previewRecarregar,
 } from "@/lib/api";
-import { arrumarIconeSvg } from "@/lib/iconeSvg";
 import { recortarAoDesenho } from "@/lib/monograma/rasterizar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/primitives";
@@ -49,7 +47,6 @@ export function CampoArquivo({
   aceita,
   aceitaNota,
   biblioteca = false,
-  recortar = false,
 }: {
   valor: string;
   label: string;
@@ -59,8 +56,6 @@ export function CampoArquivo({
   aceitaNota?: string;
   /** Campo de monograma: oferece puxar da biblioteca feita na tela Monogramas. */
   biblioteca?: boolean;
-  /** Campo de ícone: aperta o SVG até ao desenho, senão ele boia na prancheta. */
-  recortar?: boolean;
 }): ReactElement {
   const { siteId, convidado } = useContext(SiteAtual);
   const pronto = convidado || siteId !== null;
@@ -69,15 +64,6 @@ export function CampoArquivo({
   const [nota, setNota] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [escolhendo, setEscolhendo] = useState(false);
-
-  // O ícone que já estava no convite também boia: aperta-se uma vez, ao abrir o
-  // campo, e recarrega-se o quadro — senão o desenho antigo fica no cache dele.
-  useEffect(() => {
-    if (!recortar || !siteId || !valor) return;
-    void arrumarIconeSvg(siteId, valor).then((mudou) => {
-      if (mudou) void previewRecarregar().catch(() => false);
-    });
-  }, [recortar, siteId, valor]);
 
   const aplicar = async (acao: Promise<{ nome: string; web: string }[]>): Promise<void> => {
     setOcupado(true);
@@ -92,7 +78,6 @@ export function CampoArquivo({
         setErro(`${arquivos[0].nome} não serve aqui${aceitaNota ? ` — ${aceitaNota}` : ""}`);
         return;
       }
-      if (recortar && siteId) await arrumarIconeSvg(siteId, arquivos[0].web);
       onChange(comoEscrever(valor, arquivos[0].web));
       setNota(
         arquivos.length === 1

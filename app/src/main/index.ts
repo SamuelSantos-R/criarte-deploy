@@ -34,7 +34,7 @@ function csp(): string {
     // O preview é um <iframe> pro `next dev` local. Só o loopback: o app nunca
     // emoldura nada da internet. O preview do anfitrião na sessão coop entra
     // por aqui também, porque o espelho o serve em 127.0.0.1.
-    "frame-src http://localhost:* http://127.0.0.1:*",
+    "frame-src http://localhost:* http://127.0.0.1:* https:",
     "base-uri 'none'",
     "form-action 'none'",
     DEV_URL ? `connect-src 'self' ${DEV_URL} ws://localhost:* http://localhost:*` : "connect-src 'self'",
@@ -48,6 +48,15 @@ function hardenSession(): void {
     const espelho = urlDoEspelho();
     const livres = [...origensDoPreview(), ...(espelho ? [espelho] : [])];
     if (livres.some((o) => details.url.startsWith(o))) return cb({});
+    // Site de fora aberto no preview (link colado pela equipa): passa sem a CSP
+    // do app e sem as travas que proíbem emoldurar — é só para ver, dentro do Studio.
+    if (details.resourceType === "subFrame" && details.url.startsWith("https:")) {
+      const h = { ...details.responseHeaders };
+      for (const k of Object.keys(h)) {
+        if (/^x-frame-options$/i.test(k) || /^content-security-policy$/i.test(k)) delete h[k];
+      }
+      return cb({ responseHeaders: h });
+    }
     cb({ responseHeaders: { ...details.responseHeaders, "Content-Security-Policy": [csp()] } });
   });
   // Nada de câmera, microfone, geolocalização, notificação — o app não usa.

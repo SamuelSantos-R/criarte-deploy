@@ -31,6 +31,9 @@ export function Preview({
   const servidor = rodando?.siteId === id ? rodando : null;
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Link de outro site para comparar no mesmo aparelho. Tem precedência sobre o convite.
+  const [link, setLink] = useState("");
+  const externo = /^https:\/\/\S+$/.test(link.trim()) ? link.trim() : null;
 
   useSiteValido(sites, id, setId);
 
@@ -70,11 +73,18 @@ export function Preview({
         <span className="font-narrow font-semibold text-gauge text-muted">
           {largura}×{altura}
         </span>
+        <input
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          placeholder="ou cole um link https://…"
+          spellCheck={false}
+          className="no-drag h-8 w-[240px] rounded-full border border-rule bg-surface px-3 font-mono text-[11px] text-text"
+        />
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Button
             variant="ghost"
-            disabled={!servidor}
+            disabled={!servidor && !externo}
             onClick={() => setDeitado((d) => !d)}
             aria-label="Girar"
             title="Girar"
@@ -107,7 +117,7 @@ export function Preview({
 
       <div className="flex min-h-0 min-w-0 flex-1">
         <Palco
-          url={servidor?.url ?? null}
+          url={externo ?? servidor?.url ?? null}
           aparelho={aparelho}
           deitado={deitado}
           className="relative min-w-0 flex-1 overflow-hidden bg-surface-2/40"

@@ -235,11 +235,13 @@ async function desfazerRecorteDeIcones(dir: string): Promise<string[]> {
  * esquerda e 100% a direita em qualquer zoom — igual ao quadro de recorte.
  */
 function origemDoZoom(codigo: string): string {
-  return codigo
-    .replace("objectPosition: convite.hero.posicao,\n", (m) =>
-      codigo.includes("transformOrigin: convite.hero.posicao") ? m : `${m}          transformOrigin: convite.hero.posicao,\n`)
-    .replace("style={{ objectPosition: photo.posicao, transform:", (m) =>
-      codigo.includes("transformOrigin: photo.posicao") ? m : "style={{ objectPosition: photo.posicao, transformOrigin: photo.posicao, transform:");
+  // Qualquer escrita do campo de posição (convite.hero.posicao, hero?.posicao,
+  // photo.posicao…): convite feito em versões diferentes não escreve igual.
+  if (/transformOrigin\s*:/.test(codigo)) return codigo;
+  return codigo.replace(
+    /objectPosition:\s*([A-Za-z_$][\w$.?]*posicao[\w$.?]*)(\s*)(,?)/g,
+    (_m, expr: string, esp: string, virg: string) => `objectPosition: ${expr}, transformOrigin: ${expr}${virg ? "," : ""}${esp}`,
+  );
 }
 
 export async function repararConvite(dir: string): Promise<string[]> {

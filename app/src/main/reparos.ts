@@ -228,6 +228,20 @@ async function desfazerRecorteDeIcones(dir: string): Promise<string[]> {
   return feitos;
 }
 
+/**
+ * Zoom e posição andavam separados: o `scale` crescia sempre a partir do centro,
+ * então arrastar a foto para o lado no Studio não movia nada no convite. Com o
+ * `transformOrigin` no mesmo ponto do `objectPosition`, 0% mostra a borda
+ * esquerda e 100% a direita em qualquer zoom — igual ao quadro de recorte.
+ */
+function origemDoZoom(codigo: string): string {
+  return codigo
+    .replace("objectPosition: convite.hero.posicao,\n", (m) =>
+      codigo.includes("transformOrigin: convite.hero.posicao") ? m : `${m}          transformOrigin: convite.hero.posicao,\n`)
+    .replace("style={{ objectPosition: photo.posicao, transform:", (m) =>
+      codigo.includes("transformOrigin: photo.posicao") ? m : "style={{ objectPosition: photo.posicao, transformOrigin: photo.posicao, transform:");
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [...(await desfazerRecorteDeIcones(dir))];
   for (const nome of ICONES) {
@@ -258,9 +272,9 @@ export async function repararConvite(dir: string): Promise<string[]> {
   for (const [arquivo, consertar] of [
     ["components/Historia.tsx", (c: string) => tracoRegular(tracoDaHistoria(consertarHistoria(c)))],
     ["components/Evento.tsx", (c: string) => tracoRegular(numerosDoEvento(botaoDoEvento(c)))],
-    ["components/Carrousel.tsx", contornoDaGaleria],
+    ["components/Carrousel.tsx", (c: string) => origemDoZoom(contornoDaGaleria(c))],
+    ["components/Hero.tsx", (c: string) => origemDoZoom(alturaDoENaCapa(c))],
     ["lib/vars.ts", (c: string) => alturaDoE(folgaNegativa(c))],
-    ["components/Hero.tsx", alturaDoENaCapa],
     ["components/NossoDia.tsx", (c: string) => tracoRegular(alinharIconesDoCronograma(c))],
     ["components/Manual.tsx", tracoRegular],
     ["lib/numeros.tsx", tracoRegular],

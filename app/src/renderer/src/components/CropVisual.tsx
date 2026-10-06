@@ -97,7 +97,7 @@ export function CropVisual({
             draggable={false}
             onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
             className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-            style={{ objectPosition: `${x}% ${y}%`, transform: `scale(${z})` }}
+            style={{ objectPosition: `${x}% ${y}%`, transformOrigin: `${x}% ${y}%`, transform: `scale(${z})` }}
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted">

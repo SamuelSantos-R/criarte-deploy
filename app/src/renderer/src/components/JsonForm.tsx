@@ -264,11 +264,30 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
   // Cartão de evento sem texto de botão (convites antigos): o campo aparece na
   // mesma, vazio — vazio no site é "Acessar Localização". Só grava se escrever.
   if (caminho[0] === "eventos" && "mapa" in obj && !("botao" in obj)) entradas.push(["botao", ""]);
+  // Ícone do cronograma: para que lado a arte olha. Vazio = automático (só a
+  // dança tem lado). Quem desenha um ícone novo escolhe aqui.
+  if (caminho[0] === "cronograma" && "icone" in obj && !("olha" in obj)) entradas.push(["olha", ""]);
   return (
     <>
       {entradas.map(([chave, v]) => {
         const filho: Caminho = [...caminho, chave];
         const label = rotulo(chave);
+        if (typeof v === "string" && chave === "olha" && caminho[0] === "cronograma") {
+          return (
+            <Field key={chave} label="Ícone olha para">
+              <select
+                value={v}
+                onChange={(e) => onChange(filho, e.target.value)}
+                className="no-drag h-9 w-full rounded-lg border border-rule bg-surface px-2 text-[13px] text-text"
+              >
+                <option value="">automático</option>
+                <option value="direita">a direita (vira na coluna da direita)</option>
+                <option value="esquerda">a esquerda (vira na coluna da esquerda)</option>
+                <option value="nenhum">não vira</option>
+              </select>
+            </Field>
+          );
+        }
         if (typeof v === "string") {
           if (ehAsset(chave, v)) {
             return (

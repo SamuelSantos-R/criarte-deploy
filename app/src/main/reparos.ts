@@ -244,6 +244,33 @@ function origemDoZoom(codigo: string): string {
   );
 }
 
+/**
+ * Cronograma: para que lado a arte olha passa a ser escolha por ícone (campo
+ * `olha` no convite.json), em vez de uma lista fixa que só conhecia a dança.
+ * Vazio continua automático, então convite que ninguém mexer fica igual.
+ */
+const LADO_NOVO = `function ladoDoIcone(index: number, item: { icone: string }) {
+  const naDireita = index % 2 === 1;
+  const escolha = (item as { olha?: string }).olha;
+  // Para que lado a arte foi desenhada a olhar. Automático: só a dança tem lado.
+  const olha =
+    escolha === "direita" || escolha === "esquerda" ? escolha
+    : escolha === "nenhum" ? null
+    : ehDirecional(item.icone) ? "direita" : null;
+  // Cada ícone olha para a linha do meio: na coluna esquerda para a direita, na direita para a esquerda.
+  const espelhar = olha !== null && olha !== (naDireita ? "esquerda" : "direita");
+  const alinhar: "left" | "right" = naDireita !== espelhar ? "left" : "right";
+  return { alinhar, className: espelhar ? "-scale-x-100" : undefined };
+}
+`;
+
+function ladoEscolhido(codigo: string): string {
+  if (!codigo.includes("ladoDoIcone(") || codigo.includes("escolha === \"direita\"")) return codigo;
+  return codigo
+    .replace(/function ladoDoIcone\([^)]*\)\s*\{[\s\S]*?\n\}\n/, LADO_NOVO)
+    .replaceAll("ladoDoIcone(index, item.icone)", "ladoDoIcone(index, item)");
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [...(await desfazerRecorteDeIcones(dir))];
   for (const nome of ICONES) {
@@ -277,7 +304,7 @@ export async function repararConvite(dir: string): Promise<string[]> {
     ["components/Carrousel.tsx", (c: string) => origemDoZoom(contornoDaGaleria(c))],
     ["components/Hero.tsx", (c: string) => origemDoZoom(alturaDoENaCapa(c))],
     ["lib/vars.ts", (c: string) => alturaDoE(folgaNegativa(c))],
-    ["components/NossoDia.tsx", (c: string) => tracoRegular(alinharIconesDoCronograma(c))],
+    ["components/NossoDia.tsx", (c: string) => ladoEscolhido(tracoRegular(alinharIconesDoCronograma(c)))],
     ["components/Manual.tsx", tracoRegular],
     ["lib/numeros.tsx", tracoRegular],
     ["components/RSVP.tsx", letraDasOpcoes],

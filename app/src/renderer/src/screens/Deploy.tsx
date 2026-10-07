@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import { Rocket, Square, Stethoscope } from "lucide-react";
-import type { Site } from "@/lib/api";
+import { ExternalLink, Rocket, Square, Stethoscope } from "lucide-react";
+import { destinoPublicacao, openExternal, type Site } from "@/lib/api";
 import { useJob } from "@/lib/useJob";
 import { useProva } from "@/lib/prova";
 import { useSiteValido } from "@/lib/useSiteValido";
@@ -64,9 +64,32 @@ export function Deploy({
     else if (job.estado === "falhou") marcar({ publicacao: "parada" });
   }, [job.rodando, job.estado, marcar]);
 
+  // Publicou a sério: Enter (ou o botão) abre o convite no navegador.
+  const [noAr, setNoAr] = useState<string | null>(null);
+  const ultimoAserio = useRef(false);
+  useEffect(() => {
+    if (job.rodando || job.estado !== "ok" || !ultimoAserio.current || !id) {
+      if (job.rodando) setNoAr(null);
+      return;
+    }
+    void destinoPublicacao(id).then((d) => setNoAr(d.url));
+  }, [job.rodando, job.estado, id]);
+  useEffect(() => {
+    if (!noAr) return;
+    const enter = (e: KeyboardEvent): void => {
+      if (e.key !== "Enter" || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      void openExternal(noAr);
+    };
+    window.addEventListener("keydown", enter);
+    return () => window.removeEventListener("keydown", enter);
+  }, [noAr]);
+
   const disparar = (dryRun: boolean): void => {
     if (!id || expires === null) return;
     foiEnsaio.current = dryRun;
+    // `foiEnsaio` é zerado ao fim do ensaio; este fica para saber se o último foi a sério.
+    ultimoAserio.current = !dryRun;
     void job.rodar({
       kind: "deploy",
       siteId: id,
@@ -128,6 +151,16 @@ export function Deploy({
       </Topo>
 
       <OpcoesDeploy valor={opcoes} onChange={setOpcoes} travado={job.rodando} />
+
+      {noAr && !job.rodando && (
+        <div className="flex items-center gap-3 border-b border-rule bg-cyan/10 px-5 py-2.5 text-[12px] text-text">
+          <span>Publicado — carregue em <kbd className="rounded border border-rule px-1.5 font-mono text-[11px]">Enter</kbd> para abrir</span>
+          <Button variant="ghost" size="sm" onClick={() => void openExternal(noAr)}>
+            <ExternalLink size={13} /> Abrir convite
+          </Button>
+          <span className="truncate font-mono text-[11px] text-muted">{noAr}</span>
+        </div>
+      )}
 
       <Console
         linhas={job.linhas}

@@ -32,7 +32,6 @@ import {
   type Papel,
 } from "@/lib/monograma/composicao";
 import { lerEdicao, montarEdicao, type Edicao } from "@/lib/monograma/edicao";
-import { curvasParaD } from "@/lib/monograma/curvas";
 import { medirImagem, paletaDe, paraPng } from "@/lib/monograma/rasterizar";
 import { Button } from "@/components/ui/primitives";
 import { Topo } from "@/components/Topo";
@@ -298,7 +297,10 @@ export function Monograma({ ativa }: { ativa: boolean }): ReactElement {
   /** SVG com curvas e PNG sem fundo — o mesmo par serve pra exportar e pra biblioteca. */
   const gerarArquivos = async (): Promise<{ svg: string; png: string } | null> => {
     if (!comp || !desenho || !recursos) return null;
-    const svg = montarSvg(comp, curvasParaD(desenho.aneis), recursos.guirlanda, molduraArquivo);
+    // O mesmo traçado da prancheta. O ajuste para bézier (curvasParaD) inchava
+    // retas longas — a diagonal do N saía com barriga — e o arquivo deixava de
+    // ser o que ela via. Com 20 passos por curva, a faceta não se vê a 1000px.
+    const svg = montarSvg(comp, desenho.d, recursos.guirlanda, molduraArquivo);
     return { svg, png: await paraPng(svg, LADO_PNG) };
   };
 

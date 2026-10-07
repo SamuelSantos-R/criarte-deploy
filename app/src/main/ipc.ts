@@ -18,6 +18,7 @@ import {
 } from "./duplicar";
 import { FILTROS, gravarSvgDoSite, importAssets, lerSvgDoSite, previaDeAsset, semearAsset } from "./assets";
 import { criarPainel } from "./painel";
+import { marcarSujo, perguntarSalvar, sairDepoisDeSalvar } from "./pendente";
 import { apagarRecado, lerRecados } from "./mural";
 import { animarEnvelope, cancelarEnvelope, escolherConvite, mostrarVideo } from "./envelope-animado";
 import { instalarFonte, listarFontes } from "./fontes";
@@ -236,6 +237,10 @@ export function registerIpc(): void {
   );
 
   handle("painel:criar", (_e, slug: unknown) => criarPainel(asString(slug, "nome")));
+
+  handle("pendente:marcar", (_e, v: unknown) => marcarSujo(v));
+  handle("pendente:perguntar", (e) => perguntarSalvar(BrowserWindow.fromWebContents(e.sender)));
+  handle("pendente:sair", (e) => sairDepoisDeSalvar(BrowserWindow.fromWebContents(e.sender)));
 
 
   handle("mural:ler", (_e, id: unknown) => lerRecados(asString(id, "id")));

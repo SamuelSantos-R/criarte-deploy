@@ -7,6 +7,7 @@ import { encerrarPreviews, origensDoPreview, protegerQuadro } from "./preview";
 import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 import { limparAtualizacao } from "./atualizar";
+import { protegerFecho } from "./pendente";
 
 /**
  * A raiz do bundle. Era `__dirname`, que não existe quando o main sai em ESM —
@@ -88,6 +89,7 @@ function createWindow(): void {
   });
 
   win.on("ready-to-show", () => win.show());
+  protegerFecho(win);
 
   // Link externo abre no navegador do sistema, nunca numa janela do app —
   // e só se for http(s), senão vira vetor pra abrir binário local.

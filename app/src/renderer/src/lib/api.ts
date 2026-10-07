@@ -90,6 +90,11 @@ export const apagarRecado = (id: string, recado: string) =>
   call(api.apagarRecado(id, recado)) as Promise<{ apagados: number }>;
 
 
+export const marcarSujo = (v: boolean) => call(api.marcarSujo(v)) as Promise<void>;
+export const perguntarSalvar = () => call(api.perguntarSalvar()) as Promise<number>;
+export const sairDepoisDeSalvar = () => call(api.sairDepoisDeSalvar()) as Promise<void>;
+export const aoPedirSalvarESair = (cb: () => void) => api.aoPedirSalvarESair(cb);
+
 export const criarPainel = (slug: string) => call(api.criarPainel(slug)) as Promise<{ id: string }>;
 
 export const lerSvgDoSite = (id: string, caminho: string) =>

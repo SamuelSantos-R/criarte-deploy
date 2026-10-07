@@ -8,6 +8,7 @@ import {
   type ProgressoAtualizacao,
 } from "@/lib/api";
 import { Button, Rule } from "@/components/ui/primitives";
+import { resolverPendente } from "@/lib/pendente";
 
 const FASE: Record<ProgressoAtualizacao["fase"], string> = {
   baixar: "A baixar",
@@ -44,6 +45,8 @@ export function AtualizacaoStudio(): ReactElement {
   useEffect(() => onAtualizacaoProgresso(setProgresso), []);
 
   const instalar = async (): Promise<void> => {
+    // Atualizar fecha o Studio: o convite aberto com alterações pergunta antes.
+    if (!(await resolverPendente())) return;
     setErro(null);
     setProgresso({ fase: "baixar", feito: 0, total: estado?.bytes ?? 0 });
     try {

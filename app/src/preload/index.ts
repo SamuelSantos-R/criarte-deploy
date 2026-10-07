@@ -93,6 +93,10 @@ const api = {
   gravarSvgDoSite: (id: string, caminho: string, svg: string) =>
     invoke<boolean>("assets:gravarSvg", id, caminho, svg),
   criarPainel: (slug: string) => invoke<{ id: string }>("painel:criar", slug),
+  marcarSujo: (v: boolean) => invoke<void>("pendente:marcar", v),
+  perguntarSalvar: () => invoke<number>("pendente:perguntar"),
+  sairDepoisDeSalvar: () => invoke<void>("pendente:sair"),
+  aoPedirSalvarESair: ouvir<void>("pendente:salvar-e-sair"),
   lerRecados: (id: string) =>
     invoke<{ id: string; nome: string; texto: string; quando: string }[]>("mural:ler", id),
   apagarRecado: (id: string, recado: string) =>

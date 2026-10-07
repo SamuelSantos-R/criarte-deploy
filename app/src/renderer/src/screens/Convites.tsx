@@ -15,6 +15,9 @@ import {
   writeConvite,
   type Site,
   previewPreaquecer,
+  aoPedirSalvarESair,
+  marcarSujo,
+  sairDepoisDeSalvar,
 } from "@/lib/api";
 import {
   alternarSecao,
@@ -43,6 +46,7 @@ import { RenomearSite } from "@/components/RenomearSite";
 import { Tokenizar } from "@/components/Tokenizar";
 import { CorreioDoAmor } from "@/components/CorreioDoAmor";
 import { NovoPainelRSVP } from "@/components/NovoPainelRSVP";
+import { registarPendente, resolverPendente } from "@/lib/pendente";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
@@ -272,21 +276,46 @@ export function Convites({
     await gravar(id, JSON.parse(original) as unknown).catch(() => false);
   }, [id, original, gravar]);
 
-  const salvar = async (): Promise<void> => {
-    if (!id || !dados || salvando || emSessao) return;
+  /** `true` quando o convite ficou gravado (ou não havia o que gravar). */
+  const salvar = async (): Promise<boolean> => {
+    if (!id || !dados || emSessao) return !sujo;
+    if (salvando) return false;
     setSalvando(true);
     setErro(null);
     try {
-      if (!(await gravar(id, dados))) return;
+      if (!(await gravar(id, dados))) return false;
       rascunho.current = false;
       setOriginal(JSON.stringify(dados));
       recarregar();
+      return true;
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setSalvando(false);
     }
   };
+
+  // Trocar de convite, atualizar ou fechar o Studio perguntam antes de perder
+  // o que não foi salvo — antes descartava calado, e foi assim que se perdeu
+  // um convite inteiro numa atualização.
+  const salvarRef = useRef(salvar);
+  salvarRef.current = salvar;
+  const descartarRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    registarPendente({ sujo, salvar: () => salvarRef.current(), descartar: () => descartarRef.current() });
+    void marcarSujo(sujo).catch(() => undefined);
+  }, [sujo]);
+  useEffect(() => () => registarPendente(null), []);
+  useEffect(
+    () =>
+      aoPedirSalvarESair(() => {
+        void salvarRef.current().then((ok) => {
+          if (ok) void sairDepoisDeSalvar();
+        });
+      }),
+    [],
+  );
 
   /** Larga o que está na tela e volta ao que o arquivo diz agora. */
   const ficarComArquivo = useCallback(async (): Promise<void> => {
@@ -327,7 +356,8 @@ export function Convites({
     const secoes = Object.keys(antes).filter((k) => k !== CHAVE_SECOES);
     setSecao((atual) => (atual && secoes.includes(atual) ? atual : (secoes[0] ?? null)));
     void desfazerNoDisco();
-  };
+  };  descartarRef.current = descartar;
+
 
   const ligarAoVivo = async (): Promise<void> => {
     if (!id || ligando) return;
@@ -524,8 +554,11 @@ export function Convites({
           sites={sites}
           valor={id}
           onChange={(novo) => {
-            void desligarAoVivo();
-            setId(novo);
+            void resolverPendente().then((seguir) => {
+              if (!seguir) return;
+              void desligarAoVivo();
+              setId(novo);
+            });
           }}
           somenteConvite
           className="w-[220px]"

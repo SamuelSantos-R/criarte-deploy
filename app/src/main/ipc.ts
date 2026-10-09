@@ -287,8 +287,10 @@ export function registerIpc(): void {
   // e quem tem o ficheiro. O banco local aqui não diria nada sobre aquele site.
   handle("fontes:listar", () => fontesDaSessao() ?? listarFontes());
 
-  handle("fontes:instalar", async (event) => {
+  handle("fontes:instalar", async (event, arrastado: unknown) => {
     if (fontesDaSessao()) throw new Error("quem instala fontes é o anfitrião");
+    // Arrastado pra lista: o caminho já vem, sem abrir janela.
+    if (typeof arrastado === "string" && arrastado) return instalarFonte(arrastado);
     const escolha = await abrir(event, {
       title: "Escolha o ficheiro da fonte",
       properties: ["openFile"],

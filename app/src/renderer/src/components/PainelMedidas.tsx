@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { Minus, Plus, RotateCcw, Upload } from "lucide-react";
-import { instalarFonte, listarFontes, type Fonte } from "@/lib/api";
+import { caminhoDe, instalarFonte, listarFontes, type Fonte } from "@/lib/api";
 import { BLOCOS } from "@/lib/secoes";
 import { cn } from "@/lib/utils";
 
@@ -519,11 +519,21 @@ export function PainelMedidas({
       .catch((e) => setErroFonte(e instanceof Error ? e.message : "não deu pra ler o banco"));
   }, [convidado]);
 
-  const carregar = async (): Promise<void> => {
+  const [sobre, setSobre] = useState(false);
+  const degrade = (medidas.noivosDegrade ?? {}) as Record<string, unknown>;
+  const hex = (v: unknown, padrao: string): string => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : padrao);
+  // Sem cor escolhida o campo grava o que mostra, senão o convite recebia "ligado" sem cores e ignorava.
+  const corDe = hex(degrade.de, "#f3e3b0");
+  const corPara = hex(degrade.para, "#b8892f");
+  const anguloDegrade = typeof degrade.angulo === "number" ? degrade.angulo : 180;
+
+  const carregar = async (caminhos: string[] = []): Promise<void> => {
     setCarregando(true);
     setErroFonte(null);
     try {
-      const nova = await instalarFonte();
+      let nova: Fonte[] | null = null;
+      if (caminhos.length === 0) nova = await instalarFonte();
+      for (const c of caminhos) nova = await instalarFonte(c);
       if (nova) setFontes(nova);
     } catch (e) {
       setErroFonte(e instanceof Error ? e.message : "não deu pra instalar");
@@ -663,7 +673,85 @@ export function PainelMedidas({
         </div>
       </section>
 
-      <section>
+      <section className="mb-8">
+        <div className="mb-3 flex items-baseline gap-3">
+          <span className="font-narrow font-semibold text-label text-text">degradê no nome</span>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+        <p className="mb-3 max-w-[46ch] text-[12px] leading-[1.6] text-muted">
+          Pinta os dois nomes da capa com um degradê no lugar do branco. Desligado, o
+          convite fica como estava.
+        </p>
+        <div className="flex flex-wrap items-center gap-4 border-y border-rule py-3 pl-4 text-[12px] text-muted">
+          <label className="no-drag flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={degrade.ativo === true}
+              onChange={(e) =>
+                onChange(["noivosDegrade"], {
+                  ...degrade,
+                  ativo: e.target.checked,
+                  de: corDe,
+                  para: corPara,
+                  angulo: anguloDegrade,
+                })
+              }
+            />
+            ligado
+          </label>
+          <label className="no-drag flex items-center gap-2">
+            de
+            <input
+              type="color"
+              value={corDe}
+              onChange={(e) => onChange(["noivosDegrade", "de"], e.target.value)}
+              className="h-6 w-9 cursor-pointer rounded border border-rule bg-transparent"
+            />
+          </label>
+          <label className="no-drag flex items-center gap-2">
+            para
+            <input
+              type="color"
+              value={corPara}
+              onChange={(e) => onChange(["noivosDegrade", "para"], e.target.value)}
+              className="h-6 w-9 cursor-pointer rounded border border-rule bg-transparent"
+            />
+          </label>
+          <label className="no-drag flex items-center gap-2">
+            direção
+            <select
+              value={String(anguloDegrade)}
+              onChange={(e) => onChange(["noivosDegrade", "angulo"], Number(e.target.value))}
+              className="rounded border border-rule bg-surface-2 px-1.5 py-0.5 text-text"
+            >
+              <option value="180">de cima pra baixo</option>
+              <option value="0">de baixo pra cima</option>
+              <option value="90">da esquerda pra direita</option>
+              <option value="270">da direita pra esquerda</option>
+              <option value="135">diagonal</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section
+        onDragOver={(e) => {
+          if (convidado) return;
+          e.preventDefault();
+          setSobre(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setSobre(false);
+        }}
+        onDrop={(e) => {
+          if (convidado) return;
+          e.preventDefault();
+          setSobre(false);
+          const caminhos = [...e.dataTransfer.files].map(caminhoDe).filter(Boolean);
+          if (caminhos.length > 0) void carregar(caminhos);
+        }}
+        className={cn("rounded-xl transition-colors", sobre && "bg-focus/10 outline-dashed outline-1 outline-focus")}
+      >
         <div className="mb-3 flex items-baseline gap-3">
           <span className="font-narrow font-semibold text-label text-text">fonte dos noivos</span>
           <span className="font-narrow font-semibold text-gauge text-muted">
@@ -694,7 +782,7 @@ export function PainelMedidas({
           amostra de verdade é o preview ao lado.{" "}
           {convidado
             ? "O banco é o do anfitrião — é ele quem instala fonte nova."
-            : "Fonte nova entra no banco e fica disponível em todos os convites."}
+            : "Fonte nova entra no banco e fica disponível em todos os convites — dá pra arrastar o ficheiro aqui."}
         </p>
 
         {erroFonte && (

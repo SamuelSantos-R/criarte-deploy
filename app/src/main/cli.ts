@@ -1,4 +1,5 @@
 import { app, type WebContents } from "electron";
+import { repararConvite } from "./reparos";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -57,6 +58,8 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
   switch (job.kind) {
     case "deploy": {
       const cwd = await siteDirExistente(job.siteId);
+      // O que sobe é sempre o código já consertado, mesmo que ninguém tenha aberto a preview.
+      await repararConvite(cwd).catch(() => []);
       // Cada opção entra como par nomeado e só depois de passar pelo asJob.
       // A UI continua sem caminho para inventar flag (--guests-reset queima os
       // links já enviados).

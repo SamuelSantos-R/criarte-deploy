@@ -136,7 +136,7 @@ export const trocarPorWebp = (id: string) => call(api.trocarPorWebp(id)) as Prom
 
 export type Fonte = { chave: string; nome: string; ficheiro: string; bytes: number };
 export const listarFontes = () => call(api.listarFontes()) as Promise<Fonte[]>;
-export const instalarFonte = () => call(api.instalarFonte()) as Promise<Fonte[] | null>;
+export const instalarFonte = (caminho?: string) => call(api.instalarFonte(caminho)) as Promise<Fonte[] | null>;
 
 export type Servidor = { siteId: string; url: string; lan: string | null };
 

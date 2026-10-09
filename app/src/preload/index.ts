@@ -114,7 +114,7 @@ const api = {
   trocarPorWebp: (id: string) => invoke<unknown>("assets:webp", id),
 
   listarFontes: () => invoke<Fonte[]>("fontes:listar"),
-  instalarFonte: () => invoke<Fonte[] | null>("fontes:instalar"),
+  instalarFonte: (caminho?: string) => invoke<Fonte[] | null>("fontes:instalar", caminho),
 
   // O File do drag-and-drop não carrega mais o caminho no renderer isolado.
   caminhoDe: (file: File) => webUtils.getPathForFile(file),

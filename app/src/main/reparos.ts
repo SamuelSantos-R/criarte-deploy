@@ -271,6 +271,41 @@ function ladoEscolhido(codigo: string): string {
     .replaceAll("ladoDoIcone(index, item.icone)", "ladoDoIcone(index, item)");
 }
 
+/**
+ * Degradê opcional no nome dos noivos (`medidas.noivosDegrade` no convite.json).
+ * Desligado devolve `{}`, então convite que ninguém mexer fica igual ao pixel.
+ */
+const DEGRADE_TSX = `
+function degradeDosNoivos(): import("react").CSSProperties {
+  const m = (convite as unknown as { medidas?: { noivosDegrade?: Record<string, unknown> } }).medidas;
+  const d = m?.noivosDegrade;
+  const hex = /^#[0-9a-fA-F]{6}$/;
+  if (!d || d.ativo !== true || !hex.test(String(d.de)) || !hex.test(String(d.para))) return {};
+  const angulo = typeof d.angulo === "number" ? Math.min(Math.max(d.angulo, 0), 360) : 180;
+  return {
+    backgroundImage: \`linear-gradient(\${angulo}deg, \${d.de}, \${d.para})\`,
+    WebkitBackgroundClip: "text",
+    backgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    color: "transparent",
+    WebkitTextStroke: "0px transparent",
+  };
+}
+const DEGRADE_NOIVOS = degradeDosNoivos();
+`;
+
+function degradeNosNomes(codigo: string): string {
+  if (codigo.includes("DEGRADE_NOIVOS") || !codigo.includes("fontSize: TAMANHO_NOME,")) return codigo;
+  const imports = [...codigo.matchAll(/^import [^\n]*;\n/gm)];
+  const ultimo = imports.at(-1);
+  if (!ultimo || !/import convite\b/.test(codigo)) return codigo;
+  const fim = (ultimo.index ?? 0) + ultimo[0].length;
+  return (codigo.slice(0, fim) + DEGRADE_TSX + codigo.slice(fim)).replace(
+    /fontSize: TAMANHO_NOME,(\s*)/g,
+    (_m, esp: string) => `fontSize: TAMANHO_NOME,${esp}...DEGRADE_NOIVOS,${esp}`,
+  );
+}
+
 export async function repararConvite(dir: string): Promise<string[]> {
   const feitos: string[] = [...(await desfazerRecorteDeIcones(dir))];
   for (const nome of ICONES) {
@@ -302,7 +337,7 @@ export async function repararConvite(dir: string): Promise<string[]> {
     ["components/Historia.tsx", (c: string) => tracoRegular(tracoDaHistoria(consertarHistoria(c)))],
     ["components/Evento.tsx", (c: string) => tracoRegular(numerosDoEvento(botaoDoEvento(c)))],
     ["components/Carrousel.tsx", (c: string) => origemDoZoom(contornoDaGaleria(c))],
-    ["components/Hero.tsx", (c: string) => origemDoZoom(alturaDoENaCapa(c))],
+    ["components/Hero.tsx", (c: string) => degradeNosNomes(origemDoZoom(alturaDoENaCapa(c)))],
     ["lib/vars.ts", (c: string) => alturaDoE(folgaNegativa(c))],
     ["components/NossoDia.tsx", (c: string) => ladoEscolhido(tracoRegular(alinharIconesDoCronograma(c)))],
     ["components/Manual.tsx", tracoRegular],
@@ -318,4 +353,21 @@ export async function repararConvite(dir: string): Promise<string[]> {
     feitos.push(arquivo.split("/").pop() ?? arquivo);
   }
   return feitos;
+}
+
+/**
+ * Roda em todos os convites da pasta ao abrir o Studio: atualização nova vale
+ * para o convite antigo mesmo que ninguém abra a preview dele.
+ */
+export async function repararTodos(raiz: string): Promise<number> {
+  let mexidos = 0;
+  for (const cat of await readdir(raiz, { withFileTypes: true }).catch(() => [])) {
+    if (!cat.isDirectory() || cat.name.startsWith(".") || cat.name === "node_modules") continue;
+    for (const site of await readdir(join(raiz, cat.name), { withFileTypes: true }).catch(() => [])) {
+      const dir = join(raiz, cat.name, site.name);
+      if (!site.isDirectory() || !existsSync(join(dir, "src", "components"))) continue;
+      if ((await repararConvite(dir).catch(() => [])).length > 0) mexidos++;
+    }
+  }
+  return mexidos;
 }

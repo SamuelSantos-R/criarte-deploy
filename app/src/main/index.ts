@@ -8,6 +8,8 @@ import { urlDoEspelho } from "./espelho";
 import { pararVigia } from "./vigia";
 import { limparAtualizacao } from "./atualizar";
 import { protegerFecho } from "./pendente";
+import { repararTodos } from "./reparos";
+import { requireSitesRoot } from "./paths";
 
 /**
  * A raiz do bundle. Era `__dirname`, que não existe quando o main sai em ESM —
@@ -126,6 +128,12 @@ app.whenReady().then(() => {
   app.on("browser-window-created", (_, w) => optimizer.watchWindowShortcuts(w));
   createWindow();
   limparAtualizacao();
+  // Depois de uma atualização o conserto novo chega a todos os convites, não só ao que abrir.
+  try {
+    void repararTodos(requireSitesRoot()).catch(() => 0);
+  } catch {
+    // Sem pasta de sites configurada ainda: nada a reparar.
+  }
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

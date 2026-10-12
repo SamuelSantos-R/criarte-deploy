@@ -7,6 +7,7 @@ import {
   Gift,
   HeartHandshake,
   Image,
+  Languages,
   ListChecks,
   MailCheck,
   MailOpen,
@@ -46,6 +47,7 @@ const APELIDOS: Record<string, string> = {
   pretoEBranco: "Foto em preto e branco",
   centrarNomes: "Centrar nomes com a divisória",
   botao: "Texto do botão",
+  en: "Inglês",
 };
 
 export function rotulo(chave: string): string {
@@ -76,6 +78,7 @@ const ICONES: Record<string, LucideIcon> = {
   manual: ListChecks,
   rsvp: MailCheck,
   recados: MessageSquare,
+  en: Languages,
 };
 
 export function iconeDe(chave: string): LucideIcon {
@@ -182,6 +185,17 @@ const DESLIGAVEIS = new Set([
 ]);
 
 export const CHAVE_SECOES = "secoes";
+
+/**
+ * O convite em inglês dos convidados de fora. Aparece sempre no fim da régua,
+ * mesmo sem o bloco no ficheiro: ele nasce quando se escreve a primeira tradução.
+ */
+export const CHAVE_INGLES = "en";
+
+/** As chaves que a régua mostra, na ordem do ficheiro e com o inglês no fim. */
+export function chavesDaRegua(dados: Record<string, unknown>): string[] {
+  return [...Object.keys(dados).filter((k) => k !== CHAVE_SECOES && k !== CHAVE_INGLES), CHAVE_INGLES];
+}
 
 /**
  * O editor só desenha chave que já existe no convite.json, então uma seção que o

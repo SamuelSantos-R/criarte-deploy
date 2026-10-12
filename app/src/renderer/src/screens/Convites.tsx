@@ -26,6 +26,7 @@ import {
   completarSecao,
   faltamCampos,
   CHAVE_SECOES,
+  chavesDaRegua,
   estaLigada,
   podeDesligar,
   rotulo,
@@ -124,7 +125,7 @@ export function Convites({
       // A secção só era escolhida ao ler convite do disco. Quem entra sem convite
       // próprio recebia o documento do anfitrião e continuava com o formulário
       // em branco — tinha de "Salvar aqui" primeiro só pra ter o que abrir.
-      const secoes = Object.keys(doc).filter((k) => k !== CHAVE_SECOES);
+      const secoes = chavesDaRegua(doc);
       setSecao((atual) => (atual && secoes.includes(atual) ? atual : (secoes[0] ?? null)));
     },
   });
@@ -181,7 +182,7 @@ export function Convites({
         marca.current = m;
         recomecar(d);
         setOriginal(JSON.stringify(d));
-        setSecao(Object.keys(d).find((k) => k !== CHAVE_SECOES) ?? null);
+        setSecao(chavesDaRegua(d)[0] ?? null);
       })
       .catch((e: Error) => vivo && setErro(e.message));
     return () => {
@@ -199,7 +200,7 @@ export function Convites({
   }, [id]);
 
   // `secoes` é o mapa do que está fora da página, não uma seção editável.
-  const chaves = dados ? Object.keys(dados).filter((k) => k !== CHAVE_SECOES) : [];
+  const chaves = dados ? chavesDaRegua(dados) : [];
   const desligadas = new Set(chaves.filter((k) => dados !== null && !estaLigada(dados, k)));
   const faltando = dados ? ausentes(dados) : [];
   const incompletas = dados ? faltamCampos(dados) : [];
@@ -353,7 +354,7 @@ export function Convites({
     recomecar(antes);
     // Descartar depois de semear leva a secção embora; sem isto o formulário
     // dela ficava aberto e vazio, a editar uma chave que já não existe.
-    const secoes = Object.keys(antes).filter((k) => k !== CHAVE_SECOES);
+    const secoes = chavesDaRegua(antes);
     setSecao((atual) => (atual && secoes.includes(atual) ? atual : (secoes[0] ?? null)));
     void desfazerNoDisco();
   };  descartarRef.current = descartar;
@@ -743,7 +744,8 @@ export function Convites({
         {/* No convidado não há pasta pra rodar `next dev`: o que se vê é o preview
             do anfitrião servido pela LAN, e o QR aponta pro Mac dele. */}
         <PainelAoVivo
-          url={convidado ? coop.estado.aoVivo : (servidor?.url ?? null)}
+          // Na secção Inglês a prévia abre como um convidado de fora a veria.
+          url={emIngles(convidado ? coop.estado.aoVivo : (servidor?.url ?? null), secao === "en")}
           lan={convidado ? coop.estado.aoVivoLan : (servidor?.lan ?? null)}
           largura={largura}
           ligando={ligando}
@@ -818,4 +820,11 @@ export function Convites({
     </div>
     </ProvedorSite>
   );
+}
+
+function emIngles(url: string | null, ligado: boolean): string | null {
+  if (!url || !ligado) return url;
+  const u = new URL(url);
+  u.searchParams.set("l", "en");
+  return u.toString();
 }

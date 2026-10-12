@@ -13,12 +13,14 @@ export function ConfirmarPublicacao({
   siteId,
   validade,
   convidados,
+  convidadosEn = null,
   onCancelar,
   onPublicar,
 }: {
   siteId: string;
   validade: string;
   convidados: string | null;
+  convidadosEn?: string | null;
   onCancelar: () => void;
   onPublicar: () => void;
 }): ReactElement {
@@ -94,8 +96,18 @@ export function ConfirmarPublicacao({
             <dd className="text-text">{validade}</dd>
             <dt className="font-narrow font-semibold text-label text-muted">Convidados</dt>
             <dd className="text-text">
-              {convidados ? convidados.split("/").pop() : "sem lista — sobe em prévia"}
+              {convidados
+                ? convidados.split("/").pop()
+                : convidadosEn
+                  ? "só os de fora"
+                  : "sem lista — sobe em prévia"}
             </dd>
+            {convidadosEn && (
+              <>
+                <dt className="font-narrow font-semibold text-label text-muted">Em inglês</dt>
+                <dd className="text-text">{convidadosEn.split("/").pop()}</dd>
+              </>
+            )}
           </dl>
 
           <p className="mt-5 text-[12px] leading-[1.7] text-muted">

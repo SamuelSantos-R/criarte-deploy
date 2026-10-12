@@ -3,6 +3,8 @@ import { copyFile, readdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { app } from "electron";
+import { idiomaNoConvite } from "./idioma";
+import { coracaoDosPais } from "./memoria";
 
 // ============================================================================
 // REPAROS — correções que os convites já criados precisam receber. Cada site
@@ -343,6 +345,7 @@ export async function repararConvite(dir: string): Promise<string[]> {
     ["components/Manual.tsx", tracoRegular],
     ["lib/numeros.tsx", tracoRegular],
     ["components/RSVP.tsx", letraDasOpcoes],
+    ["components/Versiculo.tsx", coracaoDosPais],
   ] as const) {
     const alvo = join(dir, "src", arquivo);
     if (!existsSync(alvo)) continue;
@@ -352,6 +355,9 @@ export async function repararConvite(dir: string): Promise<string[]> {
     await writeFile(alvo, novo, "utf8");
     feitos.push(arquivo.split("/").pop() ?? arquivo);
   }
+  // Por último: os consertos acima casam com o texto em português cru, e o
+  // idioma embrulha esse mesmo texto no `t()`.
+  feitos.push(...(await idiomaNoConvite(dir)));
   return feitos;
 }
 

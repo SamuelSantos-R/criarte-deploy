@@ -19,6 +19,7 @@ export type Job =
       expires?: string;
       subdomain?: string;
       guestsFile?: string;
+      guestsEnFile?: string;
     }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }

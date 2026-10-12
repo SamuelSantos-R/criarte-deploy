@@ -38,6 +38,8 @@ export type Job =
       subdomain?: string;
       /** Caminho absoluto do .txt de convidados, já validado dentro do site. */
       guestsFile?: string;
+      /** Caminho absoluto do .txt dos convidados de fora: convite em inglês. */
+      guestsEnFile?: string;
     }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }
@@ -72,6 +74,7 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
       if (job.expires) args.push("--expires", job.expires);
       if (job.subdomain) args.push("--subdomain", job.subdomain);
       if (job.guestsFile) args.push("--guests-file", job.guestsFile);
+      if (job.guestsEnFile) args.push("--guests-en-file", job.guestsEnFile);
       return { script: cli, args, cwd };
     }
     case "check":

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
-import { GripVertical, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { GripVertical, Heart, Plus, Trash2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
 import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
+import { AvisoPlantio } from "@/components/AvisoPlantio";
 import { AvisoRSVP } from "@/components/AvisoRSVP";
 import { PainelTema } from "@/components/PainelTema";
 import { PainelMedidas } from "@/components/PainelMedidas";
@@ -9,6 +10,7 @@ import { PainelPrancheta } from "@/components/PainelPrancheta";
 import { PainelOrnamentos } from "@/components/PainelOrnamentos";
 import { PainelHero } from "@/components/PainelHero";
 import { PainelGaleria } from "@/components/PainelGaleria";
+import { PainelIngles } from "@/components/PainelIngles";
 import { rotulo } from "@/lib/secoes";
 import { cn } from "@/lib/utils";
 
@@ -146,6 +148,63 @@ function Pega({
   );
 }
 
+/** Come o ♥ e a folga dos dois lados: o nome volta a ficar como estava escrito. */
+const CORACAO = /\s*♥\uFE0E?\s*/g;
+
+/**
+ * "Em memória" não é chave nova no convite.json: o ♥ mora dentro do próprio
+ * nome, que é como o `Versiculo.tsx` já o lê desde sempre — o tidiane-mauro tem
+ * um assim escrito à mão. Guardar em vez disso uma lista de índices à parte
+ * partia-se sozinha: arrastar um nome para outra posição deixava a marca no pai
+ * errado, e o `fundir` das sementes não sabe transformar valores já gravados.
+ */
+function alternarMemoria(nome: string): string {
+  if (nome.includes("♥")) return nome.replace(CORACAO, " ").trim();
+  return `♥ ${nome.trim()}`;
+}
+
+/** O botão só aparece onde faz sentido: os nomes dos pais da noiva e do noivo. */
+function ehNomeDePai(caminho: Caminho): boolean {
+  return (
+    caminho.length === 2 &&
+    caminho[0] === "pais" &&
+    (caminho[1] === "noiva" || caminho[1] === "noivo")
+  );
+}
+
+function BotaoMemoria({
+  nome,
+  onChange,
+}: {
+  nome: string;
+  onChange: (novo: string) => void;
+}): ReactElement {
+  const ligado = nome.includes("♥");
+  const limpo = nome.replace(CORACAO, " ").trim();
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(alternarMemoria(nome))}
+      aria-pressed={ligado}
+      aria-label={ligado ? `Tirar "em memória" de ${limpo}` : `Marcar ${limpo} como em memória`}
+      title={
+        ligado
+          ? "Em memória — clique para tirar o coração"
+          : "Em memória — põe um ♥ antes do nome, na cor dos pais"
+      }
+      // Ciano e não magenta nem lápis: na paleta do Studio cada tinta tem cargo
+      // fixo — magenta é o coop, lápis é erro. Isto é um booleano ligado, que
+      // aqui já se diz em ciano (`accent-cyan` nas caixas, pega a arrastar).
+      className={cn(
+        "no-drag shrink-0 rounded-lg p-2 transition-colors hover:bg-surface-2",
+        ligado ? "text-cyan" : "text-muted hover:text-text",
+      )}
+    >
+      <Heart size={14} fill={ligado ? "currentColor" : "none"} />
+    </button>
+  );
+}
+
 /**
  * Ordem por arrasto. Antes, mudar a ordem dos eventos obrigava a apagar um e
  * voltar a escrevê-lo no sítio certo — o formulário só sabia acrescentar no fim.
@@ -153,7 +212,18 @@ function Pega({
  * A pega também responde às setas com o foco em cima: arrastar é o gesto rápido,
  * mas quem chega pelo teclado não pode ficar sem caminho.
  */
-function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; label: string }): ReactElement {
+function Lista({
+  valor,
+  caminho,
+  onChange,
+  label,
+  acessorio,
+}: Props & {
+  valor: unknown[];
+  label: string;
+  /** Botão extra por item, para listas de texto que precisam de mais do que escrever. */
+  acessorio?: (item: unknown, i: number) => ReactNode;
+}): ReactElement {
   const base = valor[0];
   const deObjetos = base !== null && typeof base === "object" && !Array.isArray(base);
   const [pegado, setPegado] = useState<number | null>(null);
@@ -240,6 +310,7 @@ function Lista({ valor, caminho, onChange, label }: Props & { valor: unknown[]; 
                 <Pega i={i} label={label} pegado={pegado} onPegar={setPegado} onLargar={largar} onMover={mover} />
                 <span className="w-6 shrink-0 font-narrow font-semibold text-gauge text-muted">{String(i + 1).padStart(2, "0")}</span>
                 <Input value={String(item ?? "")} onChange={(e) => onChange([...caminho, i], e.target.value)} />
+                {acessorio?.(item, i)}
                 <button
                   className="no-drag p-2 text-muted transition-colors hover:text-pencil"
                   onClick={() => onChange(caminho, valor.filter((_, k) => k !== i))}
@@ -335,7 +406,22 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
         if (Array.isArray(v)) {
           return (
             <div key={chave} className="col-span-2">
-              <Lista valor={v} caminho={filho} onChange={onChange} label={label} />
+              <Lista
+                valor={v}
+                caminho={filho}
+                onChange={onChange}
+                label={label}
+                acessorio={
+                  ehNomeDePai(filho)
+                    ? (item, i) => (
+                        <BotaoMemoria
+                          nome={String(item ?? "")}
+                          onChange={(novo) => onChange([...filho, i], novo)}
+                        />
+                      )
+                    : undefined
+                }
+              />
             </div>
           );
         }
@@ -381,6 +467,10 @@ export function JsonForm({
 
   const valor = dados[secao];
   const label = rotulo(secao);
+
+  if (secao === "en") {
+    return <PainelIngles dados={dados} onChange={(en) => alterar(["en"], en)} />;
+  }
 
   if (secao === "tema" && valor !== null && typeof valor === "object" && !Array.isArray(valor)) {
     return (
@@ -451,6 +541,14 @@ export function JsonForm({
       <>
         {secao === "rsvp" && (
           <AvisoRSVP siteId={siteId} rsvp={valor as Record<string, unknown>} onChange={alterar} />
+        )}
+        {/* Os pais são desenhados pelo `Versiculo.tsx`, e é lá que o ♥ existe:
+            num convite com o componente antigo o botão de memória gravava o
+            coração e a página desenhava-o na mesma linha do nome, sem estilo. */}
+        {secao === "pais" && (
+          <div className="mb-4 space-y-3 empty:hidden">
+            <AvisoPlantio siteId={siteId} secao="versiculo" />
+          </div>
         )}
         <div className="grid grid-cols-2 gap-x-5 gap-y-3">
           <Nos valor={valor} caminho={[secao]} onChange={alterar} />

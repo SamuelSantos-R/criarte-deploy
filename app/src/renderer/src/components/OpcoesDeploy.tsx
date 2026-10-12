@@ -19,6 +19,8 @@ export type Opcoes = {
   data: string;
   subdominio: string;
   convidados: string | null;
+  /** A lista dos convidados de fora: cada nome dela recebe o convite em inglês. */
+  convidadosEn: string | null;
 };
 
 export const OPCOES_PADRAO: Opcoes = {
@@ -26,6 +28,7 @@ export const OPCOES_PADRAO: Opcoes = {
   data: "",
   subdominio: "",
   convidados: null,
+  convidadosEn: null,
 };
 
 /**
@@ -62,7 +65,6 @@ export function OpcoesDeploy({
   travado: boolean;
 }): ReactElement {
   const set = (parcial: Partial<Opcoes>): void => onChange({ ...valor, ...parcial });
-  const nomeDaLista = valor.convidados?.split("/").pop() ?? null;
 
   return (
     <div className="flex flex-wrap items-end gap-x-7 gap-y-3 border-b border-rule px-8 py-4">
@@ -115,31 +117,68 @@ export function OpcoesDeploy({
         />
       </label>
 
-      <div className="flex flex-col gap-1.5">
-        <Rotulo>Convidados</Rotulo>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
+      <EscolherLista
+        rotulo="Convidados"
+        caminho={valor.convidados}
+        travado={travado}
+        onChange={(convidados) => set({ convidados })}
+        tirar="Tirar a lista de convidados"
+        dica="Sem lista o convite sobe em prévia, sem token por convidado"
+      />
+      <EscolherLista
+        rotulo="Convidados de fora (inglês)"
+        caminho={valor.convidadosEn}
+        travado={travado}
+        onChange={(convidadosEn) => set({ convidadosEn })}
+        tirar="Tirar a lista de convidados de fora"
+        dica="Quem está nesta lista recebe o convite em inglês. Quem já tinha link mantém o mesmo"
+      />
+    </div>
+  );
+}
+
+/** Um .txt com um nome por linha, escolhido no Finder. */
+function EscolherLista({
+  rotulo,
+  caminho,
+  travado,
+  onChange,
+  tirar,
+  dica,
+}: {
+  rotulo: string;
+  caminho: string | null;
+  travado: boolean;
+  onChange: (caminho: string | null) => void;
+  tirar: string;
+  dica: string;
+}): ReactElement {
+  const nome = caminho?.split("/").pop() ?? null;
+  return (
+    <div className="flex flex-col gap-1.5" title={dica}>
+      <Rotulo>{rotulo}</Rotulo>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          disabled={travado}
+          onClick={() => {
+            void pickGuests().then((c) => c && onChange(c));
+          }}
+        >
+          <FileText size={13} /> {nome ?? "Escolher .txt…"}
+        </Button>
+        {nome && (
+          <button
+            type="button"
             disabled={travado}
-            onClick={() => {
-              void pickGuests().then((caminho) => caminho && set({ convidados: caminho }));
-            }}
+            onClick={() => onChange(null)}
+            aria-label={tirar}
+            title={dica}
+            className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
           >
-            <FileText size={13} /> {nomeDaLista ?? "Escolher .txt…"}
-          </Button>
-          {nomeDaLista && (
-            <button
-              type="button"
-              disabled={travado}
-              onClick={() => set({ convidados: null })}
-              aria-label="Tirar a lista de convidados"
-              title="Sem lista o convite sobe em prévia, sem token por convidado"
-              className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text focus-visible:outline-solid focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-40"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
+            <X size={13} />
+          </button>
+        )}
       </div>
     </div>
   );

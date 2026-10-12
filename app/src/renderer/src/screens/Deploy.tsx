@@ -97,6 +97,7 @@ export function Deploy({
       expires,
       ...(opcoes.subdominio.trim() ? { subdomain: opcoes.subdominio.trim() } : {}),
       ...(opcoes.convidados ? { guestsFile: opcoes.convidados } : {}),
+      ...(opcoes.convidadosEn ? { guestsEnFile: opcoes.convidadosEn } : {}),
     });
   };
 
@@ -174,6 +175,7 @@ export function Deploy({
           siteId={id}
           validade={validadeEmPalavras(opcoes)}
           convidados={opcoes.convidados}
+          convidadosEn={opcoes.convidadosEn}
           onCancelar={() => setConfirmando(false)}
           onPublicar={() => {
             setConfirmando(false);

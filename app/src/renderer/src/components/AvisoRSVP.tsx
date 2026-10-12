@@ -1,25 +1,15 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import {
-  atualizarSecao,
-  estadoPlantio,
-  plantarSecao,
-  resolverFormulario,
-  type Plantio,
-} from "@/lib/api";
-import { Button } from "@/components/ui/primitives";
+import { resolverFormulario } from "@/lib/api";
+import { AvisoPlantio, Linha } from "@/components/AvisoPlantio";
 import type { Caminho } from "@/components/JsonForm";
 
 /** O link curto do Google, tal como sai do botão Enviar. */
 const CURTO = /^https:\/\/forms\.gle\/[A-Za-z0-9_-]+\/?$/;
 
-function Linha({ children }: { children: React.ReactNode }): ReactElement {
-  return <p className="rounded-lg bg-cyan/10 px-3 py-2 text-[13px] text-text">{children}</p>;
-}
-
 /**
- * As duas maneiras de o RSVP existir no editor e não existir na página, que
- * durante muito tempo não davam sinal nenhum: sem formulário ligado o componente
- * esconde-se sozinho, e sem estar plantado não há componente para esconder.
+ * O que é só do RSVP: sem formulário ligado o componente esconde-se sozinho na
+ * página, e nada no editor o dizia. O aviso de estar fora da página ou com o
+ * desenho velho é do `AvisoPlantio`, que serve todas as secções com molde.
  */
 export function AvisoRSVP({
   siteId,
@@ -53,87 +43,13 @@ export function AvisoRSVP({
       .finally(() => setResolvendo(false));
   }, [url, onChange]);
 
-  const [plantio, setPlantio] = useState<Plantio | null>(null);
-  const [plantando, setPlantando] = useState(false);
-
-  const verificar = (id: string): void => {
-    void estadoPlantio(id, "rsvp")
-      .then(setPlantio)
-      .catch(() => setPlantio(null));
-  };
-
-  useEffect(() => {
-    if (!siteId) return;
-    verificar(siteId);
-  }, [siteId]);
-
-  const plantar = (): void => {
-    if (!siteId) return;
-    setPlantando(true);
-    void plantarSecao(siteId, "rsvp")
-      .then(setPlantio)
-      .catch(() => undefined)
-      .finally(() => setPlantando(false));
-  };
-
-  const atualizar = (): void => {
-    if (!siteId) return;
-    setPlantando(true);
-    void atualizarSecao(siteId, "rsvp")
-      .then(() => verificar(siteId))
-      .catch(() => undefined)
-      .finally(() => setPlantando(false));
-  };
-
-  const foraDaPagina = plantio !== null && !plantio.ligada;
-  const velha = plantio?.desatualizada === true;
   const semFormulario = !longo || !nome || !comparecer;
-  if (!foraDaPagina && !velha && !semFormulario && !erroUrl && !resolvendo) return null;
 
   return (
-    <div className="mb-4 space-y-3">
-      {foraDaPagina &&
-        (plantio.impedimento ? (
-          <div className="flex items-start gap-3">
-            <Linha>
-              Esta secção não está na página, e o Studio não a consegue lá pôr:{" "}
-              {plantio.impedimento}.
-            </Linha>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (siteId) verificar(siteId);
-              }}
-            >
-              Verificar de novo
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-start gap-3">
-            <Linha>
-              A secção existe no convite.json mas não está na página — é o que acontece com
-              convites feitos antes de o Studio saber plantá-la, ou copiados de um assim.
-            </Linha>
-            <Button variant="primary" size="sm" disabled={plantando} onClick={plantar}>
-              {plantando ? "A pôr…" : "Pôr na página"}
-            </Button>
-          </div>
-        ))}
-
-      {velha && (
-        <div className="flex items-start gap-3">
-          <Linha>
-            Esta secção neste convite está atrás do que este Studio traz — no desenho, ou nas
-            dependências que o convite leva para a VPS. Sem elas o deploy compila aqui e morre
-            lá. Trocar resolve as duas; se alguém mexeu neste componente à mão, essa mão
-            perde-se.
-          </Linha>
-          <Button variant="outline" size="sm" disabled={plantando} onClick={atualizar}>
-            {plantando ? "A trocar…" : "Actualizar desenho"}
-          </Button>
-        </div>
-      )}
+    // `empty:hidden` porque o aviso do plantio esconde-se sozinho: sem ele e sem
+    // nada do formulário para dizer, o que sobrava aqui era uma folga de 16px.
+    <div className="mb-4 space-y-3 empty:hidden">
+      <AvisoPlantio siteId={siteId} secao="rsvp" />
 
       {resolvendo && <Linha>A seguir o link curto até ao formulário…</Linha>}
 

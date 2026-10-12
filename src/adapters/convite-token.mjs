@@ -83,7 +83,15 @@ export class ConviteTokenAdapter extends BaseAdapter {
 
     // 1) Resolve o arquivo de convidados (flag → auto-detect → prompt)
     const guestFile = await resolveGuestFile(projectDir);
-    if (!guestFile) {
+    // A lista dos convidados de fora (Studio: "Convidados de fora"). Cada nome
+    // dela entra como se trouxesse |en: novo ganha token, quem já existe só muda
+    // de idioma e mantém o link.
+    const enFile = (process.env.CRIARTE_GUESTS_EN_FILE || "").trim();
+    if (enFile && !existsSync(enFile)) {
+      err(`Lista de convidados de fora não encontrada: ${enFile}`);
+      return false;
+    }
+    if (!guestFile && !enFile) {
       // Sem lista nova: preserva o que já está no ar em vez de zerar — um redeploy
       // de design não pode apagar os convidados/tokens já distribuídos.
       if (existingCount > 0) {
@@ -107,26 +115,33 @@ export class ConviteTokenAdapter extends BaseAdapter {
     // 2) Lê o .txt: nomes soltos (add) + diretivas `Antigo => Novo` (rename)
     let adds, renames, linkLines, badPax;
     try {
-      ({ adds, renames, linkLines, badPax } = parseGuestList(readFileSync(guestFile, "utf8")));
+      ({ adds, renames, linkLines, badPax } = parseGuestList(guestFile ? readFileSync(guestFile, "utf8") : ""));
+      if (enFile) {
+        const fora = parseGuestList(readFileSync(enFile, "utf8"));
+        adds.push(...fora.adds.map((a) => ({ ...a, lang: "en", hadLang: true })));
+        renames.push(...fora.renames.map((r) => ({ ...r, lang: "en", hadLang: true })));
+        linkLines.push(...fora.linkLines);
+        badPax.push(...fora.badPax);
+      }
     } catch (e) {
-      err(`Falha ao ler ${guestFile}: ${e.message}`);
+      err(`Falha ao ler ${guestFile || enFile}: ${e.message}`);
       return false;
     }
     // Guarda-corpo: se o arquivo apontado é na real um `-links.txt` (ou similar),
     // aborta em vez de gerar tokens novos com URLs no lugar dos nomes.
     if (linkLines.length > 0 && linkLines.length >= adds.length) {
-      err(`${guestFile} parece ser um arquivo de LINKS, não uma lista de convidados (${linkLines.length} linha(s) com URL/token).`);
+      err(`${guestFile || enFile} parece ser um arquivo de LINKS, não uma lista de convidados (${linkLines.length} linha(s) com URL/token).`);
       info(`A lista de convidados é um .txt com ${c.bold}um nome por linha${c.reset} (ex.: "João e Maria"). Os links (convidados-<slug>-links.txt) são a SAÍDA, não a entrada.`);
       return false;
     }
     if (linkLines.length > 0) {
-      warn(`${linkLines.length} linha(s) com URL/token ignorada(s) em ${guestFile} — não são nomes de convidado.`);
+      warn(`${linkLines.length} linha(s) com URL/token ignorada(s) em ${guestFile || enFile} — não são nomes de convidado.`);
     }
     for (const b of badPax.slice(0, 5)) {
-      warn(`  "${b}": depois do ${c.bold}|${c.reset} tem que vir um número (ex.: "Família Gabo|4") — assumindo 1 pessoa.`);
+      warn(`  "${b}": depois do ${c.bold}|${c.reset} tem que vir um número ou o idioma (ex.: "Família Gabo|4", "John Smith|en") — ignorado.`);
     }
     if (adds.length === 0 && renames.length === 0 && existingCount === 0) {
-      err(`Lista de convidados vazia em ${guestFile}.`);
+      err(`Lista de convidados vazia em ${guestFile || enFile}.`);
       return false;
     }
 
@@ -139,42 +154,47 @@ export class ConviteTokenAdapter extends BaseAdapter {
     const newRows = [];   // { name, token, pax } — só os novos, pra o .txt de novos
     const renamed = [];   // { from, to }
     const paxChanged = []; // { name, from, to }
+    const langChanged = []; // { name, to }
     const renameMisses = [];
 
-    for (const { from, to, pax, hadPax } of renames) {
+    for (const { from, to, pax, hadPax, lang, hadLang } of renames) {
       const tok = nameToToken.get(normName(from));
       if (tok) {
-        // Sem |N na linha de rename, mantém o pax que o convidado já tinha.
-        guests[tok] = makeGuest(to, hadPax ? pax : guestPax(guests[tok]));
+        // Sem |N (ou |en) na linha de rename, mantém o que o convidado já tinha.
+        guests[tok] = makeGuest(to, hadPax ? pax : guestPax(guests[tok]), hadLang ? lang : guestLang(guests[tok]));
         nameToToken.delete(normName(from));
         nameToToken.set(normName(to), tok);
         renamed.push({ from, to });
       } else {
         // Antigo não encontrado no site: trata o "novo" como convidado novo.
         const t = genUniqueToken(seen);
-        guests[t] = makeGuest(to, pax);
+        guests[t] = makeGuest(to, pax, lang);
         nameToToken.set(normName(to), t);
-        newRows.push({ name: to, token: t, pax });
+        newRows.push({ name: to, token: t, pax, lang });
         renameMisses.push(from);
       }
     }
 
-    for (const { name, pax, hadPax } of adds) {
+    for (const { name, pax, hadPax, lang, hadLang } of adds) {
       const tok = nameToToken.get(normName(name));
       if (tok) {
         // Já existe → mantém o token (o link já enviado continua valendo) e só
-        // ajusta o pax se o .txt trouxe um |N diferente do que está no ar.
+        // ajusta pax/idioma se o .txt trouxe um |N ou |en diferente do que está no ar.
         const current = guestPax(guests[tok]);
-        if (hadPax && pax !== current) {
-          guests[tok] = makeGuest(guestName(guests[tok]), pax);
-          paxChanged.push({ name, from: current, to: pax });
+        const langAtual = guestLang(guests[tok]);
+        const novoPax = hadPax ? pax : current;
+        const novoLang = hadLang ? lang : langAtual;
+        if (novoPax !== current || novoLang !== langAtual) {
+          guests[tok] = makeGuest(guestName(guests[tok]), novoPax, novoLang);
+          if (novoPax !== current) paxChanged.push({ name, from: current, to: pax });
+          if (novoLang !== langAtual) langChanged.push({ name, to: novoLang });
         }
         continue;
       }
       const t = genUniqueToken(seen);
-      guests[t] = makeGuest(name, pax);
+      guests[t] = makeGuest(name, pax, lang);
       nameToToken.set(normName(name), t);
-      newRows.push({ name, token: t, pax });
+      newRows.push({ name, token: t, pax, lang });
     }
 
     // 4) Escreve public/guests.json + reescreve o fetch pro basePath
@@ -191,6 +211,7 @@ export class ConviteTokenAdapter extends BaseAdapter {
       name: guestName(v),
       token,
       pax: guestPax(v),
+      lang: guestLang(v),
     }));
 
     const fullPath = join(projectDir, `convidados-${slug}-links.txt`);
@@ -220,6 +241,9 @@ export class ConviteTokenAdapter extends BaseAdapter {
     printSample("Novos", newRows.map((r) => (r.pax > 1 ? `${r.name} (${r.pax}p)` : r.name)));
     printSample("Renomeados", renamed.map((r) => `${r.from} → ${r.to}`));
     printSample("Nº de pessoas alterado", paxChanged.map((r) => `${r.name}: ${r.from} → ${r.to}`));
+    printSample("Idioma alterado (o link continua o mesmo)", langChanged.map((r) => `${r.name} → ${r.to === "en" ? "inglês" : "português"}`));
+    const emIngles = allRows.filter((r) => r.lang === "en").length;
+    if (emIngles > 0) info(`Convidados de fora (convite em inglês): ${c.bold}${emIngles}${c.reset} — os links deles levam ${c.bold}&l=en${c.reset}.`);
     const multiPax = allRows.filter((r) => r.pax > 1);
     if (multiPax.length > 0) {
       const total = allRows.reduce((s, r) => s + r.pax, 0);
@@ -283,21 +307,29 @@ export function guestPax(v) {
   return Number.isFinite(n) && n > 1 ? Math.floor(n) : 1;
 }
 
-function makeGuest(name, pax) {
-  return pax > 1 ? { name, pax } : name;
+// Convidado de fora ganha `lang: "en"`: o convite abre em inglês e o link leva
+// `&l=en`. Português é a ausência da chave, então guests.json antigo não muda.
+export function guestLang(v) {
+  return typeof v === "object" && v?.lang === "en" ? "en" : "pt";
+}
+
+function makeGuest(name, pax, lang = "pt") {
+  if (pax <= 1 && lang !== "en") return name;
+  return { name, ...(pax > 1 ? { pax } : {}), ...(lang === "en" ? { lang } : {}) };
 }
 
 // "Família Gabo|4" → { name: "Família Gabo", pax: 4, hadPax: true }
-// hadPax distingue "não falou de pax" (preserva o que está no ar) de "pediu 1".
+// "John Smith|en" / "Smith Family|3|en" → idioma do convite (en/pt), em qualquer ordem.
+// hadPax/hadLang distinguem "não falou" (preserva o que está no ar) de "pediu".
 function parseNamePax(raw) {
-  const s = String(raw);
-  const i = s.indexOf("|");
-  if (i < 0) return { name: s.trim(), pax: 1, hadPax: false, bad: false };
-  const name = s.slice(0, i).trim();
-  const rest = s.slice(i + 1).trim();
-  if (!/^\d+$/.test(rest)) return { name, pax: 1, hadPax: false, bad: true };
-  const pax = Math.max(1, parseInt(rest, 10));
-  return { name, pax, hadPax: true, bad: false };
+  const [first, ...partes] = String(raw).split("|");
+  const out = { name: first.trim(), pax: 1, hadPax: false, lang: "pt", hadLang: false, bad: false };
+  for (const p of partes.map((x) => x.trim().toLowerCase())) {
+    if (/^\d+$/.test(p)) { out.pax = Math.max(1, parseInt(p, 10)); out.hadPax = true; }
+    else if (p === "en" || p === "pt") { out.lang = p; out.hadLang = true; }
+    else out.bad = true;
+  }
+  return out;
 }
 
 // Separa nomes soltos (add) de diretivas de rename `Antigo => Novo`.
@@ -323,14 +355,14 @@ function parseGuestList(txt) {
       const to = parseNamePax(line.slice(arrow + 2));
       if (from.name && to.name) {
         if (to.bad) badPax.push(line);
-        renames.push({ from: from.name, to: to.name, pax: to.pax, hadPax: to.hadPax });
+        renames.push({ from: from.name, to: to.name, pax: to.pax, hadPax: to.hadPax, lang: to.lang, hadLang: to.hadLang });
         continue;
       }
     }
-    const { name, pax, hadPax, bad } = parseNamePax(line);
+    const { name, pax, hadPax, lang, hadLang, bad } = parseNamePax(line);
     if (!name) continue;
     if (bad) badPax.push(line);
-    adds.push({ name, pax, hadPax });
+    adds.push({ name, pax, hadPax, lang, hadLang });
   }
   return { adds, renames, linkLines, badPax };
 }
@@ -421,11 +453,11 @@ function loadLocalLinks(projectDir, slug) {
     for (const raw of readFileSync(file, "utf8").split(/\r?\n/)) {
       const line = raw.trim();
       if (!line || line.startsWith("#")) continue;
-      const m = line.match(/\?t=([A-Za-z0-9]+)\s*[—-]\s*(.+?)\s*$/);
+      const m = line.match(/\?t=([A-Za-z0-9]+)(&l=en)?\s*[—-]\s*(.+?)\s*$/);
       if (!m) continue;
-      const pax = m[2].match(/\((\d+) pessoas\)$/);
-      const name = pax ? m[2].slice(0, pax.index).trim() : m[2].trim();
-      out[m[1]] = makeGuest(name, pax ? parseInt(pax[1], 10) : 1);
+      const pax = m[3].match(/\((\d+) pessoas\)$/);
+      const name = pax ? m[3].slice(0, pax.index).trim() : m[3].trim();
+      out[m[1]] = makeGuest(name, pax ? parseInt(pax[1], 10) : 1, m[2] ? "en" : "pt");
     }
   } catch {}
   return out;
@@ -463,7 +495,7 @@ function writeGuestsJson(stagingDir, fullSlug, guests) {
   const generatedAt = new Date().toISOString();
   const normalized = {};
   for (const [tok, v] of Object.entries(guests)) {
-    normalized[tok] = makeGuest(guestName(v), guestPax(v));
+    normalized[tok] = makeGuest(guestName(v), guestPax(v), guestLang(v));
   }
   const payload = { version: 1, generatedAt, site: fullSlug, guests: normalized };
   writeFileSync(join(publicDir, "guests.json"), JSON.stringify(payload, null, 2) + "\n");
@@ -476,7 +508,7 @@ function renderLinks(header, generatedAt, base, rows) {
     `# Gerado em ${generatedAt}`,
     `# ${rows.length} convidado(s). Um link por convidado, único e intransferível.`,
     "",
-    ...rows.map((r) => `${base}?t=${r.token} — ${r.name}${r.pax > 1 ? ` (${r.pax} pessoas)` : ""}`),
+    ...rows.map((r) => `${base}?t=${r.token}${r.lang === "en" ? "&l=en" : ""} — ${r.name}${r.pax > 1 ? ` (${r.pax} pessoas)` : ""}`),
     "",
   ].join("\n");
 }

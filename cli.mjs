@@ -3038,6 +3038,7 @@ async function cmdDirectDeploy(argv) {
   const flagDomain = takeFlag("--domain");
   const flagRsvpEmail = takeFlag("--rsvp-email");
   const flagGuestsFile = takeFlag("--guests-file");
+  const flagGuestsEnFile = takeFlag("--guests-en-file");
   const flagExpires = takeFlag("--expires");
 
   argv = argv.filter((a) => !a.startsWith("--") && !(a === "-v"));
@@ -3050,6 +3051,7 @@ async function cmdDirectDeploy(argv) {
   }
   if (flagRsvpEmail) process.env.CRIARTE_RSVP_EMAIL_OVERRIDE = flagRsvpEmail;
   if (flagGuestsFile) process.env.CRIARTE_GUESTS_FILE = flagGuestsFile;
+  if (flagGuestsEnFile) process.env.CRIARTE_GUESTS_EN_FILE = flagGuestsEnFile;
   if (guestsReset) process.env.CRIARTE_GUESTS_RESET = "1";
   if (dryRun || validateOnly) noWait = true;
 
@@ -4448,7 +4450,7 @@ const hasDirect = cmd === "deploy" ? rest.includes("--direct") : cmd === "--dire
 const FLAGS_DEPLOY = new Set([
   "--yes", "-y", "--dry-run", "--validate-only", "--no-wait", "--skip-upload",
   "--skip-typecheck", "--guests-reset", "--verbose",
-  "--subdomain", "--category", "--slug", "--domain", "--rsvp-email", "--guests-file",
+  "--subdomain", "--category", "--slug", "--domain", "--rsvp-email", "--guests-file", "--guests-en-file",
   "--expires",
 ]);
 

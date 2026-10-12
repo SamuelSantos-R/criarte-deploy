@@ -120,6 +120,7 @@ function asJob(v: unknown): Job {
         ...(j.expires === undefined ? {} : { expires: asExpires(j.expires) }),
         ...(j.subdomain === undefined ? {} : { subdomain: asSubdominio(j.subdomain) }),
         ...(j.guestsFile === undefined ? {} : { guestsFile: asString(j.guestsFile, "guestsFile") }),
+        ...(j.guestsEnFile === undefined ? {} : { guestsEnFile: asString(j.guestsEnFile, "guestsEnFile") }),
       };
     case "check":
       return { kind: "check", siteId: asString(j.siteId, "siteId") };

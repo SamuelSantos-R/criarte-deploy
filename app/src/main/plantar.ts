@@ -31,6 +31,22 @@ type Planta = {
 };
 
 const PLANTAS: Record<string, Planta> = {
+  // O versículo já está na página de todos os convites; entra aqui pelo outro
+  // lado do mecanismo, o "Actualizar desenho", que é como o ♥ de "em memória"
+  // chega a quem já tem o componente feito.
+  //
+  // `depoisDe` vazio de propósito: plantar de raiz ficaria a meio. O componente
+  // lê `convite.pais.titulo` e `convite.versiculo.linhas`, e copiar só o
+  // ficheiro para um convite sem essas chaves dava página em branco em runtime,
+  // depois do build passar. Sem âncora, o plantio recusa e diz-o por escrito.
+  versiculo: {
+    ficheiro: "src/components/Versiculo.tsx",
+    componente: "Versiculo",
+    depoisDe: [],
+    exigeToken: "pais",
+    exigeDeps: {},
+    exigeTipos: {},
+  },
   rsvp: {
     ficheiro: "src/components/RSVP.tsx",
     componente: "RSVP",

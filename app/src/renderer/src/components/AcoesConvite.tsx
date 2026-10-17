@@ -1,6 +1,6 @@
 import { type ReactElement } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Copy, FolderOpen, Mail, MoreHorizontal, PenLine, Ticket, Trash2, Users } from "lucide-react";
+import { Copy, FolderOpen, LayoutTemplate, Mail, MoreHorizontal, PenLine, Ticket, Trash2, Users } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,6 +92,7 @@ type Acoes = {
   podeSalvarComoNovo: boolean;
   temSite: boolean;
   onSalvarComoNovo: () => void;
+  onSalvarComoModelo: () => void;
   onRenomear: () => void;
   onTokenizar: () => void;
   onCorreio: () => void;
@@ -128,6 +129,9 @@ export function MenuConvite(a: Acoes): ReactElement | null {
         )}
         {donoDoSite && (
           <>
+            <DropdownMenuItem className={item} onSelect={a.onSalvarComoModelo}>
+              <LayoutTemplate size={15} className="text-muted" /> Salvar como modelo
+            </DropdownMenuItem>
             <DropdownMenuItem className={item} onSelect={a.onRenomear}>
               <PenLine size={15} className="text-muted" /> Renomear
             </DropdownMenuItem>

@@ -72,6 +72,11 @@ const api = {
   vigiarConvite: (id: string | null) => invoke<void>("convite:watch", id),
   duplicarSite: (id: string, categoria: string, slug: string) =>
     invoke<Copia>("sites:duplicate", id, categoria, slug),
+  modelosListar: () => invoke<unknown>("modelos:listar"),
+  modelosSalvar: (id: string, carga: unknown) => invoke<unknown>("modelos:salvar", id, carga),
+  modelosApagar: (id: string) => invoke<void>("modelos:apagar", id),
+  modelosCriar: (modelo: string, categoria: string, slug: string) =>
+    invoke<Copia>("modelos:criar", modelo, categoria, slug),
   tokenEstado: (id: string) => invoke<EstadoToken>("token:estado", id),
   tokenInjetar: (id: string) => invoke<EstadoToken>("token:injetar", id),
   renomearSite: (id: string, slug: string) => invoke<{ id: string }>("sites:rename", id, slug),
@@ -156,6 +161,9 @@ const api = {
   bibliotecaApagar: (id: string) => invoke<void>("biblioteca:apagar", id),
   bibliotecaLerSvg: (id: string) => invoke<{ nome: string; svg: string }>("biblioteca:lerSvg", id),
   bibliotecaSvgParaTemp: (nome: string, svg: string) => invoke<string>("biblioteca:svgParaTemp", nome, svg),
+  paletasListar: () => invoke<unknown>("paletas:listar"),
+  paletasSalvar: (carga: unknown) => invoke<unknown>("paletas:salvar", carga),
+  paletasApagar: (id: string) => invoke<void>("paletas:apagar", id),
 
   estadoDeps: () => invoke<EstadoDeps>("deps:estado"),
   atualizacaoVerificar: () => invoke<unknown>("atualizacao:verificar"),

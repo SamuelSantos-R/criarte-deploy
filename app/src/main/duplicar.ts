@@ -6,6 +6,7 @@ import { baixarFonte, estadoCoop } from "./coop";
 import { copiavel, desempacotar } from "./pacote";
 import { containedPath, requireSitesRoot } from "./paths";
 import { readConvite, siteDir } from "./sites";
+import { baixarModelo, categoriaValida } from "./modelos";
 
 const NOME = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -218,6 +219,28 @@ export async function salvarSessaoComoNovo(
     await rm(destino, { recursive: true, force: true }).catch(() => {});
     // O registo reaproveitado não é nosso para soltar: é o do convite no ar.
     if (siteId && !existente) await libertarSlug(slug).catch(() => {});
+    throw erro;
+  }
+}
+
+/**
+ * Convite novo a partir de um modelo da biblioteca. Mesma ordem do duplicar —
+ * regista antes de escrever — e o mesmo desfazer: falhando, a pasta sai e o
+ * nome é solto. A categoria é a do pedido, não a do modelo: dá para começar um
+ * noivado a partir de um molde de casamento, se for isso que se quer.
+ */
+export async function criarDeModelo(modeloId: string, categoria: string, slug: string): Promise<Copia> {
+  const cat = categoriaValida(categoria);
+  const destino = await destinoLivre(cat, slug);
+  const { pacote } = await baixarModelo(modeloId);
+  const siteId = podeRegistrar() ? await registrar(slug, tituloDoSlug(slug)) : null;
+  try {
+    await mkdir(destino, { recursive: true });
+    await desempacotar(pacote, destino);
+    return { id: `${cat}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+  } catch (erro) {
+    await rm(destino, { recursive: true, force: true }).catch(() => {});
+    if (siteId) await libertarSlug(slug).catch(() => {});
     throw erro;
   }
 }

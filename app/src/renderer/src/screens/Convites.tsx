@@ -49,6 +49,8 @@ import { CorreioDoAmor } from "@/components/CorreioDoAmor";
 import { NovoPainelRSVP } from "@/components/NovoPainelRSVP";
 import { registarPendente, resolverPendente } from "@/lib/pendente";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
+import { NovoConvite } from "@/components/NovoConvite";
+import { SalvarComoModelo } from "@/components/SalvarComoModelo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
 import { BotaoTrilha, ChaveSecao, Regua } from "@/components/ReguaSecoes";
@@ -83,6 +85,8 @@ export function Convites({
   const [aviso, setAviso] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
+  const [criandoConvite, setCriandoConvite] = useState(false);
+  const [guardandoModelo, setGuardandoModelo] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
   const [apagando, setApagando] = useState(false);
   const [tokenizando, setTokenizando] = useState(false);
@@ -518,6 +522,7 @@ export function Convites({
 
   const aoDuplicar = async (copia: { id: string; faltam: string[] }): Promise<void> => {
     setDuplicando(false);
+    setCriandoConvite(false);
     setErro(null);
     // Numa máquina sem o config do CLI não há chave pra registar o convite, e o
     // uuid do mural fica em falta junto com as outras. Sem elas o correio do
@@ -564,6 +569,13 @@ export function Convites({
           somenteConvite
           className="w-[220px]"
         />
+        <button
+          onClick={() => setCriandoConvite(true)}
+          title="Criar um convite novo a partir de um modelo"
+          className="no-drag inline-flex shrink-0 items-center gap-1.5 rounded-full border border-rule bg-surface px-2.5 py-1 font-mono text-[11px] text-muted transition-colors hover:text-text"
+        >
+          <Plus size={12} /> convite
+        </button>
         <button
           onClick={() => setCriandoPainel(true)}
           title="Criar um painel RSVP novo"
@@ -616,6 +628,7 @@ export function Convites({
             podeSalvarComoNovo={Boolean((id || convidado) && dados)}
             temSite={Boolean(id)}
             onSalvarComoNovo={() => setDuplicando(true)}
+            onSalvarComoModelo={() => setGuardandoModelo(true)}
             onCorreio={() => setVendoCorreio(true)}
             onRenomear={() => setRenomeando(true)}
             onTokenizar={() => setTokenizando(true)}
@@ -809,6 +822,20 @@ export function Convites({
             />
           );
         })()}
+      {criandoConvite && (
+        <NovoConvite onFechar={() => setCriandoConvite(false)} onPronto={(copia) => void aoDuplicar(copia)} />
+      )}
+      {guardandoModelo && id && (
+        <SalvarComoModelo
+          siteId={id}
+          porGravar={sujo}
+          onFechar={() => setGuardandoModelo(false)}
+          onPronto={(m) => {
+            setGuardandoModelo(false);
+            setAviso(`Modelo “${m.nome}” guardado na biblioteca (${m.categoria}). Já aparece em “+ convite” em todas as máquinas.`);
+          }}
+        />
+      )}
       {vendoCorreio && id && <CorreioDoAmor siteId={id} onFechar={() => setVendoCorreio(false)} />}
 
       {criandoPainel && (

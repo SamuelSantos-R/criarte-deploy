@@ -1,4 +1,7 @@
-import { type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
+import { Save, X } from "lucide-react";
+import { paletasApagar, paletasListar, paletasSalvar, type PaletaSalva } from "@/lib/api";
+import { Button, Input } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 import { SeletorCor, hexValido } from "@/components/SeletorCor";
 
@@ -10,6 +13,39 @@ type Grupo = { titulo: string; nota: string; papeis: Papel[] };
  * (`realce-escuro`, `ouro-claro`) deixou de aparecer aqui de propósito: quem
  * escolhe quer saber o que muda no ecrã, não como o token se chama.
  */
+/**
+ * O noivado tem outro desenho e só três cores: o tema dele tem `texto` e não tem
+ * `fundo-1`. É por aí que o painel sabe qual dos dois está a editar — o convite
+ * não precisa de dizer.
+ */
+export function ehNoivado(tema: Record<string, string>): boolean {
+  return "texto" in tema && !("fundo-1" in tema);
+}
+
+export const PAPEIS_NOIVADO: Grupo[] = [
+  {
+    titulo: "as três cores do noivado",
+    nota: "O convite de noivado pinta-se todo com estas três.",
+    papeis: [
+      {
+        chave: "destaque",
+        rotulo: "Destaque",
+        onde: "Nome do casal, data, ícones dos botões, números da contagem, linhas da data.",
+      },
+      {
+        chave: "texto",
+        rotulo: "Texto",
+        onde: "Versículo, bênção, frase do convite, local, botões, contagem e o fundo do rodapé.",
+      },
+      {
+        chave: "fundo",
+        rotulo: "Fundo",
+        onde: "O fundo da página e as letras do rodapé.",
+      },
+    ],
+  },
+];
+
 export const PAPEIS: Grupo[] = [
   {
     titulo: "a cor principal",
@@ -180,7 +216,60 @@ function estaPosta(paleta: Paleta, tema: Record<string, string>): boolean {
 // As quatro que se leem à distância: o destaque manda na página, o par de fundos
 // dá o tom, e o filete diz se a paleta é quente ou fria.
 const AMOSTRA = ["destaque", "fundo-2", "fundo-1", "filete"];
+const AMOSTRA_NOIVADO = ["destaque", "texto", "fundo"];
 
+function Cartao({
+  p,
+  posta,
+  onAplicar,
+  onApagar,
+}: {
+  p: Paleta;
+  posta: boolean;
+  onAplicar: () => void;
+  onApagar?: () => void;
+}): ReactElement {
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onAplicar}
+        title={p.nota}
+        aria-pressed={posta}
+        className={cn(
+          "no-drag flex w-[152px] flex-col border text-left transition-colors",
+          posta ? "border-text" : "border-rule hover:border-muted",
+        )}
+      >
+        <span className="flex h-9">
+          {(ehNoivado(p.cores) ? AMOSTRA_NOIVADO : AMOSTRA).map((c) => (
+            <span key={c} className="flex-1" style={{ background: p.cores[c] }} />
+          ))}
+        </span>
+        <span className="flex items-baseline justify-between border-t border-rule px-2 py-1.5">
+          <span className="truncate text-[12px] text-text">{p.nome}</span>
+          {posta && <span className="font-narrow font-semibold text-gauge text-muted">posta</span>}
+        </span>
+      </button>
+      {onApagar && (
+        <button
+          type="button"
+          onClick={onApagar}
+          aria-label={`Apagar a paleta ${p.nome} da biblioteca`}
+          title="Apagar da biblioteca (some em todas as máquinas)"
+          className="no-drag absolute -right-2 -top-2 hidden h-5 w-5 items-center justify-center rounded-full border border-rule bg-surface text-muted hover:text-pencil group-hover:flex focus-visible:flex"
+        >
+          <X size={11} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * As prontas viajam no app; as da biblioteca vivem no R2 e aparecem em todas as
+ * máquinas, como os monogramas. Sem rede a biblioteca some e as prontas ficam.
+ */
 function Paletas({
   tema,
   onAplicar,
@@ -188,35 +277,77 @@ function Paletas({
   tema: Record<string, string>;
   onAplicar: (cores: Record<string, string>) => void;
 }): ReactElement {
+  const noivado = ehNoivado(tema);
+  const prontas = noivado ? PALETAS_NOIVADO : PALETAS;
+  const [salvas, setSalvas] = useState<PaletaSalva[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [nome, setNome] = useState("");
+  const [gravando, setGravando] = useState(false);
+
+  useEffect(() => {
+    paletasListar()
+      .then(setSalvas)
+      .catch(() => setSalvas([]));
+  }, []);
+
+  // Paleta de casamento num noivado (ou o contrário) trazia cores que a página nem usa.
+  const daBiblioteca = (salvas ?? []).filter((p) => ehNoivado(p.cores) === noivado);
+
+  const salvar = (): void => {
+    const cores = Object.fromEntries(Object.entries(tema).filter(([, v]) => hexValido(v)));
+    setGravando(true);
+    setErro(null);
+    paletasSalvar({ nome, cores })
+      .then((nova) => {
+        setSalvas((atual) => [nova, ...(atual ?? [])]);
+        setNome("");
+      })
+      .catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)))
+      .finally(() => setGravando(false));
+  };
+
+  const apagar = (p: PaletaSalva): void => {
+    if (!window.confirm(`Apagar "${p.nome}" da biblioteca? Some em todas as máquinas.`)) return;
+    paletasApagar(p.id)
+      .then(() => setSalvas((atual) => (atual ?? []).filter((x) => x.id !== p.id)))
+      .catch((e: unknown) => setErro(e instanceof Error ? e.message : String(e)));
+  };
+
+  const jaSalva = daBiblioteca.some((p) => estaPosta(p, tema)) || prontas.some((p) => estaPosta(p, tema));
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {PALETAS.map((p) => {
-        const posta = estaPosta(p, tema);
-        return (
-          <button
+    <>
+      <div className="flex flex-wrap gap-2">
+        {prontas.map((p) => (
+          <Cartao key={p.id} p={p} posta={estaPosta(p, tema)} onAplicar={() => onAplicar(p.cores)} />
+        ))}
+        {daBiblioteca.map((p) => (
+          <Cartao
             key={p.id}
-            type="button"
-            onClick={() => onAplicar(p.cores)}
-            title={p.nota}
-            aria-pressed={posta}
-            className={cn(
-              "no-drag group flex w-[152px] flex-col border text-left transition-colors",
-              posta ? "border-text" : "border-rule hover:border-muted",
-            )}
-          >
-            <span className="flex h-9">
-              {AMOSTRA.map((c) => (
-                <span key={c} className="flex-1" style={{ background: p.cores[c] }} />
-              ))}
-            </span>
-            <span className="flex items-baseline justify-between border-t border-rule px-2 py-1.5">
-              <span className="text-[12px] text-text">{p.nome}</span>
-              {posta && <span className="font-narrow font-semibold text-gauge text-muted">posta</span>}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+            p={{ ...p, nota: p.nota || (p.autor ? `Da biblioteca — ${p.autor}` : "Da biblioteca") }}
+            posta={estaPosta(p, tema)}
+            onAplicar={() => onAplicar(p.cores)}
+            onApagar={() => apagar(p)}
+          />
+        ))}
+      </div>
+      {salvas === null && <p className="mt-2 text-[12px] text-muted">Lendo a biblioteca…</p>}
+      <div className="mt-4 flex items-center gap-2">
+        <Input
+          value={nome}
+          placeholder={jaSalva ? "esta paleta já está guardada" : "nome da paleta deste convite"}
+          onChange={(e) => setNome(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && nome.trim() && !gravando) salvar();
+          }}
+          className="h-[30px] w-[220px] text-[12px]"
+        />
+        <Button variant="outline" size="sm" disabled={!nome.trim() || gravando} onClick={salvar}>
+          <Save size={13} /> {gravando ? "Guardando…" : "Guardar na biblioteca"}
+        </Button>
+      </div>
+      {erro && <p className="mt-2 text-[12px] text-pencil">{erro}</p>}
+    </>
   );
 }
 
@@ -232,19 +363,20 @@ export function PainelTema({
 }): ReactElement {
   // Papel que existe no convite.json mas o Studio não conhece continua editável:
   // um convite antigo abre sem perder cor nenhuma.
-  const conhecidos = new Set(PAPEIS.flatMap((g) => g.papeis.map((p) => p.chave)));
+  const base = ehNoivado(tema) ? PAPEIS_NOIVADO : PAPEIS;
+  const conhecidos = new Set(base.flatMap((g) => g.papeis.map((p) => p.chave)));
   const sobra = Object.keys(tema).filter((k) => !conhecidos.has(k));
 
   const grupos: Grupo[] = sobra.length
     ? [
-        ...PAPEIS,
+        ...base,
         {
           titulo: "fora do padrão",
           nota: "Estava no convite.json e o Studio não reconhece — deve vir de uma versão antiga do modelo.",
           papeis: sobra.map((k) => ({ chave: k, rotulo: k, onde: "" })),
         },
       ]
-    : PAPEIS;
+    : base;
 
   return (
     <div className="max-w-[560px]">
@@ -261,7 +393,8 @@ export function PainelTema({
         </div>
         <p className="mb-3 max-w-[52ch] text-[12px] leading-normal text-muted">
           Põe a paleta inteira de uma vez. Depois dá para mexer linha a linha — e o que ficar
-          diferente já não conta como paleta posta.
+          diferente já não conta como paleta posta. A paleta deste convite pode ir para a
+          biblioteca e aparece em todas as máquinas.
         </p>
         <Paletas tema={tema} onAplicar={onAplicarPaleta} />
       </section>
@@ -397,5 +530,21 @@ export const PALETAS: Paleta[] = [
       "rsvp-fundo": "#FFFFFF",
       "card-borda": "#E2C4AF",
     },
+  },
+];
+
+/** As do noivado: a dourada é a da Jandira & Mauro; a preto e branco, a da Carolina & Daniel. */
+export const PALETAS_NOIVADO: Paleta[] = [
+  {
+    id: "noivado-dourado",
+    nome: "Dourado",
+    nota: "Dourado com verde-oliva — a do convite com flores.",
+    cores: { destaque: "#B99A5B", texto: "#636427", fundo: "#FFFFFF" },
+  },
+  {
+    id: "noivado-pb",
+    nome: "Preto e branco",
+    nota: "Para a capa com foto a preto e branco.",
+    cores: { destaque: "#1A1A1A", texto: "#000000", fundo: "#FFFFFF" },
   },
 ];

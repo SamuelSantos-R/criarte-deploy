@@ -1,4 +1,5 @@
 import { call } from "./utils";
+import type { Categoria } from "../../../shared/categorias";
 
 export type Site = {
   id: string;
@@ -50,6 +51,26 @@ export const onConviteMudou = api.onConviteMudou;
 export type Copia = { id: string; siteId: string | null; faltam: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
+
+export type { Categoria } from "../../../shared/categorias";
+export type ModeloConvite = {
+  v: 1;
+  id: string;
+  nome: string;
+  categoria: Categoria;
+  nota: string;
+  cor: string | null;
+  bytes: number;
+  autor: string | null;
+  criado: string;
+  atualizado: string;
+};
+export const modelosListar = () => call(api.modelosListar()) as Promise<ModeloConvite[]>;
+export const modelosSalvar = (id: string, p: { nome: string; categoria: Categoria; nota?: string }) =>
+  call(api.modelosSalvar(id, p)) as Promise<ModeloConvite>;
+export const modelosApagar = (id: string) => call(api.modelosApagar(id));
+export const modelosCriar = (modelo: string, categoria: Categoria, slug: string) =>
+  call(api.modelosCriar(modelo, categoria, slug)) as Promise<Copia>;
 export type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
 export const tokenEstado = (id: string) => call(api.tokenEstado(id)) as Promise<EstadoToken>;
 export const tokenInjetar = (id: string) => call(api.tokenInjetar(id)) as Promise<EstadoToken>;
@@ -240,6 +261,21 @@ export const bibliotecaAbrir = (id: string) =>
 export const bibliotecaApagar = (id: string) => call(api.bibliotecaApagar(id));
 export const bibliotecaLerSvg = (id: string) => call(api.bibliotecaLerSvg(id));
 export const bibliotecaSvgParaTemp = (nome: string, svg: string) => call(api.bibliotecaSvgParaTemp(nome, svg));
+
+export type PaletaSalva = {
+  v: 1;
+  id: string;
+  nome: string;
+  nota: string;
+  cores: Record<string, string>;
+  autor: string | null;
+  criado: string;
+  atualizado: string;
+};
+export const paletasListar = () => call(api.paletasListar()) as Promise<PaletaSalva[]>;
+export const paletasSalvar = (p: { nome: string; nota?: string; cores: Record<string, string> }) =>
+  call(api.paletasSalvar(p)) as Promise<PaletaSalva>;
+export const paletasApagar = (id: string) => call(api.paletasApagar(id));
 
 export type Patch = { caminho: (string | number)[]; valor: unknown };
 export type Tranca = { secao: string; nome: string };

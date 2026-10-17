@@ -9,6 +9,7 @@ import { estadoDeps } from "./deps";
 import { instalarAtualizacao, verificarAtualizacao } from "./atualizar";
 import {
   apagarSite,
+  criarDeModelo,
   duplicarSite,
   estadoDoSlug,
   libertarSlug,
@@ -34,6 +35,8 @@ import {
   recursosMonograma,
   ultimaPasta,
 } from "./monograma";
+import { apagarPaleta, listarPaletas, salvarPaleta } from "./paletas";
+import { apagarModelo, listarModelos, salvarModelo } from "./modelos";
 import { abrirDaBiblioteca, apagarDaBiblioteca, lerSvg, listarBiblioteca, salvarNaBiblioteca, svgParaTemp } from "./biblioteca";
 import { aoMudarPreview, estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, preaquecer, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
@@ -193,6 +196,12 @@ export function registerIpc(): void {
 
   handle("sites:duplicate", (_e, id: unknown, categoria: unknown, slug: unknown) =>
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
+  );
+  handle("modelos:listar", () => listarModelos());
+  handle("modelos:salvar", (_e, id: unknown, carga: unknown) => salvarModelo(asString(id, "id"), carga));
+  handle("modelos:apagar", (_e, id: unknown) => apagarModelo(id));
+  handle("modelos:criar", (_e, modelo: unknown, categoria: unknown, slug: unknown) =>
+    criarDeModelo(asString(modelo, "modelo"), asString(categoria, "categoria"), asString(slug, "nome")),
   );
 
   handle("token:estado", (_e, id: unknown) => estadoToken(asString(id, "id")));
@@ -384,6 +393,9 @@ export function registerIpc(): void {
   handle("biblioteca:apagar", (_e, id: unknown) => apagarDaBiblioteca(id));
   handle("biblioteca:lerSvg", (_e, id: unknown) => lerSvg(id));
   handle("biblioteca:svgParaTemp", (_e, nome: unknown, svg: unknown) => svgParaTemp(nome, svg));
+  handle("paletas:listar", () => listarPaletas());
+  handle("paletas:salvar", (_e, carga: unknown) => salvarPaleta(carga));
+  handle("paletas:apagar", (_e, id: unknown) => apagarPaleta(id));
 
   handle("monograma:abrirPasta", async () => {
     const pasta = ultimaPasta();

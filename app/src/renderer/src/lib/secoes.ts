@@ -11,6 +11,7 @@ import {
   ListChecks,
   MailCheck,
   MailOpen,
+  MousePointerClick,
   MapPin,
   MessageSquare,
   Images,
@@ -26,7 +27,7 @@ import {
 } from "lucide-react";
 import { MEDIDAS_PADRAO } from "@/components/PainelMedidas";
 import { ORNAMENTOS_PADRAO } from "@/components/PainelOrnamentos";
-import { TEMA_PADRAO } from "@/components/PainelTema";
+import { TEMA_PADRAO, ehNoivado } from "@/components/PainelTema";
 
 const APELIDOS: Record<string, string> = {
   r2: "CDN (R2)",
@@ -47,6 +48,13 @@ const APELIDOS: Record<string, string> = {
   pretoEBranco: "Foto em preto e branco",
   centrarNomes: "Centrar nomes com a divisória",
   botao: "Texto do botão",
+  capa: "Capa",
+  comFoto: "Capa com foto do casal",
+  local: "Local",
+  botoes: "Botões",
+  countdown: "Contagem",
+  fecho: "Frase de fecho",
+  dica: "Dica abaixo dos botões",
   en: "Inglês",
 };
 
@@ -79,6 +87,12 @@ const ICONES: Record<string, LucideIcon> = {
   rsvp: MailCheck,
   recados: MessageSquare,
   en: Languages,
+  // Noivado
+  capa: Image,
+  convite: MailOpen,
+  local: MapPin,
+  botoes: MousePointerClick,
+  countdown: Clock,
 };
 
 export function iconeDe(chave: string): LucideIcon {
@@ -107,6 +121,12 @@ const ANCORAS: Record<string, string> = {
   dresscode: "dresscode",
   rsvp: "rsvp",
   recados: "mensagens",
+  // Noivado: quase tudo vive no bloco do versículo, que vai da bênção aos botões.
+  capa: "hero",
+  convite: "versiculo",
+  local: "versiculo",
+  botoes: "versiculo",
+  countdown: "countdown",
 };
 
 export function ancoraDe(chave: string): string | null {
@@ -234,7 +254,14 @@ const SEMENTES: Record<string, () => Record<string, unknown>> = {
   tema: () => ({ ...TEMA_PADRAO }),
 };
 
+/** O noivado tem outro desenho: as sementes de casamento não têm onde aparecer nele. */
+function noivado(dados: Record<string, unknown>): boolean {
+  const tema = dados.tema;
+  return ehObjeto(tema) && ehNoivado(tema as Record<string, string>);
+}
+
 export function ausentes(dados: Record<string, unknown>): string[] {
+  if (noivado(dados)) return [];
   return Object.keys(SEMENTES).filter((k) => !(k in dados));
 }
 
@@ -245,6 +272,7 @@ export function ausentes(dados: Record<string, unknown>): string[] {
  * lá chegar, porque `ausentes` olha só para o nome da secção, que já existe.
  */
 export function faltamCampos(dados: Record<string, unknown>): string[] {
+  if (noivado(dados)) return [];
   return Object.keys(SEMENTES).filter((chave) => {
     const atual = dados[chave];
     if (!ehObjeto(atual)) return false;

@@ -86,12 +86,18 @@ export class ConviteTokenAdapter extends BaseAdapter {
     // A lista dos convidados de fora (Studio: "Convidados de fora"). Cada nome
     // dela entra como se trouxesse |en: novo ganha token, quem já existe só muda
     // de idioma e mantém o link.
-    const enFile = (process.env.CRIARTE_GUESTS_EN_FILE || "").trim();
-    if (enFile && !existsSync(enFile)) {
-      err(`Lista de convidados de fora não encontrada: ${enFile}`);
-      return false;
+    // A lista PT extra devolve ao português quem estava numa lista de fora.
+    const listasFora = ["pt", ...LINGUAS_FORA]
+      .map((lang) => ({ lang, file: (process.env[`CRIARTE_GUESTS_${lang.toUpperCase()}_FILE`] || "").trim() }))
+      .filter((l) => l.file);
+    for (const l of listasFora) {
+      if (!existsSync(l.file)) {
+        err(`Lista de convidados (${l.lang}) não encontrada: ${l.file}`);
+        return false;
+      }
     }
-    if (!guestFile && !enFile) {
+    const enFile = listasFora.map((l) => l.file).join(", ");
+    if (!guestFile && listasFora.length === 0) {
       // Sem lista nova: preserva o que já está no ar em vez de zerar — um redeploy
       // de design não pode apagar os convidados/tokens já distribuídos.
       if (existingCount > 0) {
@@ -116,10 +122,10 @@ export class ConviteTokenAdapter extends BaseAdapter {
     let adds, renames, linkLines, badPax;
     try {
       ({ adds, renames, linkLines, badPax } = parseGuestList(guestFile ? readFileSync(guestFile, "utf8") : ""));
-      if (enFile) {
-        const fora = parseGuestList(readFileSync(enFile, "utf8"));
-        adds.push(...fora.adds.map((a) => ({ ...a, lang: "en", hadLang: true })));
-        renames.push(...fora.renames.map((r) => ({ ...r, lang: "en", hadLang: true })));
+      for (const { lang, file } of listasFora) {
+        const fora = parseGuestList(readFileSync(file, "utf8"));
+        adds.push(...fora.adds.map((a) => ({ ...a, lang, hadLang: true })));
+        renames.push(...fora.renames.map((r) => ({ ...r, lang, hadLang: true })));
         linkLines.push(...fora.linkLines);
         badPax.push(...fora.badPax);
       }
@@ -241,9 +247,12 @@ export class ConviteTokenAdapter extends BaseAdapter {
     printSample("Novos", newRows.map((r) => (r.pax > 1 ? `${r.name} (${r.pax}p)` : r.name)));
     printSample("Renomeados", renamed.map((r) => `${r.from} → ${r.to}`));
     printSample("Nº de pessoas alterado", paxChanged.map((r) => `${r.name}: ${r.from} → ${r.to}`));
-    printSample("Idioma alterado (o link continua o mesmo)", langChanged.map((r) => `${r.name} → ${r.to === "en" ? "inglês" : "português"}`));
-    const emIngles = allRows.filter((r) => r.lang === "en").length;
-    if (emIngles > 0) info(`Convidados de fora (convite em inglês): ${c.bold}${emIngles}${c.reset} — os links deles levam ${c.bold}&l=en${c.reset}.`);
+    const NOME_LINGUA = { pt: "português", en: "inglês", fr: "francês" };
+    printSample("Idioma alterado (o link continua o mesmo)", langChanged.map((r) => `${r.name} → ${NOME_LINGUA[r.to]}`));
+    for (const lang of LINGUAS_FORA) {
+      const n = allRows.filter((r) => r.lang === lang).length;
+      if (n > 0) info(`Convidados em ${NOME_LINGUA[lang]}: ${c.bold}${n}${c.reset} — os links deles levam ${c.bold}&l=${lang}${c.reset}.`);
+    }
     const multiPax = allRows.filter((r) => r.pax > 1);
     if (multiPax.length > 0) {
       const total = allRows.reduce((s, r) => s + r.pax, 0);
@@ -307,26 +316,29 @@ export function guestPax(v) {
   return Number.isFinite(n) && n > 1 ? Math.floor(n) : 1;
 }
 
-// Convidado de fora ganha `lang: "en"`: o convite abre em inglês e o link leva
-// `&l=en`. Português é a ausência da chave, então guests.json antigo não muda.
+// Convidado de fora ganha `lang` ("en" ou "fr"): o convite abre nessa língua e o
+// link leva `&l=<lang>`. Português é a ausência da chave, então guests.json
+// antigo não muda.
+export const LINGUAS_FORA = ["en", "fr"];
 export function guestLang(v) {
-  return typeof v === "object" && v?.lang === "en" ? "en" : "pt";
+  return typeof v === "object" && LINGUAS_FORA.includes(v?.lang) ? v.lang : "pt";
 }
 
 function makeGuest(name, pax, lang = "pt") {
-  if (pax <= 1 && lang !== "en") return name;
-  return { name, ...(pax > 1 ? { pax } : {}), ...(lang === "en" ? { lang } : {}) };
+  const fora = LINGUAS_FORA.includes(lang);
+  if (pax <= 1 && !fora) return name;
+  return { name, ...(pax > 1 ? { pax } : {}), ...(fora ? { lang } : {}) };
 }
 
 // "Família Gabo|4" → { name: "Família Gabo", pax: 4, hadPax: true }
-// "John Smith|en" / "Smith Family|3|en" → idioma do convite (en/pt), em qualquer ordem.
+// "John Smith|en" / "Famille Dupont|3|fr" → idioma do convite (pt/en/fr), em qualquer ordem.
 // hadPax/hadLang distinguem "não falou" (preserva o que está no ar) de "pediu".
 function parseNamePax(raw) {
   const [first, ...partes] = String(raw).split("|");
   const out = { name: first.trim(), pax: 1, hadPax: false, lang: "pt", hadLang: false, bad: false };
   for (const p of partes.map((x) => x.trim().toLowerCase())) {
     if (/^\d+$/.test(p)) { out.pax = Math.max(1, parseInt(p, 10)); out.hadPax = true; }
-    else if (p === "en" || p === "pt") { out.lang = p; out.hadLang = true; }
+    else if (p === "pt" || LINGUAS_FORA.includes(p)) { out.lang = p; out.hadLang = true; }
     else out.bad = true;
   }
   return out;
@@ -453,11 +465,11 @@ function loadLocalLinks(projectDir, slug) {
     for (const raw of readFileSync(file, "utf8").split(/\r?\n/)) {
       const line = raw.trim();
       if (!line || line.startsWith("#")) continue;
-      const m = line.match(/\?t=([A-Za-z0-9]+)(&l=en)?\s*[—-]\s*(.+?)\s*$/);
+      const m = line.match(/\?t=([A-Za-z0-9]+)(?:&l=(en|fr))?\s*[—-]\s*(.+?)\s*$/);
       if (!m) continue;
       const pax = m[3].match(/\((\d+) pessoas\)$/);
       const name = pax ? m[3].slice(0, pax.index).trim() : m[3].trim();
-      out[m[1]] = makeGuest(name, pax ? parseInt(pax[1], 10) : 1, m[2] ? "en" : "pt");
+      out[m[1]] = makeGuest(name, pax ? parseInt(pax[1], 10) : 1, m[2] || "pt");
     }
   } catch {}
   return out;
@@ -508,7 +520,7 @@ function renderLinks(header, generatedAt, base, rows) {
     `# Gerado em ${generatedAt}`,
     `# ${rows.length} convidado(s). Um link por convidado, único e intransferível.`,
     "",
-    ...rows.map((r) => `${base}?t=${r.token}${r.lang === "en" ? "&l=en" : ""} — ${r.name}${r.pax > 1 ? ` (${r.pax} pessoas)` : ""}`),
+    ...rows.map((r) => `${base}?t=${r.token}${r.lang !== "pt" ? `&l=${r.lang}` : ""} — ${r.name}${r.pax > 1 ? ` (${r.pax} pessoas)` : ""}`),
     "",
   ].join("\n");
 }

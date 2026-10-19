@@ -4,7 +4,7 @@ import { writeFile } from "node:fs/promises";
 import { loadSettings, saveSettings } from "./paths";
 import { estadoCredenciais, exportarCredenciais, importarCredenciais } from "./credenciais";
 import { listSites, readConvite, siteDir, writeConvite } from "./sites";
-import { cancelJob, destinoPublicacao, startJob, type Job } from "./cli";
+import { cancelJob, destinoPublicacao, startJob, type Job, type ListaLingua } from "./cli";
 import { estadoDeps } from "./deps";
 import { instalarAtualizacao, verificarAtualizacao } from "./atualizar";
 import {
@@ -111,6 +111,23 @@ function asSubdominio(v: unknown): string {
   return t;
 }
 
+/** Uma lista por língua no máximo; a língua vem de um conjunto fechado. */
+function asListas(v: unknown): ListaLingua[] {
+  if (!Array.isArray(v) || v.length > 3) throw new Error("listas inválidas");
+  const vistas = new Set<string>();
+  return v.map((x) => {
+    const l = (x ?? {}) as Record<string, unknown>;
+    if (l.lang !== "pt" && l.lang !== "en" && l.lang !== "fr") throw new Error("língua inválida");
+    if (vistas.has(l.lang)) throw new Error("duas listas na mesma língua");
+    vistas.add(l.lang);
+    return {
+      lang: l.lang,
+      arquivo: asString(l.arquivo, "arquivo"),
+      ...(l.video === undefined || l.lang === "pt" ? {} : { video: asString(l.video, "video") }),
+    };
+  });
+}
+
 function asJob(v: unknown): Job {
   if (!v || typeof v !== "object") throw new Error("job inválido");
   const j = v as Record<string, unknown>;
@@ -123,7 +140,7 @@ function asJob(v: unknown): Job {
         ...(j.expires === undefined ? {} : { expires: asExpires(j.expires) }),
         ...(j.subdomain === undefined ? {} : { subdomain: asSubdominio(j.subdomain) }),
         ...(j.guestsFile === undefined ? {} : { guestsFile: asString(j.guestsFile, "guestsFile") }),
-        ...(j.guestsEnFile === undefined ? {} : { guestsEnFile: asString(j.guestsEnFile, "guestsEnFile") }),
+        ...(j.listas === undefined ? {} : { listas: asListas(j.listas) }),
       };
     case "check":
       return { kind: "check", siteId: asString(j.siteId, "siteId") };
@@ -452,6 +469,13 @@ export function registerIpc(): void {
   // O ficheiro entra por diálogo nativo, nunca por caminho digitado no
   // renderer: quem escolhe é o Heatz, no Finder, e o main só repassa o que ele
   // apontou.
+  handle("deploy:pickVideo", (event) =>
+    abrir(event, {
+      title: "Vídeo do envelope nesta língua",
+      properties: ["openFile"],
+      filters: [{ name: "Vídeo", extensions: ["mp4", "mov", "webm", "m4v"] }],
+    }),
+  );
   handle("deploy:pickGuests", (event) =>
     abrir(event, {
       title: "Lista de convidados (.txt)",

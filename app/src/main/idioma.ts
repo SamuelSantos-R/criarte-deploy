@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 // ============================================================================
-// IDIOMA — o convite em inglês para os convidados de fora. Não há segundo site
+// IDIOMA — o convite em inglês e francês para os convidados de fora. Não há segundo site
 // nem segundo build: o link do convidado leva `&l=en`, e o convite troca o texto
 // no próprio browser. O que o casal escreve vem do bloco `en` do convite.json,
 // por cima do português; o que vive cravado nos componentes passa pelo `t()`.
@@ -21,14 +21,12 @@ import { join } from "node:path";
  * diferença ao hidratar e redesenha no cliente — por baixo do envelope, que é a
  * primeira coisa que a pessoa vê, por isso a troca não aparece.
  */
-export const IDIOMA_TS = `// Criado pelo Criarte Studio — o convite em inglês para os convidados de fora.
+export const IDIOMA_TS = `// Criado pelo Criarte Studio — o convite em inglês e francês para os convidados de fora.
 // Não editar à mão: o Studio reescreve este ficheiro quando o dicionário cresce.
-export type Idioma = "pt" | "en";
+export type Idioma = "pt" | "en" | "fr";
 
-export const idioma: Idioma =
-  typeof window !== "undefined" && new URLSearchParams(window.location.search).get("l") === "en"
-    ? "en"
-    : "pt";
+const pedido = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("l") : null;
+export const idioma: Idioma = pedido === "en" || pedido === "fr" ? pedido : "pt";
 
 // A chave é o próprio texto em português: o componente continua legível e o
 // que faltar aqui sai em português em vez de sair vazio.
@@ -78,8 +76,56 @@ const EN: Record<string, string> = {
   "Presença Confirmada": "Attendance confirmed",
 };
 
+const FR: Record<string, string> = {
+  Janeiro: "Janvier",
+  Fevereiro: "Février",
+  "Março": "Mars",
+  Abril: "Avril",
+  Maio: "Mai",
+  Junho: "Juin",
+  Julho: "Juillet",
+  Agosto: "Août",
+  Setembro: "Septembre",
+  Outubro: "Octobre",
+  Novembro: "Novembre",
+  Dezembro: "Décembre",
+  "Deslize para baixo": "Faites défiler",
+  "Acessar Localização": "Voir l'adresse",
+  "Hoje é o grande dia!": "C'est le grand jour !",
+  dias: "jours",
+  horas: "heures",
+  seg: "sec",
+  "Correio do Amor": "Mots d'amour",
+  "Seu nome": "Votre nom",
+  "Mensagem de carinho aos noivos ♡": "Un mot doux pour les mariés ♡",
+  "Deixe uma mensagem especial para este momento.": "Laissez un message spécial pour ce moment.",
+  "Prometemos ler com muito carinho!": "Nous promettons de le lire avec tendresse !",
+  "❌ Não foi possível enviar a tua mensagem. Tenta novamente em instantes.":
+    "❌ Votre message n'a pas pu être envoyé. Réessayez dans un instant.",
+  "✉️ Obrigado, {}! A tua mensagem foi recebida com muito carinho.":
+    "✉️ Merci, {} ! Votre message a été reçu avec tendresse.",
+  "Ativar som": "Activer le son",
+  "Silenciar som": "Couper le son",
+  "Desenvolvido com amor por": "Réalisé avec amour par",
+  "Copiar IBAN": "Copier l'IBAN",
+  "IBAN Copiado!": "IBAN copié !",
+  "Por favor, confirme a sua presença": "Merci de confirmer votre présence",
+  "Por favor, confirme até {}": "Merci de confirmer avant le {}",
+  "Confirmações encerradas": "Confirmations closes",
+  "Sim, estarei lá!": "Oui, je serai là !",
+  "Não poderei ir": "Je ne pourrai pas venir",
+  "Nome completo do acompanhante": "Nom complet de votre accompagnant",
+  "Nome completo do acompanhante {}": "Nom complet de l'accompagnant {}",
+  "Enviando...": "Envoi...",
+  "Confirmar Presença": "Confirmer ma présence",
+  "Ausência Informada": "Absence signalée",
+  "Presença Confirmada": "Présence confirmée",
+};
+
+const DICIONARIO: Record<Idioma, Record<string, string>> = { pt: {}, en: EN, fr: FR };
+
 export function t(pt: string): string {
-  return idioma === "en" ? EN[pt] ?? pt : pt;
+  return DICIONARIO[idioma][pt] ?? pt;
 }
 
 /** Para frase com um valor no meio: \`tf("Por favor, confirme até {}", prazo)\`. */
@@ -91,33 +137,35 @@ export function tf(pt: string, ...valores: unknown[]): string {
 const objeto = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 
-// Só o que foi traduzido sobe por cima: campo vazio ou ausente no \`en\` fica em
-// português. Listas de objetos (eventos, história) casam posição a posição para
-// a hora e o local não precisarem de ser escritos duas vezes; listas de texto
-// (linhas de uma chamada) trocam inteiras, porque a tradução raramente tem o
-// mesmo número de linhas.
-function fundir(pt: unknown, en: unknown): unknown {
-  if (en === null || en === undefined) return pt;
+// Só o que foi traduzido sobe por cima: campo vazio ou ausente no bloco da
+// língua fica em português. Listas de objetos (eventos, história) casam posição
+// a posição para a hora e o local não precisarem de ser escritos duas vezes;
+// listas de texto (linhas de uma chamada) trocam inteiras, porque a tradução
+// raramente tem o mesmo número de linhas. O vídeo do envelope entra igual: é um
+// texto (o caminho) no bloco da língua.
+function fundir(pt: unknown, tr: unknown): unknown {
+  if (tr === null || tr === undefined) return pt;
   // Formato diferente do português (lista contra objeto, texto contra lista):
   // tradução estragada não pode partir a página, fica o original.
-  if (Array.isArray(pt) !== Array.isArray(en) || objeto(pt) !== objeto(en)) return pt;
-  if (Array.isArray(pt) && Array.isArray(en)) {
-    if (pt.some(objeto)) return pt.map((item, i) => (i < en.length ? fundir(item, en[i]) : item));
-    const linhas = en.filter((l) => typeof l === "string" && l.trim() !== "");
+  if (Array.isArray(pt) !== Array.isArray(tr) || objeto(pt) !== objeto(tr)) return pt;
+  if (Array.isArray(pt) && Array.isArray(tr)) {
+    if (pt.some(objeto)) return pt.map((item, i) => (i < tr.length ? fundir(item, tr[i]) : item));
+    const linhas = tr.filter((l) => typeof l === "string" && l.trim() !== "");
     return linhas.length > 0 ? linhas : pt;
   }
-  if (objeto(pt) && objeto(en)) {
+  if (objeto(pt) && objeto(tr)) {
     const junto: Record<string, unknown> = { ...pt };
-    for (const k of Object.keys(en)) junto[k] = k in pt ? fundir(pt[k], en[k]) : en[k];
+    for (const k of Object.keys(tr)) junto[k] = k in pt ? fundir(pt[k], tr[k]) : tr[k];
     return junto;
   }
-  if (typeof en === "string") return en.trim() === "" ? pt : en;
-  return en ?? pt;
+  if (typeof tr === "string") return tr.trim() === "" ? pt : tr;
+  return tr ?? pt;
 }
 
 export function emIdioma<T>(convite: T): T {
-  const en = (convite as { en?: unknown }).en;
-  return idioma === "en" && objeto(en) ? (fundir(convite, en) as T) : convite;
+  if (idioma === "pt") return convite;
+  const bloco = (convite as Record<string, unknown>)[idioma];
+  return objeto(bloco) ? (fundir(convite, bloco) as T) : convite;
 }
 `;
 
@@ -208,7 +256,22 @@ export function conviteEmIdioma(codigo: string): string {
  * lista de fora (ou saiu dela) cai no idioma certo sem precisar de link novo.
  */
 export function guestComIdioma(codigo: string): string {
-  if (codigo.includes("emIngles")) return codigo;
+  if (codigo.includes("linguaDoConvidado")) return codigo;
+  const acerto = (esp: string): string =>
+    [
+      `${esp}const linguaDoConvidado = (entrada as { lang?: string } | null)?.lang;`,
+      `${esp}const lingua = linguaDoConvidado === "en" || linguaDoConvidado === "fr" ? linguaDoConvidado : null;`,
+      `${esp}if (name && lingua !== params.get("l")) {`,
+      `${esp}  const certo = new URL(window.location.href);`,
+      `${esp}  if (lingua) certo.searchParams.set("l", lingua);`,
+      `${esp}  else certo.searchParams.delete("l");`,
+      `${esp}  window.location.replace(certo.toString());`,
+      `${esp}  return;`,
+      `${esp}}`,
+    ].join("\n");
+  // Convite que já recebeu a versão só-inglês (6.6): troca o bloco por inteiro.
+  const antigo = /^([ \t]*)const emIngles = [^\n]*\n(?:[^\n]*\n){6}\1\}/m;
+  if (antigo.test(codigo)) return codigo.replace(antigo, (_m, esp: string) => acerto(esp));
   return codigo.replace(
     /^([ \t]*)const name = data\.guests\?\.\[token\];/m,
     (_m, esp: string) =>
@@ -218,14 +281,7 @@ export function guestComIdioma(codigo: string): string {
         `${esp}  typeof entrada === "string"`,
         `${esp}    ? entrada`,
         `${esp}    : ((entrada as { name?: string } | null)?.name ?? null);`,
-        `${esp}const emIngles = (entrada as { lang?: string } | null)?.lang === "en";`,
-        `${esp}if (name && emIngles !== (params.get("l") === "en")) {`,
-        `${esp}  const certo = new URL(window.location.href);`,
-        `${esp}  if (emIngles) certo.searchParams.set("l", "en");`,
-        `${esp}  else certo.searchParams.delete("l");`,
-        `${esp}  window.location.replace(certo.toString());`,
-        `${esp}  return;`,
-        `${esp}}`,
+        acerto(esp),
       ].join("\n"),
   );
 }

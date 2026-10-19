@@ -176,6 +176,7 @@ const api = {
 
   destinoPublicacao: (id: string) => invoke<{ url: string | null }>("deploy:destino", id),
   pickGuests: () => invoke<string | null>("deploy:pickGuests"),
+  pickVideo: () => invoke<string | null>("deploy:pickVideo"),
   startJob: (job: unknown) => invoke<string>("job:start", job),
   cancelJob: (runId: string) => invoke<boolean>("job:cancel", runId),
 

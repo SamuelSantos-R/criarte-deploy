@@ -50,6 +50,7 @@ import { NovoPainelRSVP } from "@/components/NovoPainelRSVP";
 import { registarPendente, resolverPendente } from "@/lib/pendente";
 import { SalvarComoNovo } from "@/components/SalvarComoNovo";
 import { NovoConvite } from "@/components/NovoConvite";
+import type { LinguaTraducao } from "@/components/PainelIngles";
 import { SalvarComoModelo } from "@/components/SalvarComoModelo";
 import { SeletorSite } from "@/components/SeletorSite";
 import { FaixaConflito, PainelAoVivo } from "@/components/PainelAoVivo";
@@ -86,6 +87,7 @@ export function Convites({
   const [salvando, setSalvando] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
   const [criandoConvite, setCriandoConvite] = useState(false);
+  const [linguaTraducao, setLinguaTraducao] = useState<LinguaTraducao>("en");
   const [guardandoModelo, setGuardandoModelo] = useState(false);
   const [renomeando, setRenomeando] = useState(false);
   const [apagando, setApagando] = useState(false);
@@ -744,6 +746,8 @@ export function Convites({
                       onPatch={publicar}
                       convidado={convidado}
                       siteId={convidado ? null : id}
+                      lingua={linguaTraducao}
+                      onLingua={setLinguaTraducao}
                     />
                   </div>
                 </>
@@ -757,8 +761,8 @@ export function Convites({
         {/* No convidado não há pasta pra rodar `next dev`: o que se vê é o preview
             do anfitrião servido pela LAN, e o QR aponta pro Mac dele. */}
         <PainelAoVivo
-          // Na secção Inglês a prévia abre como um convidado de fora a veria.
-          url={emIngles(convidado ? coop.estado.aoVivo : (servidor?.url ?? null), secao === "en")}
+          // Na secção Traduções a prévia abre como o convidado daquela língua a veria.
+          url={naLingua(convidado ? coop.estado.aoVivo : (servidor?.url ?? null), secao === "en" ? linguaTraducao : null)}
           lan={convidado ? coop.estado.aoVivoLan : (servidor?.lan ?? null)}
           largura={largura}
           ligando={ligando}
@@ -849,9 +853,9 @@ export function Convites({
   );
 }
 
-function emIngles(url: string | null, ligado: boolean): string | null {
-  if (!url || !ligado) return url;
+function naLingua(url: string | null, lingua: LinguaTraducao | null): string | null {
+  if (!url || !lingua) return url;
   const u = new URL(url);
-  u.searchParams.set("l", "en");
+  u.searchParams.set("l", lingua);
   return u.toString();
 }

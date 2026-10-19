@@ -1,3 +1,4 @@
+import { videoDoEnvelope } from "./envelope-lingua";
 import { app, type WebContents } from "electron";
 import { repararConvite } from "./reparos";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -28,6 +29,8 @@ export function destinoPublicacao(siteId: string): { url: string | null } {
   }
 }
 
+export type ListaLingua = { lang: "pt" | "en" | "fr"; arquivo: string; video?: string };
+
 export type Job =
   | {
       kind: "deploy";
@@ -38,8 +41,11 @@ export type Job =
       subdomain?: string;
       /** Caminho absoluto do .txt de convidados, já validado dentro do site. */
       guestsFile?: string;
-      /** Caminho absoluto do .txt dos convidados de fora: convite em inglês. */
-      guestsEnFile?: string;
+      /**
+       * Listas extra, cada uma numa língua. EN/FR podem trazer o vídeo do
+       * envelope nessa língua; PT devolve ao português quem estava fora.
+       */
+      listas?: ListaLingua[];
     }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }
@@ -74,7 +80,11 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
       if (job.expires) args.push("--expires", job.expires);
       if (job.subdomain) args.push("--subdomain", job.subdomain);
       if (job.guestsFile) args.push("--guests-file", job.guestsFile);
-      if (job.guestsEnFile) args.push("--guests-en-file", job.guestsEnFile);
+      for (const l of job.listas ?? []) {
+        // O vídeo entra no convite antes do CLI empacotar: sobe junto com o resto.
+        if (l.video && l.lang !== "pt") await videoDoEnvelope(cwd, l.lang, l.video);
+        args.push(`--guests-${l.lang}-file`, l.arquivo);
+      }
       return { script: cli, args, cwd };
     }
     case "check":

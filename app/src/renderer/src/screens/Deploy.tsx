@@ -12,6 +12,7 @@ import {
   expiresDe,
   validadeEmPalavras,
   type Opcoes,
+  listasDe,
 } from "@/components/OpcoesDeploy";
 import { Console } from "@/components/Console";
 import { SeletorSite } from "@/components/SeletorSite";
@@ -97,7 +98,7 @@ export function Deploy({
       expires,
       ...(opcoes.subdominio.trim() ? { subdomain: opcoes.subdominio.trim() } : {}),
       ...(opcoes.convidados ? { guestsFile: opcoes.convidados } : {}),
-      ...(opcoes.convidadosEn ? { guestsEnFile: opcoes.convidadosEn } : {}),
+      ...(listasDe(opcoes).length > 0 ? { listas: listasDe(opcoes) } : {}),
     });
   };
 
@@ -175,7 +176,7 @@ export function Deploy({
           siteId={id}
           validade={validadeEmPalavras(opcoes)}
           convidados={opcoes.convidados}
-          convidadosEn={opcoes.convidadosEn}
+          listas={opcoes.listas}
           onCancelar={() => setConfirmando(false)}
           onPublicar={() => {
             setConfirmando(false);

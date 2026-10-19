@@ -55,7 +55,7 @@ const APELIDOS: Record<string, string> = {
   countdown: "Contagem",
   fecho: "Frase de fecho",
   dica: "Dica abaixo dos botões",
-  en: "Inglês",
+  en: "Traduções",
 };
 
 export function rotulo(chave: string): string {
@@ -214,7 +214,8 @@ export const CHAVE_INGLES = "en";
 
 /** As chaves que a régua mostra, na ordem do ficheiro e com o inglês no fim. */
 export function chavesDaRegua(dados: Record<string, unknown>): string[] {
-  return [...Object.keys(dados).filter((k) => k !== CHAVE_SECOES && k !== CHAVE_INGLES), CHAVE_INGLES];
+  // O bloco `fr` é editado dentro da secção Traduções, como o `en`.
+  return [...Object.keys(dados).filter((k) => k !== CHAVE_SECOES && k !== CHAVE_INGLES && k !== "fr"), CHAVE_INGLES];
 }
 
 /**

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactElement } from "react";
 import { Rocket } from "lucide-react";
 import { destinoPublicacao } from "@/lib/api";
 import { Button } from "@/components/ui/primitives";
+import { LINGUAS, type LinhaLingua } from "@/components/OpcoesDeploy";
 
 /**
  * O último sítio onde dá para desistir. O CLI corre com `--yes` porque a tela de
@@ -13,14 +14,14 @@ export function ConfirmarPublicacao({
   siteId,
   validade,
   convidados,
-  convidadosEn = null,
+  listas = [],
   onCancelar,
   onPublicar,
 }: {
   siteId: string;
   validade: string;
   convidados: string | null;
-  convidadosEn?: string | null;
+  listas?: LinhaLingua[];
   onCancelar: () => void;
   onPublicar: () => void;
 }): ReactElement {
@@ -98,16 +99,28 @@ export function ConfirmarPublicacao({
             <dd className="text-text">
               {convidados
                 ? convidados.split("/").pop()
-                : convidadosEn
-                  ? "só os de fora"
+                : listas.some((l) => l.arquivo)
+                  ? "só as listas noutras línguas"
                   : "sem lista — sobe em prévia"}
             </dd>
-            {convidadosEn && (
-              <>
-                <dt className="font-narrow font-semibold text-label text-muted">Em inglês</dt>
-                <dd className="text-text">{convidadosEn.split("/").pop()}</dd>
-              </>
-            )}
+            {listas
+              .filter((l) => l.arquivo)
+              .map((l) => (
+                <Fragment key={l.lang}>
+                  <dt className="font-narrow font-semibold text-label text-muted">
+                    {LINGUAS.find((x) => x.valor === l.lang)?.rotulo}
+                  </dt>
+                  <dd className="text-text">
+                    {l.arquivo?.split("/").pop()}
+                    {l.lang !== "pt" && (
+                      <span className={l.video ? "text-muted" : "text-pencil"}>
+                        {" · "}
+                        {l.video ? `envelope: ${l.video.split("/").pop()}` : "sem vídeo — envelope em português"}
+                      </span>
+                    )}
+                  </dd>
+                </Fragment>
+              ))}
           </dl>
 
           <p className="mt-5 text-[12px] leading-[1.7] text-muted">

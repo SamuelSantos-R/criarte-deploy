@@ -10,7 +10,7 @@ import { PainelPrancheta } from "@/components/PainelPrancheta";
 import { PainelOrnamentos } from "@/components/PainelOrnamentos";
 import { PainelHero } from "@/components/PainelHero";
 import { PainelGaleria } from "@/components/PainelGaleria";
-import { PainelIngles } from "@/components/PainelIngles";
+import { PainelIngles, type LinguaTraducao } from "@/components/PainelIngles";
 import { rotulo } from "@/lib/secoes";
 import { cn } from "@/lib/utils";
 
@@ -449,6 +449,8 @@ export function JsonForm({
   onPatch,
   convidado = false,
   siteId = null,
+  lingua = "en",
+  onLingua,
 }: {
   dados: Record<string, unknown>;
   secao: string;
@@ -459,6 +461,9 @@ export function JsonForm({
   convidado?: boolean;
   /** Só o anfitrião o tem: é preciso para saber se a secção está na página. */
   siteId?: string | null;
+  /** Língua aberta na secção Traduções; a prévia acompanha. */
+  lingua?: LinguaTraducao;
+  onLingua?: (l: LinguaTraducao) => void;
 }): ReactElement {
   const alterar = (caminho: Caminho, valor: unknown): void => {
     onChange(setIn(dados, caminho, valor) as Record<string, unknown>);
@@ -469,7 +474,14 @@ export function JsonForm({
   const label = rotulo(secao);
 
   if (secao === "en") {
-    return <PainelIngles dados={dados} onChange={(en) => alterar(["en"], en)} />;
+    return (
+      <PainelIngles
+        dados={dados}
+        lingua={lingua}
+        onLingua={onLingua ?? (() => {})}
+        onChange={(bloco) => alterar([lingua], bloco)}
+      />
+    );
   }
 
   if (secao === "tema" && valor !== null && typeof valor === "object" && !Array.isArray(valor)) {

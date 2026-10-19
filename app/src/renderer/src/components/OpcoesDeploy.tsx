@@ -1,6 +1,6 @@
 import { type ReactElement } from "react";
-import { ChevronDown, FileText, X } from "lucide-react";
-import { pickGuests } from "@/lib/api";
+import { ChevronDown, Clapperboard, FileText, Plus, X } from "lucide-react";
+import { pickGuests, pickVideo, type Lingua, type ListaLingua } from "@/lib/api";
 import { Button, Input } from "@/components/ui/primitives";
 
 /** O que o CLI aceita em `--expires`: "0" é permanente, o resto é em meses. */
@@ -19,16 +19,32 @@ export type Opcoes = {
   data: string;
   subdominio: string;
   convidados: string | null;
-  /** A lista dos convidados de fora: cada nome dela recebe o convite em inglês. */
-  convidadosEn: string | null;
+  /** Listas noutras línguas: cada nome recebe o convite nessa língua. */
+  listas: LinhaLingua[];
 };
+
+/** Uma linha da tela: o .txt e o vídeo ainda podem estar por escolher. */
+export type LinhaLingua = { lang: Lingua; arquivo: string | null; video: string | null };
+
+export const LINGUAS: { valor: Lingua; rotulo: string }[] = [
+  { valor: "en", rotulo: "Inglês" },
+  { valor: "fr", rotulo: "Francês" },
+  { valor: "pt", rotulo: "Português" },
+];
+
+/** Só as linhas com .txt escolhido viajam; o vídeo só nas línguas que o têm. */
+export function listasDe(o: Opcoes): ListaLingua[] {
+  return o.listas
+    .filter((l): l is LinhaLingua & { arquivo: string } => l.arquivo !== null)
+    .map((l) => ({ lang: l.lang, arquivo: l.arquivo, ...(l.video && l.lang !== "pt" ? { video: l.video } : {}) }));
+}
 
 export const OPCOES_PADRAO: Opcoes = {
   validade: "3",
   data: "",
   subdominio: "",
   convidados: null,
-  convidadosEn: null,
+  listas: [],
 };
 
 /**
@@ -125,14 +141,7 @@ export function OpcoesDeploy({
         tirar="Tirar a lista de convidados"
         dica="Sem lista o convite sobe em prévia, sem token por convidado"
       />
-      <EscolherLista
-        rotulo="Convidados de fora (inglês)"
-        caminho={valor.convidadosEn}
-        travado={travado}
-        onChange={(convidadosEn) => set({ convidadosEn })}
-        tirar="Tirar a lista de convidados de fora"
-        dica="Quem está nesta lista recebe o convite em inglês. Quem já tinha link mantém o mesmo"
-      />
+      <ListasDeFora listas={valor.listas} travado={travado} onChange={(listas) => set({ listas })} />
     </div>
   );
 }
@@ -180,6 +189,95 @@ function EscolherLista({
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+const nomeDe = (caminho: string | null): string | null => caminho?.split("/").pop() ?? null;
+
+/**
+ * Convidados noutra língua. Cada linha é uma lista: a língua, o .txt e — em
+ * inglês e francês — o vídeo do envelope nessa língua, que é a única coisa do
+ * convite que não se traduz por texto. Português aqui serve para devolver à
+ * língua da casa quem antes estava numa lista de fora; o link não muda.
+ */
+function ListasDeFora({
+  listas,
+  travado,
+  onChange,
+}: {
+  listas: LinhaLingua[];
+  travado: boolean;
+  onChange: (listas: LinhaLingua[]) => void;
+}): ReactElement {
+  const usadas = new Set(listas.map((l) => l.lang));
+  const livre = LINGUAS.find((l) => !usadas.has(l.valor));
+  const mudar = (i: number, parcial: Partial<LinhaLingua>): void =>
+    onChange(listas.map((l, k) => (k === i ? { ...l, ...parcial } : l)));
+
+  return (
+    <div className="flex w-full flex-col gap-1.5">
+      <Rotulo>Convidados de fora</Rotulo>
+      {listas.map((linha, i) => (
+        <div key={linha.lang} className="flex flex-wrap items-center gap-2">
+          <div className="relative w-[118px]">
+            <select
+              value={linha.lang}
+              disabled={travado}
+              aria-label="Língua desta lista"
+              onChange={(e) => {
+                const lang = e.target.value as Lingua;
+                mudar(i, { lang, ...(lang === "pt" ? { video: null } : {}) });
+              }}
+              className="no-drag h-[30px] w-full appearance-none rounded-lg border border-rule bg-surface pl-2.5 pr-8 text-[12px] text-text focus:border-focus focus:outline-hidden disabled:opacity-40"
+            >
+              {LINGUAS.filter((l) => l.valor === linha.lang || !usadas.has(l.valor)).map((l) => (
+                <option key={l.valor} value={l.valor}>
+                  {l.rotulo}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={13} aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" />
+          </div>
+          <Button
+            variant="outline"
+            disabled={travado}
+            onClick={() => void pickGuests().then((c) => c && mudar(i, { arquivo: c }))}
+          >
+            <FileText size={13} /> {nomeDe(linha.arquivo) ?? "Escolher .txt…"}
+          </Button>
+          {linha.lang !== "pt" && (
+            <Button
+              variant="outline"
+              disabled={travado}
+              title="O vídeo do envelope com o texto nesta língua. Sem ele, estes convidados veem o envelope em português."
+              onClick={() => void pickVideo().then((c) => c && mudar(i, { video: c }))}
+            >
+              <Clapperboard size={13} /> {nomeDe(linha.video) ?? "Vídeo do envelope…"}
+            </Button>
+          )}
+          <button
+            type="button"
+            disabled={travado}
+            onClick={() => onChange(listas.filter((_, k) => k !== i))}
+            aria-label="Tirar esta lista"
+            className="no-drag flex h-[26px] w-[26px] items-center justify-center text-muted transition-colors hover:text-text disabled:opacity-40"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+      {livre && (
+        <div>
+          <Button
+            variant="ghost"
+            disabled={travado}
+            onClick={() => onChange([...listas, { lang: livre.valor, arquivo: null, video: null }])}
+          >
+            <Plus size={13} /> {listas.length === 0 ? "Lista noutra língua" : "Outra língua"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

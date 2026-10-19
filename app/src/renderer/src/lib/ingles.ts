@@ -83,8 +83,99 @@ export const SUGESTOES: Record<string, string> = {
   "Convite de Casamento": "Wedding Invitation",
 };
 
+/** As mesmas frases em francês. Chave igual: o texto exato do convite.json. */
+export const SUGESTOES_FR: Record<string, string> = {
+  "Têm a honra convidar o Exmo Sr.(a)": "Ont l'honneur de vous convier",
+  "Têm a honra de convidar o Exmo Sr.(a)": "Ont l'honneur de vous convier",
+  "para celebrar o seu Enlace Matrimonial": "à célébrer leur mariage",
+  "Venha celebrar o nosso amor!": "Venez célébrer notre amour !",
+  "Querido convidado!": "Cher invité !",
+  "Com a benção de Deus e de seus Pais": "Avec la bénédiction de Dieu et de leurs parents",
+  "com a bênção de Deus e de seus Pais": "avec la bénédiction de Dieu et de leurs parents",
+  "Nossa História": "Notre histoire",
+  "Capítulos do nosso amor": "Les chapitres de notre amour",
+  "O Primeiro Encontro": "La première rencontre",
+  "O Pedido": "La demande",
+  "Apresentação": "Présentation aux familles",
+  Casamento: "Mariage",
+  "O Grande Dia": "Le grand jour",
+  "Detalhes do Evento": "Détails de l'événement",
+  "Cerimônia Religiosa": "Cérémonie religieuse",
+  "Cerimônia Civil": "Cérémonie civile",
+  "Copo-d'água": "Réception",
+  "Nosso Dia": "Notre journée",
+  "Dança dos Noivos": "Première danse",
+  "Corte do Bolo": "Découpe du gâteau",
+  "Abertura da Pista": "Ouverture de la piste",
+  "Abertura do Jantar": "Le dîner est servi",
+  "Aproveite cada momento": "Profitez de chaque instant",
+  "Manual do Bom Convidado": "Guide de l'invité",
+  "Informações úteis": "Informations utiles",
+  "Sua presença é essencial": "Votre présence compte",
+  "Por favor, seja pontual": "Merci d'être ponctuel",
+  "Convidado não convida": "Merci de ne pas venir accompagné d'invités supplémentaires",
+  "Comemore connosco": "Célébrez avec nous",
+  "Branco é a cor da noiva": "Le blanc est réservé à la mariée",
+  "Registe o nosso dia": "Immortalisez notre journée",
+  "Despeça-se dos noivos": "Dites au revoir aux mariés",
+  "Agradecemos a compreensão\ne o vosso carinho!": "Merci de votre compréhension\net de votre affection !",
+  "Dress Code": "Code vestimentaire",
+  "A Elegância das Cores de Verão": "L'élégance des couleurs d'été",
+  "Num cenário de verão e ao ar livre, os tons pastel serão a escolha perfeita para tornar este dia ainda mais harmonioso e especial.":
+    "Dans un cadre estival en plein air, les tons pastel seront le choix parfait pour rendre cette journée encore plus harmonieuse et spéciale.",
+  Rosa: "Rose",
+  "Pêssego": "Pêche",
+  Amarelo: "Jaune",
+  Azul: "Bleu",
+  "Lilás": "Lilas",
+  "Verde Oliva": "Vert olive",
+  "Reservado às damas": "Réservé aux demoiselles d'honneur",
+  "O Verde Oliva é o tom exclusivo das nossas damas.\nPedimos, com carinho, que os demais convidados não usem esta cor.":
+    "Le vert olive est réservé à nos demoiselles d'honneur.\nNous demandons gentiment aux autres invités de ne pas porter cette couleur.",
+  Presentes: "Cadeaux",
+  "Um gesto de carinho": "Un geste d'affection",
+  "Para os familiares e amigos que desejarem\nnos presentear de outra forma,\ndisponibilizamos abaixo os dados bancários:":
+    "Pour la famille et les amis qui souhaitent\nnous offrir un cadeau autrement,\nvoici nos coordonnées bancaires :",
+  "Com carinho,": "Avec tendresse,",
+  "A vossa presença neste dia tão especial\nserá sempre o nosso maior presente!":
+    "Votre présence en ce jour si spécial\nsera toujours notre plus beau cadeau !",
+  Recados: "Messages",
+  "Correio do Amor": "Mots d'amour",
+  "Deixe uma mensagem especial para este momento.": "Laissez un message spécial pour ce moment.",
+  "Prometemos ler com muito carinho!": "Nous promettons de le lire avec tendresse !",
+  "Seu nome": "Votre nom",
+  "Mensagem de carinho aos noivos": "Un mot doux pour les mariés",
+  "Mensagem de carinho aos noivos ♡": "Un mot doux pour les mariés ♡",
+  "Convite de Casamento": "Faire-part de mariage",
+  // Noivado
+  "CONVIDAM PARA A CELEBRAÇÃO\nDO SEU NOIVADO QUE SE REALIZARÁ": "VOUS INVITENT À LA CÉLÉBRATION\nDE LEURS FIANÇAILLES QUI AURA LIEU",
+  "TOQUE NOS ÍCONES PARA ACESSAR": "TOUCHEZ LES ICÔNES POUR ACCÉDER",
+  "faltam:": "plus que :",
+  "Contamos com a sua presença!": "Nous comptons sur votre présence !",
+  "acessar a": "voir",
+  "localização": "l'adresse",
+  confirmar: "confirmer",
+  "presença": "ma présence",
+  "manual do": "guide de",
+  "bom convidado": "l'invité",
+  "CONFIRMAÇÃO DE PRESENÇA": "CONFIRMATION DE PRÉSENCE",
+  "NOSSO NOIVADO": "NOS FIANÇAILLES",
+};
+
+const MESES_FR: Record<string, string> = {
+  Janeiro: "Janvier", Fevereiro: "Février", "Março": "Mars", Abril: "Avril", Maio: "Mai", Junho: "Juin",
+  Julho: "Juillet", Agosto: "Août", Setembro: "Septembre", Outubro: "Octobre", Novembro: "Novembre", Dezembro: "Décembre",
+};
+
 /** Título do navegador: "Convite de Casamento | Ana & João" → "Wedding Invitation | Ana & João". */
-export function sugestao(pt: string): string | null {
+export function sugestao(pt: string, lingua: "en" | "fr" = "en"): string | null {
+  if (lingua === "fr") {
+    if (SUGESTOES_FR[pt]) return SUGESTOES_FR[pt];
+    const metaFr = /^Convite de (Casamento|Noivado)(\s*\|.*)$/.exec(pt);
+    if (metaFr) return `${metaFr[1] === "Noivado" ? "Faire-part de fiançailles" : "Faire-part de mariage"}${metaFr[2]}`;
+    const mesFr = /^(\S+) de (\d{4})$/.exec(pt);
+    return mesFr && MESES_FR[mesFr[1]] ? `${MESES_FR[mesFr[1]]} ${mesFr[2]}` : null;
+  }
   if (SUGESTOES[pt]) return SUGESTOES[pt];
   const meta = /^Convite de Casamento(\s*\|.*)$/.exec(pt);
   if (meta) return `Wedding Invitation${meta[1]}`;

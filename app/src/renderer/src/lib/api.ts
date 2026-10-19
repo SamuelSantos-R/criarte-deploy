@@ -1,4 +1,7 @@
 import { call } from "./utils";
+
+export type Lingua = "pt" | "en" | "fr";
+export type ListaLingua = { lang: Lingua; arquivo: string; video?: string };
 import type { Categoria } from "../../../shared/categorias";
 
 export type Site = {
@@ -20,7 +23,7 @@ export type Job =
       expires?: string;
       subdomain?: string;
       guestsFile?: string;
-      guestsEnFile?: string;
+      listas?: ListaLingua[];
     }
   | { kind: "check"; siteId: string }
   | { kind: "fotos"; siteId: string; max: number; qualidade: number }
@@ -340,6 +343,7 @@ export const credExportar = () => call(api.credExportar()) as Promise<string | n
 export const destinoPublicacao = (id: string) =>
   call(api.destinoPublicacao(id)) as Promise<{ url: string | null }>;
 export const pickGuests = () => call(api.pickGuests()) as Promise<string | null>;
+export const pickVideo = () => call(api.pickVideo()) as Promise<string | null>;
 export const startJob = (job: Job) => call(api.startJob(job));
 export const cancelJob = (runId: string) => call(api.cancelJob(runId));
 export const reveal = (id: string) => call(api.reveal(id));

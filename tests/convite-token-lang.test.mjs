@@ -99,3 +99,24 @@ test("redeploy sem lista preserva o idioma de quem já está no ar", async () =>
   const g = porNome(lerGuests().guests);
   assert.deepEqual(g["Prima Ana"].value, { name: "Prima Ana", lang: "en" });
 });
+
+test("francês: |fr e lista FR convivem com a EN; link com &l=fr", async () => {
+  novoStaging();
+  writeFileSync(join(projectDir, "convidados.txt"), "Pierre Martin|fr\n");
+  const fr = join(root, "fr.txt");
+  writeFileSync(fr, "Famille Dupont|3\n");
+  const en = join(root, "en.txt");
+  writeFileSync(en, "Mary Jones\n");
+  process.env.CRIARTE_GUESTS_FR_FILE = fr;
+  process.env.CRIARTE_GUESTS_EN_FILE = en;
+  assert.equal(await preparar(), true);
+  const g = porNome(lerGuests().guests);
+  assert.deepEqual(g["Pierre Martin"].value, { name: "Pierre Martin", lang: "fr" });
+  assert.deepEqual(g["Famille Dupont"].value, { name: "Famille Dupont", pax: 3, lang: "fr" });
+  assert.deepEqual(g["Mary Jones"].value, { name: "Mary Jones", lang: "en" });
+  const links = readFileSync(join(projectDir, "convidados-mateus-rose-links.txt"), "utf8");
+  assert.match(links, /\?t=\w+&l=fr — Famille Dupont \(3 pessoas\)$/m);
+  assert.match(links, /\?t=\w+&l=en — Mary Jones$/m);
+  delete process.env.CRIARTE_GUESTS_FR_FILE;
+  delete process.env.CRIARTE_GUESTS_EN_FILE;
+});

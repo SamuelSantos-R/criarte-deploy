@@ -4,6 +4,7 @@ import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives
 import { ehAsset } from "@/components/CampoArquivo";
 import { rotulo } from "@/lib/secoes";
 import { sugestao } from "@/lib/ingles";
+import { cn } from "@/lib/utils";
 import type { Caminho } from "@/components/JsonForm";
 
 /**
@@ -20,6 +21,7 @@ import type { Caminho } from "@/components/JsonForm";
 /** Secções sem texto para o convidado ler: cores, medidas, ficheiros, controlo. */
 const FORA = new Set([
   "en",
+  "fr",
   "secoes",
   "tema",
   "medidas",
@@ -98,11 +100,11 @@ function Par({ pt, en, caminho, onChange, label }: Props & { pt: string; label: 
           <Textarea
             rows={Math.min(8, pt.split("\n").length + 1)}
             value={valor}
-            placeholder="English…"
+            placeholder="Tradução…"
             onChange={(e) => onChange(caminho, e.target.value)}
           />
         ) : (
-          <Input value={valor} placeholder="English…" onChange={(e) => onChange(caminho, e.target.value)} />
+          <Input value={valor} placeholder="Tradução…" onChange={(e) => onChange(caminho, e.target.value)} />
         )}
       </Field>
     </div>
@@ -122,7 +124,7 @@ function Linhas({ pt, en, caminho, onChange, label }: Props & { pt: string[]; la
         <Textarea
           rows={Math.max(2, pt.length + 1)}
           value={valor}
-          placeholder="English…"
+          placeholder="Tradução…"
           onChange={(e) => onChange(caminho, e.target.value === "" ? [] : e.target.value.split("\n"))}
         />
       </Field>
@@ -180,21 +182,21 @@ function Nos({ pt, en, caminho, onChange }: Props): ReactElement {
  * Escreve nas caixas vazias a tradução das frases que todos os convites têm.
  * Nunca por cima do que já foi escrito: quem ajustou uma tradução não a perde.
  */
-function preencherPadrao(dados: Record<string, unknown>): { en: Record<string, unknown>; quantos: number } {
-  let en: unknown = dados.en ?? {};
+function preencherPadrao(dados: Record<string, unknown>, lingua: LinguaTraducao): { en: Record<string, unknown>; quantos: number } {
+  let en: unknown = dados[lingua] ?? {};
   let quantos = 0;
   const andar = (pt: unknown, caminho: Caminho, chave: string): void => {
     const atual = ler(en, caminho);
     if (typeof pt === "string") {
       if (!traduzivel(chave, pt) || (typeof atual === "string" && atual.trim() !== "")) return;
-      const s = sugestao(pt);
+      const s = sugestao(pt, lingua);
       if (s) {
         en = gravar(en, caminho, s);
         quantos++;
       }
     } else if (Array.isArray(pt) && pt.length > 0 && pt.every((x) => typeof x === "string")) {
       if (Array.isArray(atual) && atual.some((l) => typeof l === "string" && l.trim() !== "")) return;
-      const linhas = (pt as string[]).map((l) => sugestao(l));
+      const linhas = (pt as string[]).map((l) => sugestao(l, lingua));
       // Linhas de uma frase só: ou se traduz tudo, ou nada — meia chamada em
       // inglês e meia em português lia-se pior do que tudo em português.
       if (linhas.every((l): l is string => l !== null)) {
@@ -214,7 +216,7 @@ function preencherPadrao(dados: Record<string, unknown>): { en: Record<string, u
 }
 
 /** Quantos textos já têm inglês, para o aviso antes de publicar. */
-export function progressoIngles(dados: Record<string, unknown>): { feitos: number; total: number } {
+export function progressoIngles(dados: Record<string, unknown>, lingua: LinguaTraducao = "en"): { feitos: number; total: number } {
   let feitos = 0;
   let total = 0;
   const andar = (pt: unknown, en: unknown, chave: string): void => {
@@ -233,36 +235,61 @@ export function progressoIngles(dados: Record<string, unknown>): { feitos: numbe
     }
   };
   for (const [secao, v] of Object.entries(dados)) {
-    if (!FORA.has(secao)) andar(v, ler(dados.en, [secao]), secao);
+    if (!FORA.has(secao)) andar(v, ler(dados[lingua], [secao]), secao);
   }
   return { feitos, total };
 }
 
+export type LinguaTraducao = "en" | "fr";
+const NOME: Record<LinguaTraducao, string> = { en: "inglês", fr: "francês" };
+
 export function PainelIngles({
   dados,
+  lingua,
+  onLingua,
   onChange,
 }: {
   dados: Record<string, unknown>;
+  lingua: LinguaTraducao;
+  onLingua: (l: LinguaTraducao) => void;
   /** Recebe o bloco `en` inteiro já atualizado. */
   onChange: (en: Record<string, unknown>) => void;
 }): ReactElement {
-  const en = (dados.en ?? {}) as Record<string, unknown>;
+  const en = (dados[lingua] ?? {}) as Record<string, unknown>;
   const secoes = Object.entries(dados).filter(([k, v]) => !FORA.has(k) && temTexto(v, k));
-  const { feitos, total } = progressoIngles(dados);
+  const { feitos, total } = progressoIngles(dados, lingua);
 
   return (
     <div>
+      <div role="radiogroup" aria-label="Língua da tradução" className="mb-4 flex w-[220px] rounded-full border border-rule p-0.5">
+        {(["en", "fr"] as const).map((l) => (
+          <button
+            key={l}
+            type="button"
+            role="radio"
+            aria-checked={lingua === l}
+            onClick={() => onLingua(l)}
+            className={cn(
+              "flex-1 rounded-full py-1.5 text-[12.5px] capitalize transition-colors",
+              lingua === l ? "bg-surface-2 font-semibold text-text" : "text-muted hover:text-text",
+            )}
+          >
+            {NOME[l]}
+          </button>
+        ))}
+      </div>
       <div className="mb-6 flex items-start gap-3">
         <p className="flex-1 rounded-lg bg-cyan/10 px-3 py-2 text-[13px] leading-[1.6] text-text">
-          Só os convidados da lista <b>Convidados de fora</b> (na tela de publicar) veem o convite
-          em inglês. Caixa vazia sai em português. {feitos}/{total} textos traduzidos.
+          Só os convidados da lista em {NOME[lingua]} (em <b>Convidados de fora</b>, na tela de
+          publicar) veem o convite em {NOME[lingua]}. Caixa vazia sai em português. O vídeo do
+          envelope nesta língua escolhe-se lá também. {feitos}/{total} textos traduzidos.
         </p>
         <Button
           variant="outline"
           size="sm"
           title="Traduz as frases que todos os convites têm (títulos, manual, cronograma). Não mexe no que já foi escrito."
           onClick={() => {
-            const { en: novo, quantos } = preencherPadrao(dados);
+            const { en: novo, quantos } = preencherPadrao(dados, lingua);
             if (quantos > 0) onChange(novo);
           }}
         >

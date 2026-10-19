@@ -286,6 +286,34 @@ export function guestComIdioma(codigo: string): string {
   );
 }
 
+/**
+ * O envelope só ganha o vídeo no browser. O HTML exportado é sempre o português,
+ * e com o \`src\` já lá o convidado de fora baixava — e chegava a ver — o envelope
+ * PT antes de o React pôr o da língua dele. Sem \`src\` no HTML, o primeiro vídeo
+ * que o browser pede já é o certo. Convite com o vídeo cravado (sem ler o
+ * convite.json) não tem língua para escolher e fica como está.
+ */
+export function envelopeNaLingua(codigo: string): string {
+  if (codigo.includes("setIntroVideo")) return codigo;
+  const linha = /^[ \t]*const introVideo = (.*convite\.envelope\.video.*);\r?\n/m.exec(codigo);
+  const ref = /^([ \t]*)const videoRef = useRef<HTMLVideoElement>\(null\);\r?\n/m.exec(codigo);
+  if (!linha || !ref) return codigo;
+  const esp = ref[1];
+  let novo = codigo.replace(linha[0], "");
+  novo = novo.replace(
+    ref[0],
+    `${ref[0]}${esp}// Sem src no HTML exportado: o vídeo pedido já é o da língua do convidado.\n` +
+      `${esp}const [introVideo, setIntroVideo] = useState<string | undefined>(undefined);\n` +
+      `${esp}useEffect(() => setIntroVideo(${linha[1]}), []);\n`,
+  );
+  const guarda = novo.indexOf("if (!video) return;");
+  if (guarda < 0) return codigo;
+  novo = novo.slice(0, guarda) + "if (!video || !introVideo) return;" + novo.slice(guarda + "if (!video) return;".length);
+  const fim = novo.indexOf("\n  }, []);", guarda);
+  if (fim < 0) return codigo;
+  return novo.slice(0, fim) + "\n  }, [introVideo]);" + novo.slice(fim + "\n  }, []);".length);
+}
+
 /** Ficheiros com texto cravado que o dicionário cobre. */
 const COM_TEXTO = [
   "Hero.tsx",
@@ -316,6 +344,7 @@ export async function idiomaNoConvite(dir: string): Promise<string[]> {
   const alvos: [string, (c: string) => string][] = [
     [conviteTs, conviteEmIdioma],
     [join(lib, "guest.tsx"), guestComIdioma],
+    [join(dir, "src", "components", "EnvelopeLoader.tsx"), envelopeNaLingua],
     ...COM_TEXTO.map((f): [string, (c: string) => string] => [join(dir, "src", "components", f), embrulhar]),
   ];
   for (const [alvo, consertar] of alvos) {

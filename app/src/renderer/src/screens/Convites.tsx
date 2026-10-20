@@ -36,6 +36,7 @@ import { derrubarServidor, subirServidor, usarServidor } from "@/lib/servidor";
 import { useProva } from "@/lib/prova";
 import { useHistorico } from "@/lib/useHistorico";
 import { cn } from "@/lib/utils";
+import { propagarNoivos } from "@/lib/noivos";
 import { Button } from "@/components/ui/primitives";
 import { JsonForm, setIn, type Caminho } from "@/components/JsonForm";
 import { PainelCoop } from "@/components/PainelCoop";
@@ -742,7 +743,11 @@ export function Convites({
                     <JsonForm
                       dados={dados}
                       secao={secao}
-                      onChange={setDados}
+                      onChange={(proximo) => {
+                        const final = propagarNoivos(dados, proximo);
+                        setDados(final);
+                        if (final !== proximo) publicar(["meta", "titulo"], (final.meta as Record<string, unknown>).titulo);
+                      }}
                       onPatch={publicar}
                       convidado={convidado}
                       siteId={convidado ? null : id}

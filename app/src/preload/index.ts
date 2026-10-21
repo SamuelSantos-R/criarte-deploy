@@ -77,6 +77,7 @@ const api = {
   modelosApagar: (id: string) => invoke<void>("modelos:apagar", id),
   modelosCriar: (modelo: string, categoria: string, slug: string) =>
     invoke<Copia>("modelos:criar", modelo, categoria, slug),
+  traduzirTextos: (textos: string[], lingua: string) => invoke<(string | null)[]>("traducao:textos", textos, lingua),
   tokenEstado: (id: string) => invoke<EstadoToken>("token:estado", id),
   tokenInjetar: (id: string) => invoke<EstadoToken>("token:injetar", id),
   renomearSite: (id: string, slug: string) => invoke<{ id: string }>("sites:rename", id, slug),

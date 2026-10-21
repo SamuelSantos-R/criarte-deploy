@@ -74,6 +74,43 @@ const EN: Record<string, string> = {
   "Confirmar Presença": "Confirm attendance",
   "Ausência Informada": "Absence noted",
   "Presença Confirmada": "Attendance confirmed",
+  "Enviar Mensagem": "Send message",
+  pausado: "paused",
+  "{} de {} de {}": "{} {} {}",
+  " de {} de ": " {} ",
+  Domingo: "Sunday",
+  "Segunda-feira": "Monday",
+  "Terça-feira": "Tuesday",
+  "Quarta-feira": "Wednesday",
+  "Quinta-feira": "Thursday",
+  "Sexta-feira": "Friday",
+  "Sábado": "Saturday",
+  "às {}h{}": "at {}:{}",
+  "Somente eu": "Just me",
+  "+1 acompanhante": "+1 guest",
+  "Nome completo": "Full name",
+  "Você irá comparecer?": "Will you attend?",
+  "Nome do acompanhante": "Plus-one's name",
+  "Nome do acompanhante {}": "Plus-one's name {}",
+  "Enviar Resposta": "Send reply",
+  "Sentiremos sua falta!": "We'll miss you!",
+  "Obrigado por nos avisar.": "Thank you for letting us know.",
+  "Sua presença foi confirmada!": "Your attendance is confirmed!",
+  "Mal esperamos para celebrar juntos!": "We can't wait to celebrate together!",
+  "Por favor, confirmar até o dia": "Please confirm by",
+  "Manual do": "The good",
+  "Bom Convidado": "Guest Guide",
+  "SUA PRESENÇA\\nÉ ESSENCIAL": "YOUR PRESENCE\\nMATTERS",
+  "POR FAVOR,\\nSEJA PONTUAL": "PLEASE\\nBE ON TIME",
+  "CONVIDADO\\nNÃO CONVIDA": "NO EXTRA\\nGUESTS, PLEASE",
+  "COMEMORE\\nA NOSSA UNIÃO": "CELEBRATE\\nOUR UNION",
+  "REGISTE OS\\nBONS MOMENTOS": "CAPTURE THE\\nGOOD MOMENTS",
+  "SORRIA E SEJA\\nMUITO FELIZ": "SMILE AND BE\\nVERY HAPPY",
+  "DESPEÇA-SE\\nDOS NOIVOS": "SAY GOODBYE\\nTO THE COUPLE",
+  "POR FAVOR, NÃO\\nLEVAR CRIANÇAS": "PLEASE, NO\\nCHILDREN",
+  "AGRADECEMOS A COMPREENSÃO": "THANK YOU FOR YOUR UNDERSTANDING",
+  "E O VOSSO CARINHO!": "AND YOUR LOVE!",
+  Voltar: "Back",
 };
 
 const FR: Record<string, string> = {
@@ -120,6 +157,43 @@ const FR: Record<string, string> = {
   "Confirmar Presença": "Confirmer ma présence",
   "Ausência Informada": "Absence signalée",
   "Presença Confirmada": "Présence confirmée",
+  "Enviar Mensagem": "Envoyer le message",
+  pausado: "en pause",
+  "{} de {} de {}": "{} {} {}",
+  " de {} de ": " {} ",
+  Domingo: "Dimanche",
+  "Segunda-feira": "Lundi",
+  "Terça-feira": "Mardi",
+  "Quarta-feira": "Mercredi",
+  "Quinta-feira": "Jeudi",
+  "Sexta-feira": "Vendredi",
+  "Sábado": "Samedi",
+  "às {}h{}": "à {}h{}",
+  "Somente eu": "Seulement moi",
+  "+1 acompanhante": "+1 accompagnant",
+  "Nome completo": "Nom complet",
+  "Você irá comparecer?": "Serez-vous présent(e) ?",
+  "Nome do acompanhante": "Nom de l'accompagnant",
+  "Nome do acompanhante {}": "Nom de l'accompagnant {}",
+  "Enviar Resposta": "Envoyer la réponse",
+  "Sentiremos sua falta!": "Vous allez nous manquer !",
+  "Obrigado por nos avisar.": "Merci de nous avoir prévenus.",
+  "Sua presença foi confirmada!": "Votre présence est confirmée !",
+  "Mal esperamos para celebrar juntos!": "Nous avons hâte de célébrer ensemble !",
+  "Por favor, confirmar até o dia": "Merci de confirmer avant le",
+  "Manual do": "Le guide du",
+  "Bom Convidado": "Bon Invité",
+  "SUA PRESENÇA\\nÉ ESSENCIAL": "VOTRE PRÉSENCE\\nEST ESSENTIELLE",
+  "POR FAVOR,\\nSEJA PONTUAL": "MERCI D'ÊTRE\\nPONCTUEL",
+  "CONVIDADO\\nNÃO CONVIDA": "UN INVITÉ\\nN'INVITE PAS",
+  "COMEMORE\\nA NOSSA UNIÃO": "CÉLÉBREZ\\nNOTRE UNION",
+  "REGISTE OS\\nBONS MOMENTOS": "IMMORTALISEZ\\nLES BEAUX MOMENTS",
+  "SORRIA E SEJA\\nMUITO FELIZ": "SOURIEZ ET SOYEZ\\nHEUREUX",
+  "DESPEÇA-SE\\nDOS NOIVOS": "DITES AU REVOIR\\nAUX FIANCÉS",
+  "POR FAVOR, NÃO\\nLEVAR CRIANÇAS": "MERCI DE NE PAS\\nVENIR AVEC DES ENFANTS",
+  "AGRADECEMOS A COMPREENSÃO": "MERCI POUR VOTRE COMPRÉHENSION",
+  "E O VOSSO CARINHO!": "ET VOTRE AFFECTION !",
+  Voltar: "Retour",
 };
 
 const DICIONARIO: Record<Idioma, Record<string, string>> = { pt: {}, en: EN, fr: FR };
@@ -191,37 +265,80 @@ const escapar = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
  * meses) só no `label=` e no array dos meses, onde não há como confundir.
  */
 export function embrulhar(codigo: string): string {
-  let novo = codigo;
+  // Linha a linha, e nunca dentro de comentário: a explicação do componente
+  // fala das frases ("Somente eu") e não é para o convidado ler.
+  const comentario = /^\s*(\*|\/\/|\/\*)/;
+  let novo = codigo
+    .split("\n")
+    .map((linha) => (comentario.test(linha) ? linha : trocarFrases(linha)))
+    .join("\n");
+  if (novo === codigo) return novo;
+  // Contador com `const t = { d, h, m, s }`: o `t()` importado ficava tapado e a
+  // página partia. Aí a tradução entra com outro nome.
+  const semImports = codigo.replace(/^import [\s\S]*?;\r?\n/gm, "");
+  const tapado = /\b(?:const|let|var)\s+t\s*=|(?<![\w.])t\.[a-zA-Z]/.test(semImports);
+  if (tapado) novo = novo.replace(/(?<![\w.])t\("/g, 'tr("');
+  // Só o que o ficheiro usa: um import a sobrar acende o lint do build.
+  const usados = (tapado ? ["tr", "tf"] : ["t", "tf"])
+    .filter((n) => new RegExp(`\\b${n}\\("`).test(novo))
+    .map((n) => (n === "tr" ? "t as tr" : n));
+  const imp = /^import \{ ([^}]*) \} from "@\/lib\/idioma";$/m.exec(novo);
+  if (!imp) return importar(novo, `import { ${usados.join(", ")} } from "@/lib/idioma";`);
+  const juntos = [...new Set([...imp[1].split(",").map((s) => s.trim()), ...usados])].sort();
+  return novo.replace(imp[0], `import { ${juntos.join(", ")} } from "@/lib/idioma";`);
+}
+
+function trocarFrases(linha: string): string {
+  // O que vai para o Google Form tem de ser a opção do formulário, em português,
+  // seja qual for a língua de quem responde. Aspas simples ficam fora do t().
+  let novo = /^[ \t]*const \w*Opcao = /.test(linha) ? linha.replace(/"/g, "'") : linha;
   for (const pt of CHAVES) {
     const lit = escapar(pt);
     const curta = /^[A-Za-zÀ-ú]+$/.test(pt) && pt.length < 12;
     if (curta) {
-      novo = novo.replace(new RegExp(`(\\blabel=)"${lit}"`, "g"), `$1{t("${pt}")}`);
+      novo = novo.replace(new RegExp(`(\\b(?:label|l)=)"${lit}"`, "g"), `$1{t("${pt}")}`);
+      novo = novo.replace(new RegExp(`(\\blabel:\\s*)"${lit}"`, "g"), `$1t("${pt}")`);
       continue;
     }
     // Atributo JSX: placeholder="Seu nome" → placeholder={t("Seu nome")}
     novo = novo.replace(new RegExp(`(\\s[a-zA-Z-]+=)"${lit}"`, "g"), `$1{t("${pt}")}`);
     // Literal em expressão, que ainda não esteja dentro de um t(
-    novo = novo.replace(new RegExp(`(?<!\\bt\\()(?<![=\\w])"${lit}"`, "g"), `t("${pt}")`);
+    novo = novo.replace(new RegExp(`(?<!\\bt\\()(?<!\\btr\\()(?<![=\\w])"${lit}"`, "g"), `t("${pt}")`);
     // Texto JSX entre tags na mesma linha: >Hoje é o grande dia!<
     novo = novo.replace(new RegExp(`>(\\s*)${lit}(\\s*)<`, "g"), `>$1{t("${pt}")}$2<`);
     // Texto JSX sozinho numa linha
     novo = novo.replace(new RegExp(`^(\\s+)${lit}(\\s*)$`, "gm"), `$1{t("${pt}")}$2`);
   }
   for (const molde of MOLDES) {
-    const [antes, depois] = molde.split("{}").map(escapar);
+    // Molde que começa ou acaba em espaço é pedaço de JSX, tratado à parte.
+    if (molde !== molde.trim()) continue;
+    const partes = molde.split("{}").map(escapar);
     novo = novo.replace(
-      new RegExp("`" + antes + "\\$\\{([^}`]+)\\}" + depois + "`", "g"),
-      (_m, expr: string) => `tf("${molde}", ${expr.trim()})`,
+      new RegExp("`" + partes.join("\\$\\{([^}`]+)\\}") + "`", "g"),
+      (_m, ...grupos: unknown[]) => {
+        const exprs = grupos.slice(0, partes.length - 1).map((g) => String(g).trim());
+        return `tf("${molde}", ${exprs.join(", ")})`;
+      },
     );
   }
-  if (novo === codigo) return novo;
-  // Só o que o ficheiro usa: um import a sobrar acende o lint do build.
-  const usados = ["t", "tf"].filter((n) => new RegExp(`\\b${n}\\("`).test(novo));
-  const imp = /^import \{ ([^}]*) \} from "@\/lib\/idioma";$/m.exec(novo);
-  if (!imp) return importar(novo, `import { ${usados.join(", ")} } from "@/lib/idioma";`);
-  const juntos = [...new Set([...imp[1].split(",").map((s) => s.trim()), ...usados])].sort();
-  return novo.replace(imp[0], `import { ${juntos.join(", ")} } from "@/lib/idioma";`);
+  // A data no cronograma: `<span>{dia}</span> de {mes} de <span>{ano}</span>`.
+  novo = novo.replace(/<\/span> de \{mes\} de <span/g, '</span>{tf(" de {} de ", mes)}<span');
+  // O prazo do RSVP do noivado: "Por favor, confirmar até o dia <span>01</span> de Novembro de <span>2026</span>".
+  novo = novo.replace(/^(\s+)Por favor, confirmar até o dia /gm, '$1{t("Por favor, confirmar até o dia")}{" "}');
+  novo = novo.replace(
+    /<\/span> de (Janeiro|Fevereiro|Março|Abril|Maio|Junho|Julho|Agosto|Setembro|Outubro|Novembro|Dezembro) de <span/g,
+    '</span>{tf(" de {} de ", t("$1"))}<span',
+  );
+  // O fecho do manual do noivado, partido por um <br />.
+  novo = novo.replace(
+    /^(\s+)AGRADECEMOS A COMPREENSÃO<br \/>E O VOSSO CARINHO!(\s*)$/,
+    '$1{t("AGRADECEMOS A COMPREENSÃO")}<br />{t("E O VOSSO CARINHO!")}$2',
+  );
+  // "← Voltar" do manual aberto por cima do convite.
+  novo = novo.replace(/(<\/span>\s*)Voltar(\s*)$/, '$1{t("Voltar")}$2');
+  // O selo do mural parado, sozinho numa linha.
+  novo = novo.replace(/^(\s+)pausado(\s*)$/gm, '$1{t("pausado")}$2');
+  return novo;
 }
 
 /** Depois do último import do ficheiro, que é onde o resto do convite os põe. */
@@ -314,6 +431,58 @@ export function envelopeNaLingua(codigo: string): string {
   return novo.slice(0, fim) + "\n  }, [introVideo]);" + novo.slice(fim + "\n  }, []);".length);
 }
 
+/**
+ * Componente de servidor (o Footer) é desenhado uma vez no build, em português,
+ * e o browser nunca o volta a correr: o `t()` lá dentro não servia de nada. Com
+ * `"use client"` ele corre também no browser e sai na língua do convidado.
+ */
+export function noCliente(codigo: string): string {
+  if (/^\s*["']use client["']/.test(codigo)) return codigo;
+  if (!/\bt\("|\btf\("/.test(codigo)) return codigo;
+  return `"use client";\n\n${codigo}`;
+}
+
+/**
+ * O <title> do HTML exportado é o português (vem do `metadata` do layout). Na
+ * língua do convidado troca no browser, assim que o convite é lido.
+ */
+export function tituloNaLingua(codigo: string): string {
+  if (codigo.includes("tituloDaLingua")) return codigo;
+  if (!codigo.includes("emIdioma(")) return codigo;
+  // O Next volta a pôr o título do metadata sempre que redesenha o <head>; o
+  // observador devolve o da língua de cada vez. Em português `emIdioma` devolve
+  // o próprio JSON e nada disto corre.
+  const bloco = [
+    'if (typeof window !== "undefined" && convite !== bruto && convite.meta?.titulo) {',
+    "  const tituloDaLingua = (): void => {",
+    "    if (document.title !== convite.meta.titulo) document.title = convite.meta.titulo;",
+    "  };",
+    "  tituloDaLingua();",
+    "  new MutationObserver(tituloDaLingua).observe(document.head, { subtree: true, childList: true, characterData: true });",
+    "}",
+    "",
+  ].join("\n");
+  // Versões de teste anteriores, só na máquina do Heatz.
+  const antigo = /^if \(typeof (?:document|window) !== "undefined" && convite\.meta\?\.titulo\)[\s\S]*?\n(?:\}\n|(?=\n))/m;
+  if (antigo.test(codigo)) return codigo.replace(antigo, bloco);
+  return codigo.replace(/^(const convite = emIdioma\(bruto\);\r?\n)/m, `$1${bloco}`);
+}
+
+/**
+ * A data montada no `convite.ts` do modelo de noivado: "20 de Novembro de
+ * 2026", o dia da semana e "às 20h00".
+ */
+export function dataNaLingua(codigo: string): string {
+  const imp = /^import \{ emIdioma, t(?:, tf)? \} from "\.\/idioma";$/m;
+  if (!imp.test(codigo)) return codigo;
+  const novo = codigo
+    .replace(/`\$\{([^}`]+)\} de \$\{mes\} de \$\{ano\}`/, (_m, dia: string) => `tf("{} de {} de {}", ${dia.trim()}, mes, ano)`)
+    .replace(/= SEMANA\[([^\]]+)\];/, "= t(SEMANA[$1]);")
+    .replace(/`às \$\{([^}`]+)\}h\$\{([^}`]+)\}`/, (_m, h: string, m: string) => `tf("às {}h{}", ${h.trim()}, ${m.trim()})`);
+  if (novo === codigo) return codigo;
+  return novo.replace(imp, 'import { emIdioma, t, tf } from "./idioma";');
+}
+
 /** Ficheiros com texto cravado que o dicionário cobre. */
 const COM_TEXTO = [
   "Hero.tsx",
@@ -324,6 +493,12 @@ const COM_TEXTO = [
   "Footer.tsx",
   "Presentes.tsx",
   "RSVP.tsx",
+  "NossoDia.tsx",
+  "Versiculo.tsx",
+  // Modelo de noivado
+  "RSVPModal.tsx",
+  "ManualBlocos.tsx",
+  "ManualModal.tsx",
 ];
 
 /** Idempotente: só escreve o que mudou e devolve o nome do que mexeu. */
@@ -342,10 +517,13 @@ export async function idiomaNoConvite(dir: string): Promise<string[]> {
   }
 
   const alvos: [string, (c: string) => string][] = [
-    [conviteTs, conviteEmIdioma],
+    [conviteTs, (c) => dataNaLingua(tituloNaLingua(conviteEmIdioma(c)))],
     [join(lib, "guest.tsx"), guestComIdioma],
     [join(dir, "src", "components", "EnvelopeLoader.tsx"), envelopeNaLingua],
-    ...COM_TEXTO.map((f): [string, (c: string) => string] => [join(dir, "src", "components", f), embrulhar]),
+    ...COM_TEXTO.map((f): [string, (c: string) => string] => [
+      join(dir, "src", "components", f),
+      (c) => noCliente(embrulhar(c)),
+    ]),
   ];
   for (const [alvo, consertar] of alvos) {
     if (!existsSync(alvo)) continue;

@@ -74,6 +74,8 @@ export const modelosSalvar = (id: string, p: { nome: string; categoria: Categori
 export const modelosApagar = (id: string) => call(api.modelosApagar(id));
 export const modelosCriar = (modelo: string, categoria: Categoria, slug: string) =>
   call(api.modelosCriar(modelo, categoria, slug)) as Promise<Copia>;
+export const traduzirTextos = (textos: string[], lingua: "en" | "fr") =>
+  call(api.traduzirTextos(textos, lingua)) as Promise<(string | null)[]>;
 export type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
 export const tokenEstado = (id: string) => call(api.tokenEstado(id)) as Promise<EstadoToken>;
 export const tokenInjetar = (id: string) => call(api.tokenInjetar(id)) as Promise<EstadoToken>;

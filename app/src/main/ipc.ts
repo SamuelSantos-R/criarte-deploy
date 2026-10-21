@@ -37,6 +37,7 @@ import {
 } from "./monograma";
 import { apagarPaleta, listarPaletas, salvarPaleta } from "./paletas";
 import { apagarModelo, listarModelos, salvarModelo } from "./modelos";
+import { traduzirTextos } from "./traduzir";
 import { abrirDaBiblioteca, apagarDaBiblioteca, lerSvg, listarBiblioteca, salvarNaBiblioteca, svgParaTemp } from "./biblioteca";
 import { aoMudarPreview, estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, preaquecer, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
@@ -215,6 +216,13 @@ export function registerIpc(): void {
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
   );
   handle("modelos:listar", () => listarModelos());
+  handle("traducao:textos", (_e, textos: unknown, lingua: unknown) => {
+    if (lingua !== "en" && lingua !== "fr") throw new Error("língua inválida");
+    if (!Array.isArray(textos) || textos.length > 500 || !textos.every((t) => typeof t === "string" && t.length <= 5000)) {
+      throw new Error("textos inválidos");
+    }
+    return traduzirTextos(textos as string[], lingua);
+  });
   handle("modelos:salvar", (_e, id: unknown, carga: unknown) => salvarModelo(asString(id, "id"), carga));
   handle("modelos:apagar", (_e, id: unknown) => apagarModelo(id));
   handle("modelos:criar", (_e, modelo: unknown, categoria: unknown, slug: unknown) =>

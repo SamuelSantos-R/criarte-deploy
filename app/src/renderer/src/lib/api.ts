@@ -51,7 +51,7 @@ export const writeConvite = (id: string, data: unknown, marca?: number) =>
 export const vigiarConvite = (id: string | null) => call(api.vigiarConvite(id));
 export const onConviteMudou = api.onConviteMudou;
 
-export type Copia = { id: string; siteId: string | null; faltam: string[] };
+export type Copia = { id: string; siteId: string | null; faltam: string[]; pendentes?: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
 
@@ -72,8 +72,8 @@ export const modelosListar = () => call(api.modelosListar()) as Promise<ModeloCo
 export const modelosSalvar = (id: string, p: { nome: string; categoria: Categoria; nota?: string }) =>
   call(api.modelosSalvar(id, p)) as Promise<ModeloConvite>;
 export const modelosApagar = (id: string) => call(api.modelosApagar(id));
-export const modelosCriar = (modelo: string, categoria: Categoria, slug: string) =>
-  call(api.modelosCriar(modelo, categoria, slug)) as Promise<Copia>;
+export const modelosCriar = (modelo: string, categoria: Categoria, slug: string, card?: unknown) =>
+  call(api.modelosCriar(modelo, categoria, slug, card)) as Promise<Copia>;
 export const traduzirTextos = (textos: string[], lingua: "en" | "fr") =>
   call(api.traduzirTextos(textos, lingua)) as Promise<(string | null)[]>;
 export type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };

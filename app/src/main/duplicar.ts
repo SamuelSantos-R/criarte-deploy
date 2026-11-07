@@ -1,3 +1,4 @@
+import { aplicarCard, type Briefcard } from "./briefcard";
 import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -139,7 +140,7 @@ async function gravarSiteId(destino: string, siteId: string | null): Promise<str
   return exigidas.filter((c) => !new RegExp(`^${c}=.+$`, "m").test(depois));
 }
 
-export type Copia = { id: string; siteId: string | null; faltam: string[] };
+export type Copia = { id: string; siteId: string | null; faltam: string[]; pendentes?: string[] };
 
 async function destinoLivre(categoria: string, slug: string): Promise<string> {
   if (!NOME.test(categoria)) throw new Error("categoria inválida — minúsculas e hífen");
@@ -229,7 +230,12 @@ export async function salvarSessaoComoNovo(
  * nome é solto. A categoria é a do pedido, não a do modelo: dá para começar um
  * noivado a partir de um molde de casamento, se for isso que se quer.
  */
-export async function criarDeModelo(modeloId: string, categoria: string, slug: string): Promise<Copia> {
+export async function criarDeModelo(
+  modeloId: string,
+  categoria: string,
+  slug: string,
+  card?: Briefcard,
+): Promise<Copia> {
   const cat = categoriaValida(categoria);
   const destino = await destinoLivre(cat, slug);
   const { pacote } = await baixarModelo(modeloId);
@@ -237,7 +243,8 @@ export async function criarDeModelo(modeloId: string, categoria: string, slug: s
   try {
     await mkdir(destino, { recursive: true });
     await desempacotar(pacote, destino);
-    return { id: `${cat}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId) };
+    const pendentes = card ? await aplicarCard(destino, card) : undefined;
+    return { id: `${cat}/${slug}`, siteId, faltam: await gravarSiteId(destino, siteId), pendentes };
   } catch (erro) {
     await rm(destino, { recursive: true, force: true }).catch(() => {});
     if (siteId) await libertarSlug(slug).catch(() => {});

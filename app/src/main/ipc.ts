@@ -1,3 +1,4 @@
+import { validarCard } from "./briefcard";
 import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -225,8 +226,13 @@ export function registerIpc(): void {
   });
   handle("modelos:salvar", (_e, id: unknown, carga: unknown) => salvarModelo(asString(id, "id"), carga));
   handle("modelos:apagar", (_e, id: unknown) => apagarModelo(id));
-  handle("modelos:criar", (_e, modelo: unknown, categoria: unknown, slug: unknown) =>
-    criarDeModelo(asString(modelo, "modelo"), asString(categoria, "categoria"), asString(slug, "nome")),
+  handle("modelos:criar", (_e, modelo: unknown, categoria: unknown, slug: unknown, card?: unknown) =>
+    criarDeModelo(
+      asString(modelo, "modelo"),
+      asString(categoria, "categoria"),
+      asString(slug, "nome"),
+      card === undefined || card === null ? undefined : validarCard(card),
+    ),
   );
 
   handle("token:estado", (_e, id: unknown) => estadoToken(asString(id, "id")));

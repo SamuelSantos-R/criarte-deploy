@@ -523,7 +523,10 @@ export function Convites({
     }
   };
 
-  const aoDuplicar = async (copia: { id: string; faltam: string[] }): Promise<void> => {
+  // `doModelo`: o convite novo nasceu de um modelo (e talvez de um card do
+  // Brief Flow) — o convite.json dele é o certo e NÃO leva o doc da sessão por
+  // cima. Só o "duplicar" copia o que está aberto.
+  const aoDuplicar = async (copia: { id: string; faltam: string[] }, doModelo = false): Promise<void> => {
     setDuplicando(false);
     setCriandoConvite(false);
     setErro(null);
@@ -540,7 +543,7 @@ export function Convites({
       // O convidado não tinha convite aberto do próprio disco pra devolver ao
       // estado salvo, e o convite.json dele já foi escrito com o doc da sessão.
       if (!convidado) {
-        if (dados) await writeConvite(copia.id, dados);
+        if (dados && !doModelo) await writeConvite(copia.id, dados);
         await desfazerNoDisco();
         await derrubarServidor();
       }
@@ -832,7 +835,7 @@ export function Convites({
           );
         })()}
       {criandoConvite && (
-        <NovoConvite onFechar={() => setCriandoConvite(false)} onPronto={(copia) => void aoDuplicar(copia)} />
+        <NovoConvite onFechar={() => setCriandoConvite(false)} onPronto={(copia) => void aoDuplicar(copia, true)} />
       )}
       {guardandoModelo && id && (
         <SalvarComoModelo

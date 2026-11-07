@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && electron-vite build",
-    "test": "node --experimental-strip-types tests/prancheta-canto.test.mjs && node --experimental-strip-types --import ./tests/registrar-resolver.mjs tests/atualizacao-arvore.test.mjs && node tests/envelope-relogio.test.mjs",
+    "test": "node --experimental-strip-types tests/prancheta-canto.test.mjs && node --experimental-strip-types --import ./tests/registrar-resolver.mjs tests/atualizacao-arvore.test.mjs && node tests/envelope-relogio.test.mjs && node --experimental-strip-types tests/briefcard.test.mjs",
     "dmg": "npm run build && electron-builder --mac --x64",
     "exe": "npm run build && electron-builder --win --x64",
     "publicar": "node scripts/publicar-atualizacao.ts",

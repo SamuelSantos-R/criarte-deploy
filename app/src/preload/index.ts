@@ -75,8 +75,8 @@ const api = {
   modelosListar: () => invoke<unknown>("modelos:listar"),
   modelosSalvar: (id: string, carga: unknown) => invoke<unknown>("modelos:salvar", id, carga),
   modelosApagar: (id: string) => invoke<void>("modelos:apagar", id),
-  modelosCriar: (modelo: string, categoria: string, slug: string) =>
-    invoke<Copia>("modelos:criar", modelo, categoria, slug),
+  modelosCriar: (modelo: string, categoria: string, slug: string, card?: unknown) =>
+    invoke<Copia>("modelos:criar", modelo, categoria, slug, card),
   traduzirTextos: (textos: string[], lingua: string) => invoke<(string | null)[]>("traducao:textos", textos, lingua),
   tokenEstado: (id: string) => invoke<EstadoToken>("token:estado", id),
   tokenInjetar: (id: string) => invoke<EstadoToken>("token:injetar", id),

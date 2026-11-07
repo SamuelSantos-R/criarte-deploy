@@ -66,6 +66,11 @@ const api = {
   pickRoot: () => invoke<{ sitesRoot: string | null }>("settings:pickRoot"),
 
   listSites: () => invoke<unknown[]>("sites:list"),
+  mapaBuscar: (q: string) => invoke<unknown>("mapa:buscar", q),
+  musicaBuscar: (q: string) => invoke<unknown>("musica:buscar", q),
+  musicaPrevia: (id: string) => invoke<Uint8Array>("musica:previa", id),
+  musicaUsar: (siteId: string, id: string, inicio: number, artista: string, titulo: string) =>
+    invoke<{ arquivo: string }>("musica:usar", siteId, id, inicio, artista, titulo),
   readConvite: (id: string) => invoke<Convite>("convite:read", id),
   writeConvite: (id: string, data: unknown, marca?: number) =>
     invoke<Gravacao>("convite:write", id, data, marca),

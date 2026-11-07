@@ -352,3 +352,12 @@ export const reveal = (id: string) => call(api.reveal(id));
 export const openExternal = (url: string) => call(api.openExternal(url));
 export const onOutput = api.onOutput;
 export const onDone = api.onDone;
+
+export type Lugar = { nome: string; morada: string; lat: number; lon: number; link: string };
+export const mapaBuscar = (q: string) => call(api.mapaBuscar(q)) as Promise<Lugar[]>;
+
+export type Faixa = { id: string; titulo: string; canal: string; duracao: number; capa: string; versaoSuspeita: boolean };
+export const musicaBuscar = (q: string) => call(api.musicaBuscar(q)) as Promise<Faixa[]>;
+export const musicaPrevia = (id: string) => call(api.musicaPrevia(id)) as Promise<Uint8Array>;
+export const musicaUsar = (siteId: string, id: string, inicio: number, artista: string, titulo: string) =>
+  call(api.musicaUsar(siteId, id, inicio, artista, titulo)) as Promise<{ arquivo: string }>;

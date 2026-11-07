@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "
 import { GripVertical, Heart, Plus, Trash2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
 import { CampoArquivo, ehAsset } from "@/components/CampoArquivo";
+import { CampoMapa } from "@/components/CampoMapa";
+import { BuscarMusica } from "@/components/BuscarMusica";
 import { AvisoPlantio } from "@/components/AvisoPlantio";
 import { AvisoRSVP } from "@/components/AvisoRSVP";
 import { PainelTema } from "@/components/PainelTema";
@@ -359,6 +361,26 @@ function Nos({ valor, caminho, onChange }: Props): ReactElement {
             </Field>
           );
         }
+        if (typeof v === "string" && chave === "mapa" && caminho[0] === "eventos") {
+          const sugestao = [obj.local, obj.detalhe].filter((x) => typeof x === "string" && x).join(", ").replace(/\n/g, " ");
+          return (
+            <CampoMapa
+              key={chave}
+              valor={v}
+              label={label}
+              sugestao={sugestao}
+              onChange={(novo) => onChange(filho, novo)}
+              onEscolher={(link, morada) =>
+                // A morada só entra se o cartão ainda não tiver uma: não se pisa no que alguém escreveu.
+                onChange(caminho, {
+                  ...obj,
+                  mapa: link,
+                  ...(morada && typeof obj.detalhe === "string" && !obj.detalhe.trim() ? { detalhe: morada } : {}),
+                })
+              }
+            />
+          );
+        }
         if (typeof v === "string") {
           if (ehAsset(chave, v)) {
             return (
@@ -557,6 +579,13 @@ export function JsonForm({
         {/* Os pais são desenhados pelo `Versiculo.tsx`, e é lá que o ♥ existe:
             num convite com o componente antigo o botão de memória gravava o
             coração e a página desenhava-o na mesma linha do nome, sem estilo. */}
+        {secao === "musica" && siteId && (
+          <BuscarMusica
+            siteId={siteId}
+            musica={valor as Record<string, unknown>}
+            onChange={(campo, novo) => alterar(["musica", campo], novo)}
+          />
+        )}
         {secao === "pais" && (
           <div className="mb-4 space-y-3 empty:hidden">
             <AvisoPlantio siteId={siteId} secao="versiculo" />

@@ -1,3 +1,5 @@
+import { buscarMusica, previaMusica, usarMusica } from "./musica";
+import { buscarLugares } from "./mapa";
 import { validarCard } from "./briefcard";
 import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import { existsSync } from "node:fs";
@@ -199,6 +201,12 @@ export function registerIpc(): void {
   });
 
   handle("sites:list", () => listSites());
+  handle("mapa:buscar", (_e, q: unknown) => buscarLugares(q));
+  handle("musica:buscar", (_e, q: unknown) => buscarMusica(q));
+  handle("musica:previa", (_e, id: unknown) => previaMusica(id));
+  handle("musica:usar", (_e, siteId: unknown, id: unknown, inicio: unknown, artista: unknown, titulo: unknown) =>
+    usarMusica({ siteId, id, inicio, artista, titulo }),
+  );
   handle("convite:read", (_e, id: unknown) => readConvite(asString(id, "id")));
   handle("convite:write", async (_e, id: unknown, data: unknown, marca: unknown) => {
     const alvo = asString(id, "id");

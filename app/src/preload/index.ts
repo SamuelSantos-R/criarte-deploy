@@ -66,6 +66,11 @@ const api = {
   pickRoot: () => invoke<{ sitesRoot: string | null }>("settings:pickRoot"),
 
   listSites: () => invoke<unknown[]>("sites:list"),
+  mapaBuscar: (q: string) => invoke<unknown>("mapa:buscar", q),
+  musicaBuscar: (q: string) => invoke<unknown>("musica:buscar", q),
+  musicaPrevia: (id: string) => invoke<Uint8Array>("musica:previa", id),
+  musicaUsar: (siteId: string, id: string, inicio: number, artista: string, titulo: string) =>
+    invoke<{ arquivo: string }>("musica:usar", siteId, id, inicio, artista, titulo),
   readConvite: (id: string) => invoke<Convite>("convite:read", id),
   writeConvite: (id: string, data: unknown, marca?: number) =>
     invoke<Gravacao>("convite:write", id, data, marca),
@@ -75,8 +80,9 @@ const api = {
   modelosListar: () => invoke<unknown>("modelos:listar"),
   modelosSalvar: (id: string, carga: unknown) => invoke<unknown>("modelos:salvar", id, carga),
   modelosApagar: (id: string) => invoke<void>("modelos:apagar", id),
-  modelosCriar: (modelo: string, categoria: string, slug: string) =>
-    invoke<Copia>("modelos:criar", modelo, categoria, slug),
+  modelosCriar: (modelo: string, categoria: string, slug: string, card?: unknown) =>
+    invoke<Copia>("modelos:criar", modelo, categoria, slug, card),
+  traduzirTextos: (textos: string[], lingua: string) => invoke<(string | null)[]>("traducao:textos", textos, lingua),
   tokenEstado: (id: string) => invoke<EstadoToken>("token:estado", id),
   tokenInjetar: (id: string) => invoke<EstadoToken>("token:injetar", id),
   renomearSite: (id: string, slug: string) => invoke<{ id: string }>("sites:rename", id, slug),

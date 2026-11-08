@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
-import { CornerDownLeft, X } from "lucide-react";
+import { CornerDownLeft, FileUp, X } from "lucide-react";
 import {
   modelosApagar,
   modelosCriar,
@@ -43,6 +43,29 @@ export function NovoConvite({
   const [erro, setErro] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const campo = useRef<HTMLInputElement>(null);
+  const arquivoCard = useRef<HTMLInputElement>(null);
+  // O "memory card" do Brief Flow: as respostas dos noivos já na língua do convite.json.
+  const [card, setCard] = useState<{ bruto: unknown; noiva: string; noivo: string } | null>(null);
+  const [pronta, setPronta] = useState<Copia | null>(null);
+
+  const lerCard = async (arquivo: File | undefined): Promise<void> => {
+    if (!arquivo) return;
+    setErro(null);
+    try {
+      const bruto = JSON.parse(await arquivo.text()) as {
+        formato?: unknown;
+        casal?: { noiva?: unknown; noivo?: unknown; slug?: unknown };
+      };
+      if (bruto?.formato !== "criarte.briefcard" || typeof bruto.casal?.noiva !== "string" || typeof bruto.casal?.noivo !== "string") {
+        throw new Error("Esse arquivo não é um card do Brief Flow.");
+      }
+      setCard({ bruto, noiva: bruto.casal.noiva, noivo: bruto.casal.noivo });
+      if (typeof bruto.casal.slug === "string" && bruto.casal.slug) setSlug(emSlug(bruto.casal.slug));
+    } catch (e) {
+      setCard(null);
+      setErro(e instanceof SyntaxError ? "Arquivo corrompido — baixe o card de novo no Brief Flow." : e instanceof Error ? e.message : String(e));
+    }
+  };
 
   useEffect(() => {
     modelosListar()
@@ -73,7 +96,12 @@ export function NovoConvite({
     setCriando(true);
     setErro(null);
     try {
-      onPronto(await modelosCriar(modelo.id, categoria, slug));
+      const copia = await modelosCriar(modelo.id, categoria, slug, card?.bruto);
+      // Com card, mostra antes o que ainda pede mão humana; sem card, segue direto.
+      if (copia.pendentes?.length) {
+        setPronta(copia);
+        setCriando(false);
+      } else onPronto(copia);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
       setCriando(false);
@@ -108,7 +136,57 @@ export function NovoConvite({
           </p>
         </div>
 
+        {pronta ? (
+          <div className="space-y-3 px-6 py-5">
+            <p className="text-[13px] text-text">
+              Convite de <b>{card?.noiva} &amp; {card?.noivo}</b> criado e preenchido. Falta revisar:
+            </p>
+            <ul className="max-h-[260px] space-y-1.5 overflow-y-auto">
+              {pronta.pendentes?.map((p) => (
+                <li key={p} className="rounded-lg border border-rule px-3 py-2 text-[12px] leading-[1.5] text-text">
+                  {p}
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end pt-1">
+              <Button variant="primary" onClick={() => onPronto(pronta)}>
+                <CornerDownLeft size={13} /> Abrir convite
+              </Button>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="space-y-4 px-6 py-5">
+          <input
+            ref={arquivoCard}
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={(e) => {
+              void lerCard(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+          {card ? (
+            <div className="flex items-center gap-2 rounded-lg bg-cyan/10 px-3 py-2 text-[12px] text-text">
+              <FileUp size={13} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                Card plugado: <b>{card.noiva} &amp; {card.noivo}</b> — o modelo escolhido nasce preenchido.
+              </span>
+              <button type="button" onClick={() => setCard(null)} aria-label="Tirar o card" className="p-1 text-muted hover:text-text">
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => arquivoCard.current?.click()}
+              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-rule px-3 py-2 text-left text-[12px] text-muted transition-colors hover:border-muted hover:text-text"
+            >
+              <FileUp size={13} /> Plugar card do Brief Flow <span className="ml-auto font-mono text-[11px]">.briefcard.json</span>
+            </button>
+          )}
+
           <div role="radiogroup" aria-label="Tipo de convite" className="flex rounded-full border border-rule p-0.5">
             {CATEGORIAS.map((c) => {
               const quantos = (modelos ?? []).filter((m) => m.categoria === c.id).length;
@@ -203,6 +281,8 @@ export function NovoConvite({
             </Button>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

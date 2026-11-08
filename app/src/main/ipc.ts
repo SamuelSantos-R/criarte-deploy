@@ -1,3 +1,6 @@
+import { buscarMusica, previaMusica, usarMusica } from "./musica";
+import { buscarLugares } from "./mapa";
+import { validarCard } from "./briefcard";
 import { BrowserWindow, dialog, ipcMain, shell, type IpcMainInvokeEvent } from "electron";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -37,6 +40,7 @@ import {
 } from "./monograma";
 import { apagarPaleta, listarPaletas, salvarPaleta } from "./paletas";
 import { apagarModelo, listarModelos, salvarModelo } from "./modelos";
+import { traduzirTextos } from "./traduzir";
 import { abrirDaBiblioteca, apagarDaBiblioteca, lerSvg, listarBiblioteca, salvarNaBiblioteca, svgParaTemp } from "./biblioteca";
 import { aoMudarPreview, estadoPreview, forcarRepinte, iniciarServidor, pararServidor, pintarPreview, preaquecer, repintarPreview, rolarPreview } from "./preview";
 import { construirEspelho, estadoEspelho, pararEspelho } from "./telemovel";
@@ -197,6 +201,12 @@ export function registerIpc(): void {
   });
 
   handle("sites:list", () => listSites());
+  handle("mapa:buscar", (_e, q: unknown) => buscarLugares(q));
+  handle("musica:buscar", (_e, q: unknown) => buscarMusica(q));
+  handle("musica:previa", (_e, id: unknown) => previaMusica(id));
+  handle("musica:usar", (_e, siteId: unknown, id: unknown, inicio: unknown, artista: unknown, titulo: unknown) =>
+    usarMusica({ siteId, id, inicio, artista, titulo }),
+  );
   handle("convite:read", (_e, id: unknown) => readConvite(asString(id, "id")));
   handle("convite:write", async (_e, id: unknown, data: unknown, marca: unknown) => {
     const alvo = asString(id, "id");
@@ -215,10 +225,22 @@ export function registerIpc(): void {
     duplicarSite(asString(id, "id"), asString(categoria, "categoria"), asString(slug, "nome")),
   );
   handle("modelos:listar", () => listarModelos());
+  handle("traducao:textos", (_e, textos: unknown, lingua: unknown) => {
+    if (lingua !== "en" && lingua !== "fr") throw new Error("língua inválida");
+    if (!Array.isArray(textos) || textos.length > 500 || !textos.every((t) => typeof t === "string" && t.length <= 5000)) {
+      throw new Error("textos inválidos");
+    }
+    return traduzirTextos(textos as string[], lingua);
+  });
   handle("modelos:salvar", (_e, id: unknown, carga: unknown) => salvarModelo(asString(id, "id"), carga));
   handle("modelos:apagar", (_e, id: unknown) => apagarModelo(id));
-  handle("modelos:criar", (_e, modelo: unknown, categoria: unknown, slug: unknown) =>
-    criarDeModelo(asString(modelo, "modelo"), asString(categoria, "categoria"), asString(slug, "nome")),
+  handle("modelos:criar", (_e, modelo: unknown, categoria: unknown, slug: unknown, card?: unknown) =>
+    criarDeModelo(
+      asString(modelo, "modelo"),
+      asString(categoria, "categoria"),
+      asString(slug, "nome"),
+      card === undefined || card === null ? undefined : validarCard(card),
+    ),
   );
 
   handle("token:estado", (_e, id: unknown) => estadoToken(asString(id, "id")));

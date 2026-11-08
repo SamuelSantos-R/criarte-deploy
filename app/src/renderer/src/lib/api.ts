@@ -51,7 +51,7 @@ export const writeConvite = (id: string, data: unknown, marca?: number) =>
 export const vigiarConvite = (id: string | null) => call(api.vigiarConvite(id));
 export const onConviteMudou = api.onConviteMudou;
 
-export type Copia = { id: string; siteId: string | null; faltam: string[] };
+export type Copia = { id: string; siteId: string | null; faltam: string[]; pendentes?: string[] };
 export const duplicarSite = (id: string, categoria: string, slug: string) =>
   call(api.duplicarSite(id, categoria, slug)) as Promise<Copia>;
 
@@ -72,8 +72,10 @@ export const modelosListar = () => call(api.modelosListar()) as Promise<ModeloCo
 export const modelosSalvar = (id: string, p: { nome: string; categoria: Categoria; nota?: string }) =>
   call(api.modelosSalvar(id, p)) as Promise<ModeloConvite>;
 export const modelosApagar = (id: string) => call(api.modelosApagar(id));
-export const modelosCriar = (modelo: string, categoria: Categoria, slug: string) =>
-  call(api.modelosCriar(modelo, categoria, slug)) as Promise<Copia>;
+export const modelosCriar = (modelo: string, categoria: Categoria, slug: string, card?: unknown) =>
+  call(api.modelosCriar(modelo, categoria, slug, card)) as Promise<Copia>;
+export const traduzirTextos = (textos: string[], lingua: "en" | "fr") =>
+  call(api.traduzirTextos(textos, lingua)) as Promise<(string | null)[]>;
 export type EstadoToken = { tokenizado: boolean; faltam: string[]; impedimento: string | null };
 export const tokenEstado = (id: string) => call(api.tokenEstado(id)) as Promise<EstadoToken>;
 export const tokenInjetar = (id: string) => call(api.tokenInjetar(id)) as Promise<EstadoToken>;
@@ -350,3 +352,12 @@ export const reveal = (id: string) => call(api.reveal(id));
 export const openExternal = (url: string) => call(api.openExternal(url));
 export const onOutput = api.onOutput;
 export const onDone = api.onDone;
+
+export type Lugar = { nome: string; morada: string; lat: number; lon: number; link: string };
+export const mapaBuscar = (q: string) => call(api.mapaBuscar(q)) as Promise<Lugar[]>;
+
+export type Faixa = { id: string; titulo: string; canal: string; duracao: number; capa: string; versaoSuspeita: boolean };
+export const musicaBuscar = (q: string) => call(api.musicaBuscar(q)) as Promise<Faixa[]>;
+export const musicaPrevia = (id: string) => call(api.musicaPrevia(id)) as Promise<Uint8Array>;
+export const musicaUsar = (siteId: string, id: string, inicio: number, artista: string, titulo: string) =>
+  call(api.musicaUsar(siteId, id, inicio, artista, titulo)) as Promise<{ arquivo: string }>;

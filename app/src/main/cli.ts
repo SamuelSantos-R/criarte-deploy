@@ -1,6 +1,7 @@
 import { videoDoEnvelope } from "./envelope-lingua";
 import { app, type WebContents } from "electron";
 import { repararConvite } from "./reparos";
+import { traduzirConvite } from "./traduzir";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -61,7 +62,7 @@ const running = new Map<string, ChildProcess>();
  * `script` é o .js que o Electron-em-modo-Node vai rodar. Quase sempre é o
  * nosso CLI; o job das dependências troca pelo `npm-cli.js` da máquina.
  */
-async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: string }> {
+async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: string; aviso?: string }> {
   const cli = cliPath();
   switch (job.kind) {
     case "deploy": {
@@ -85,7 +86,19 @@ async function plan(job: Job): Promise<{ script: string; args: string[]; cwd: st
         if (l.video && l.lang !== "pt") await videoDoEnvelope(cwd, l.lang, l.video);
         args.push(`--guests-${l.lang}-file`, l.arquivo);
       }
-      return { script: cli, args, cwd };
+      // Lista em inglês/francês com o convite só em português punha os botões
+      // numa língua e o resto noutra. O que ficou por traduzir entra agora.
+      const linguas = [...new Set((job.listas ?? []).map((l) => l.lang))].filter(
+        (l): l is "en" | "fr" => l === "en" || l === "fr",
+      );
+      const feitos = await traduzirConvite(cwd, linguas).catch(() => null);
+      const aviso =
+        linguas.length === 0
+          ? undefined
+          : feitos === null
+            ? "⚠ tradução automática falhou — o que não estava traduzido sai em português\n"
+            : `✓ tradução: ${linguas.map((l) => `${l.toUpperCase()} ${feitos[l] ?? 0} texto(s) novo(s)`).join(", ")}\n`;
+      return { script: cli, args, cwd, aviso };
     }
     case "check":
       return { script: cli, args: ["check"], cwd: await siteDirExistente(job.siteId) };
@@ -144,7 +157,7 @@ export async function startJob(sender: WebContents, job: Job): Promise<string> {
     void correrInterno(sender, job, runId);
     return runId;
   }
-  const { script, args, cwd } = await plan(job);
+  const { script, args, cwd, aviso } = await plan(job);
   const runId = randomUUID();
 
   // ELECTRON_RUN_AS_NODE faz o próprio binário do Electron rodar como Node,
@@ -166,6 +179,7 @@ export async function startJob(sender: WebContents, job: Job): Promise<string> {
     if (sender.isDestroyed()) return;
     sender.send("cli:output", { runId, stream, text: chunk.toString() });
   };
+  if (aviso) setTimeout(() => emit("out", Buffer.from(aviso)), 300);
   child.stdout?.on("data", (c: Buffer) => emit("out", c));
   child.stderr?.on("data", (c: Buffer) => emit("err", c));
 

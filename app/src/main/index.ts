@@ -1,3 +1,4 @@
+import { limparPrevias } from "./musica";
 import { app, BrowserWindow, shell, session } from "electron";
 import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { join } from "node:path";
@@ -32,7 +33,10 @@ function csp(): string {
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     // As fotos dos convites moram no R2 — é a única origem remota permitida.
-    "img-src 'self' data: https://*.r2.dev",
+    // + as capas da busca de música (só a CDN de miniaturas do YouTube).
+    "img-src 'self' data: https://*.r2.dev https://i.ytimg.com",
+    // A prévia da música toca de um blob criado a partir dos bytes do main.
+    "media-src 'self' blob:",
     "object-src 'none'",
     // O preview é um <iframe> pro `next dev` local. Só o loopback: o app nunca
     // emoldura nada da internet. O preview do anfitrião na sessão coop entra
@@ -150,4 +154,5 @@ app.on("before-quit", () => {
   killAll();
   encerrarPreviews();
   pararVigia();
+  void limparPrevias();
 });

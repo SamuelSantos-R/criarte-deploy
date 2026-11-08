@@ -1,11 +1,19 @@
-import { type ReactElement } from "react";
-import { Wand2 } from "lucide-react";
+import { useState, type ReactElement } from "react";
+import { Languages, Wand2 } from "lucide-react";
 import { Button, Field, Input, Rule, Textarea } from "@/components/ui/primitives";
-import { ehAsset } from "@/components/CampoArquivo";
 import { rotulo } from "@/lib/secoes";
-import { sugestao } from "@/lib/ingles";
+import { traduzirTextos } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Caminho } from "@/components/JsonForm";
+import {
+  FORA,
+  gravar,
+  ler,
+  preencher,
+  temTexto,
+  traduzivel,
+  type LinguaTraducao,
+} from "../../../shared/traducao";
 
 /**
  * O convite em inglês, para os convidados de fora. Não é um segundo convite: é o
@@ -17,70 +25,6 @@ import type { Caminho } from "@/components/JsonForm";
  * Caixa vazia sai em português. Assim um convite meio traduzido nunca mostra um
  * buraco, e quem não tem convidado de fora não tem de passar por aqui.
  */
-
-/** Secções sem texto para o convidado ler: cores, medidas, ficheiros, controlo. */
-const FORA = new Set([
-  "en",
-  "fr",
-  "secoes",
-  "tema",
-  "medidas",
-  "ornamentos",
-  "molduras",
-  "assets",
-  "r2",
-  "data",
-  "noivos",
-  "envelope",
-  "musica",
-]);
-
-/** Chaves que guardam dados, não frases — mesmo sendo texto. */
-const CHAVES_DE_DADO =
-  /^(posicao|mapa|url|link|iban|cor|cores|fonte|icone|olha|foto|telefone|email|limite|prazo|hora|horario|zoom|aliancas|monograma|capa|arquivo|video)$/i;
-
-/** Texto que é hora, data, número ou cor: igual nos dois idiomas. */
-const SEM_PALAVRAS = /^[\d\s:.,h/\-–+#()%]*$/i;
-
-function traduzivel(chave: string, v: string): boolean {
-  if (v.trim() === "" || CHAVES_DE_DADO.test(chave) || ehAsset(chave, v)) return false;
-  // `entry.123` é o campo do Google Form do RSVP, não frase.
-  if (/^https?:\/\//.test(v) || /^entry\.\d+$/.test(v) || SEM_PALAVRAS.test(v)) return false;
-  return true;
-}
-
-function temTexto(v: unknown, chave = ""): boolean {
-  if (typeof v === "string") return traduzivel(chave, v);
-  if (Array.isArray(v)) return v.some((x) => temTexto(x, chave));
-  if (v && typeof v === "object") return Object.entries(v).some(([k, x]) => temTexto(x, k));
-  return false;
-}
-
-/**
- * Como o `setIn`, mas um índice numérico cria lista, não objeto: o site funde o
- * inglês por cima posição a posição, e `{ "0": … }` no lugar de `[…]` seria
- * deitado fora como formato errado. Buraco fica `null`, que no site é "igual ao
- * português".
- */
-function gravar(alvo: unknown, caminho: Caminho, valor: unknown): unknown {
-  if (caminho.length === 0) return valor;
-  const [chave, ...resto] = caminho;
-  if (typeof chave === "number") {
-    const lista = Array.isArray(alvo) ? alvo.slice() : [];
-    while (lista.length <= chave) lista.push(null);
-    lista[chave] = gravar(lista[chave], resto, valor);
-    return lista;
-  }
-  const obj = alvo && typeof alvo === "object" && !Array.isArray(alvo) ? (alvo as Record<string, unknown>) : {};
-  return { ...obj, [chave]: gravar(obj[chave], resto, valor) };
-}
-
-function ler(alvo: unknown, caminho: Caminho): unknown {
-  return caminho.reduce<unknown>(
-    (acc, k) => (acc && typeof acc === "object" ? (acc as Record<string, unknown>)[String(k)] : undefined),
-    alvo,
-  );
-}
 
 type Props = {
   pt: unknown;
@@ -178,43 +122,6 @@ function Nos({ pt, en, caminho, onChange }: Props): ReactElement {
   );
 }
 
-/**
- * Escreve nas caixas vazias a tradução das frases que todos os convites têm.
- * Nunca por cima do que já foi escrito: quem ajustou uma tradução não a perde.
- */
-function preencherPadrao(dados: Record<string, unknown>, lingua: LinguaTraducao): { en: Record<string, unknown>; quantos: number } {
-  let en: unknown = dados[lingua] ?? {};
-  let quantos = 0;
-  const andar = (pt: unknown, caminho: Caminho, chave: string): void => {
-    const atual = ler(en, caminho);
-    if (typeof pt === "string") {
-      if (!traduzivel(chave, pt) || (typeof atual === "string" && atual.trim() !== "")) return;
-      const s = sugestao(pt, lingua);
-      if (s) {
-        en = gravar(en, caminho, s);
-        quantos++;
-      }
-    } else if (Array.isArray(pt) && pt.length > 0 && pt.every((x) => typeof x === "string")) {
-      if (Array.isArray(atual) && atual.some((l) => typeof l === "string" && l.trim() !== "")) return;
-      const linhas = (pt as string[]).map((l) => sugestao(l, lingua));
-      // Linhas de uma frase só: ou se traduz tudo, ou nada — meia chamada em
-      // inglês e meia em português lia-se pior do que tudo em português.
-      if (linhas.every((l): l is string => l !== null)) {
-        en = gravar(en, caminho, linhas);
-        quantos++;
-      }
-    } else if (Array.isArray(pt)) {
-      pt.forEach((x, i) => andar(x, [...caminho, i], chave));
-    } else if (pt && typeof pt === "object") {
-      for (const [k, x] of Object.entries(pt)) andar(x, [...caminho, k], k);
-    }
-  };
-  for (const [secao, v] of Object.entries(dados)) {
-    if (!FORA.has(secao)) andar(v, [secao], secao);
-  }
-  return { en: en as Record<string, unknown>, quantos };
-}
-
 /** Quantos textos já têm inglês, para o aviso antes de publicar. */
 export function progressoIngles(dados: Record<string, unknown>, lingua: LinguaTraducao = "en"): { feitos: number; total: number } {
   let feitos = 0;
@@ -240,7 +147,7 @@ export function progressoIngles(dados: Record<string, unknown>, lingua: LinguaTr
   return { feitos, total };
 }
 
-export type LinguaTraducao = "en" | "fr";
+export type { LinguaTraducao };
 const NOME: Record<LinguaTraducao, string> = { en: "inglês", fr: "francês" };
 
 export function PainelIngles({
@@ -258,6 +165,8 @@ export function PainelIngles({
   const en = (dados[lingua] ?? {}) as Record<string, unknown>;
   const secoes = Object.entries(dados).filter(([k, v]) => !FORA.has(k) && temTexto(v, k));
   const { feitos, total } = progressoIngles(dados, lingua);
+  const [traduzindo, setTraduzindo] = useState(false);
+  const [falha, setFalha] = useState<string | null>(null);
 
   return (
     <div>
@@ -282,20 +191,43 @@ export function PainelIngles({
         <p className="flex-1 rounded-lg bg-cyan/10 px-3 py-2 text-[13px] leading-[1.6] text-text">
           Só os convidados da lista em {NOME[lingua]} (em <b>Convidados de fora</b>, na tela de
           publicar) veem o convite em {NOME[lingua]}. Caixa vazia sai em português. O vídeo do
-          envelope nesta língua escolhe-se lá também. {feitos}/{total} textos traduzidos.
+          envelope nesta língua escolhe-se lá também. Ao publicar, o que estiver vazio é traduzido sozinho. {feitos}/{total} textos traduzidos.
         </p>
-        <Button
-          variant="outline"
-          size="sm"
-          title="Traduz as frases que todos os convites têm (títulos, manual, cronograma). Não mexe no que já foi escrito."
-          onClick={() => {
-            const { en: novo, quantos } = preencherPadrao(dados, lingua);
-            if (quantos > 0) onChange(novo);
-          }}
-        >
-          <Wand2 size={13} /> Preencher o padrão
-        </Button>
+        <div className="flex flex-col items-stretch gap-1.5">
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={traduzindo}
+            title="Traduz todas as caixas vazias — as frases padrão e o resto (história, recados) pelo tradutor automático. Não mexe no que já foi escrito. A publicação faz isto sozinha se ficar algo por traduzir."
+            onClick={() => {
+              setTraduzindo(true);
+              setFalha(null);
+              void preencher(dados, lingua, (textos) => traduzirTextos(textos, lingua))
+                .then(({ bloco, quantos }) => {
+                  if (quantos > 0) onChange(bloco);
+                })
+                .catch(() => setFalha("O tradutor não respondeu. Tenta de novo."))
+                .finally(() => setTraduzindo(false));
+            }}
+          >
+            <Languages size={13} /> {traduzindo ? "A traduzir…" : "Traduzir tudo"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={traduzindo}
+            title="Traduz só as frases que todos os convites têm (títulos, manual, cronograma). Não mexe no que já foi escrito."
+            onClick={() => {
+              void preencher(dados, lingua).then(({ bloco, quantos }) => {
+                if (quantos > 0) onChange(bloco);
+              });
+            }}
+          >
+            <Wand2 size={13} /> Só o padrão
+          </Button>
+        </div>
       </div>
+      {falha && <p className="mb-4 rounded-lg bg-pencil/10 px-3 py-2 text-[12px] text-pencil">{falha}</p>}
       {secoes.map(([secao, v]) => (
         <div key={secao}>
           <Rule>{rotulo(secao)}</Rule>
